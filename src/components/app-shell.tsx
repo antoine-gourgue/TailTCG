@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import { signOut } from "@/app/actions";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { ThemeToggle, useTheme } from "@/components/theme-toggle";
 
 /* État de la sidebar : vit sur <html data-sidebar>, comme le thème */
 let sidebarListeners: Array<() => void> = [];
@@ -75,6 +75,7 @@ function isActive(href: string, pathname: string) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { theme, toggle: toggleTheme } = useTheme();
   const sidebar = useSyncExternalStore(
     subscribeSidebar,
     getSidebar,
@@ -100,12 +101,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <>
       {/* ——— Sidebar (desktop) ——— */}
       <aside className="app-sidebar fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-edge bg-surface md:flex">
-        <div className={`flex h-16 items-center gap-2.5 ${rail ? "justify-center px-0" : "px-5"}`}>
-          <Pokeball />
-          <span className="nav-label display text-[15px]">Pokédex</span>
+        <div
+          className={`flex items-center ${
+            rail ? "h-auto flex-col gap-2 py-4" : "h-16 justify-between pl-5 pr-3"
+          }`}
+        >
+          <Link href="/" className="flex items-center gap-2.5">
+            <Pokeball />
+            <span className="nav-label display text-[15px]">Pokédex</span>
+          </Link>
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            title={rail ? "Déplier" : "Replier"}
+            aria-label={rail ? "Déplier la navigation" : "Replier la navigation"}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-faint transition hover:bg-raised hover:text-foreground"
+          >
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`transition-transform ${rail ? "rotate-180" : ""}`}
+              aria-hidden
+            >
+              <path d="m15 6-6 6 6 6" />
+            </svg>
+          </button>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-1 px-3 pt-2">
+        <nav className="flex flex-1 flex-col gap-1 px-3 pt-1">
           {NAV.map((item) => {
             const active = isActive(item.href, pathname);
             return (
@@ -128,47 +157,47 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className={`flex flex-col gap-1 border-t border-edge px-3 py-3 ${rail ? "items-center" : ""}`}>
-          <div className={`flex items-center gap-1 ${rail ? "flex-col" : ""}`}>
-            <ThemeToggle />
-            <form action={signOut}>
-              <button
-                type="submit"
-                title="Déconnexion"
-                aria-label="Déconnexion"
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-edge text-muted transition hover:border-edge-strong hover:text-foreground"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-                </svg>
-              </button>
-            </form>
-          </div>
+        <div className="flex flex-col gap-1 border-t border-edge px-3 py-3">
           <button
             type="button"
-            onClick={toggleSidebar}
-            title={rail ? "Déplier la navigation" : "Replier la navigation"}
-            aria-label={rail ? "Déplier la navigation" : "Replier la navigation"}
-            className={`mt-1 flex h-8 items-center justify-center gap-2 rounded-lg text-faint transition hover:bg-raised hover:text-foreground ${
-              rail ? "w-8" : "w-full"
+            onClick={toggleTheme}
+            title={rail ? (theme === "dark" ? "Thème clair" : "Thème sombre") : undefined}
+            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted transition hover:bg-raised hover:text-foreground ${
+              rail ? "justify-center" : ""
             }`}
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={`transition-transform ${rail ? "rotate-180" : ""}`}
-              aria-hidden
-            >
-              <path d="m15 6-6 6 6 6" />
-            </svg>
-            <span className="nav-label text-xs">Replier</span>
+            <span className="shrink-0">
+              {theme === "dark" ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4m11.4-11.4 1.4-1.4" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+                </svg>
+              )}
+            </span>
+            <span className="nav-label">
+              {theme === "dark" ? "Thème clair" : "Thème sombre"}
+            </span>
           </button>
+          <form action={signOut}>
+            <button
+              type="submit"
+              title={rail ? "Déconnexion" : undefined}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted transition hover:bg-raised hover:text-foreground ${
+                rail ? "justify-center" : ""
+              }`}
+            >
+              <span className="shrink-0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+                </svg>
+              </span>
+              <span className="nav-label">Déconnexion</span>
+            </button>
+          </form>
         </div>
       </aside>
 

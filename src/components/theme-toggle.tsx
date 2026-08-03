@@ -17,7 +17,7 @@ function getTheme(): "dark" | "light" {
   return document.documentElement.dataset.theme === "light" ? "light" : "dark";
 }
 
-export function ThemeToggle() {
+export function useTheme() {
   const theme = useSyncExternalStore(subscribe, getTheme, () => "dark" as const);
 
   function toggle() {
@@ -28,6 +28,12 @@ export function ThemeToggle() {
     } catch {}
     listeners.forEach((l) => l());
   }
+
+  return { theme, toggle };
+}
+
+export function ThemeToggle() {
+  const { theme, toggle } = useTheme();
 
   return (
     <button
