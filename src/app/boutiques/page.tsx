@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { SiteHeader } from "@/components/site-header";
+import { AppShell } from "@/components/app-shell";
 import { ShopsClient, type SourceWithStats } from "@/components/shops-client";
 
 export const metadata = {
@@ -41,13 +41,14 @@ export default async function BoutiquesPage() {
 
   return (
     <>
-      <SiteHeader />
+      <AppShell>
       <main className="mx-auto max-w-6xl px-4 py-8">
         <h1 className="mb-6 display text-3xl font-bold tracking-tight">
           Boutiques &amp; sites
         </h1>
         <ShopsClient sources={withStats} />
       </main>
+      </AppShell>
     </>
   );
 }

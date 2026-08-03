@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatEur } from "@/lib/domain";
-import { SiteHeader } from "@/components/site-header";
+import { AppShell } from "@/components/app-shell";
 import { ItemForm } from "@/components/item-form";
 import { DeleteItemButton } from "@/components/delete-item-button";
 import { PhotoGallery, type GalleryPhoto } from "@/components/photo-gallery";
@@ -58,7 +58,7 @@ export default async function CartePage({
 
   return (
     <>
-      <SiteHeader />
+      <AppShell>
       <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8">
         <Link
           href="/"
@@ -160,6 +160,7 @@ export default async function CartePage({
           </div>
         </div>
       </main>
+      </AppShell>
     </>
   );
 }

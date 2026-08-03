@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { SiteHeader } from "@/components/site-header";
+import { AppShell } from "@/components/app-shell";
 import {
   CollectionClient,
   type CollectionItem,
@@ -35,7 +35,7 @@ export default async function Home({
 
   return (
     <>
-      <SiteHeader />
+      <AppShell>
       <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="display text-3xl font-bold tracking-tight">Collection</h1>
@@ -49,6 +49,7 @@ export default async function Home({
           initialSource={initialSource ?? ""}
         />
       </main>
+      </AppShell>
     </>
   );
 }

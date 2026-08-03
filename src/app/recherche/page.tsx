@@ -1,4 +1,4 @@
-import { SiteHeader } from "@/components/site-header";
+import { AppShell } from "@/components/app-shell";
 import { SearchClient } from "./search-client";
 
 export const metadata = {
@@ -8,7 +8,7 @@ export const metadata = {
 export default function RecherchePage() {
   return (
     <>
-      <SiteHeader />
+      <AppShell>
       <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8">
         <h1 className="display mb-1 text-3xl font-bold tracking-tight">
           Ajouter une carte
@@ -19,6 +19,7 @@ export default function RecherchePage() {
         </p>
         <SearchClient />
       </main>
+      </AppShell>
     </>
   );
 }

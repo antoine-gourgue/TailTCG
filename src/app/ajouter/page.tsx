@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCard } from "@/lib/tcgdex";
 import { CardImage } from "@/components/card-image";
-import { SiteHeader } from "@/components/site-header";
+import { AppShell } from "@/components/app-shell";
 import { ItemForm } from "@/components/item-form";
 import type { SourceOption } from "@/app/items/actions";
 
@@ -33,7 +33,7 @@ export default async function AjouterPage({
 
   return (
     <>
-      <SiteHeader />
+      <AppShell>
       <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8">
         <h1 className="display mb-6 text-3xl font-bold tracking-tight">
           Ajouter une carte
@@ -91,6 +91,7 @@ export default async function AjouterPage({
           </div>
         </div>
       </main>
+      </AppShell>
     </>
   );
 }

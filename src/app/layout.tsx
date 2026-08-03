@@ -1,19 +1,14 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
+import { Instrument_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const sans = Instrument_Sans({
+  variable: "--font-sans-var",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
+const mono = Geist_Mono({
   variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-const display = Bricolage_Grotesque({
-  variable: "--font-display",
   subsets: ["latin"],
 });
 
@@ -22,8 +17,9 @@ export const metadata: Metadata = {
   description: "Ma collection de cartes Pokémon",
 };
 
-// Applique le thème avant le premier rendu pour éviter le flash
-const themeInit = `(function(){try{var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark"){t=window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"}document.documentElement.dataset.theme=t}catch(e){}})()`;
+// Applique thème (sombre par défaut) et état de la sidebar avant le premier
+// rendu, pour éviter tout flash
+const bootScript = `(function(){try{var t=localStorage.getItem("theme");document.documentElement.dataset.theme=(t==="light")?"light":"dark";var s=localStorage.getItem("sidebar");if(s==="rail"){document.documentElement.dataset.sidebar="rail"}}catch(e){}})()`;
 
 export default function RootLayout({
   children,
@@ -35,10 +31,10 @@ export default function RootLayout({
       lang="fr"
       data-theme="dark"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${display.variable} h-full antialiased`}
+      className={`${sans.variable} ${mono.variable} h-full antialiased`}
     >
       <body className="relative min-h-full flex flex-col">
-        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        <script dangerouslySetInnerHTML={{ __html: bootScript }} />
         {children}
       </body>
     </html>

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { fetchSetsIndex } from "@/lib/tcgdex";
 import { formatEur, CONDITIONS } from "@/lib/domain";
-import { SiteHeader } from "@/components/site-header";
+import { AppShell } from "@/components/app-shell";
 
 export const metadata = {
   title: "Statistiques — Pokédex Collection",
@@ -205,7 +205,7 @@ export default async function StatsPage() {
 
   return (
     <>
-      <SiteHeader />
+      <AppShell>
       <main className="mx-auto max-w-6xl px-4 py-8">
         <h1 className="mb-6 display text-3xl font-bold tracking-tight">
           Statistiques
@@ -352,6 +352,7 @@ export default async function StatsPage() {
           </div>
         )}
       </main>
+      </AppShell>
     </>
   );
 }
