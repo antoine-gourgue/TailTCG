@@ -113,6 +113,7 @@ export default async function AjouterPage({
                 condition: null,
                 quantity: 1,
                 purchase_price: null,
+                manual_price: null,
                 purchase_date: null,
                 source_id: null,
                 cardmarket_url: cardmarketSearchUrl(card.name),

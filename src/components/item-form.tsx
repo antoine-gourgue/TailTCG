@@ -16,6 +16,7 @@ export type ItemDefaults = {
   condition: string | null;
   quantity: number;
   purchase_price: number | null;
+  manual_price: number | null;
   purchase_date: string | null;
   source_id: string | null;
   cardmarket_url: string | null;
@@ -212,7 +213,7 @@ export function ItemForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div>
           <label htmlFor="purchase_date" className={labelCls}>
             Date d&apos;achat
@@ -224,6 +225,23 @@ export function ItemForm({
             defaultValue={defaults.purchase_date ?? ""}
             className={`${inputCls} num`}
           />
+        </div>
+        <div>
+          <label htmlFor="manual_price" className={labelCls}>
+            Cote perso (€)
+          </label>
+          <input
+            id="manual_price"
+            type="text"
+            inputMode="decimal"
+            name="manual_price"
+            placeholder="auto (Cardmarket)"
+            defaultValue={defaults.manual_price ?? ""}
+            className={`${inputCls} num`}
+          />
+          <p className="mt-1 text-[11px] text-muted">
+            Remplace la cote Cardmarket. Vide = automatique.
+          </p>
         </div>
         <div>
           <label htmlFor="cardmarket_url" className={labelCls}>

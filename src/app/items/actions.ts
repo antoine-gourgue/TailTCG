@@ -40,11 +40,18 @@ function parseItemFields(formData: FormData): {
     return { error: "Prix payé invalide." };
   }
 
+  const manualRaw = str(formData, "manual_price").replace(",", ".");
+  const manual_price = manualRaw === "" ? null : Number.parseFloat(manualRaw);
+  if (manual_price !== null && (Number.isNaN(manual_price) || manual_price < 0)) {
+    return { error: "Cote perso invalide." };
+  }
+
   return {
     fields: {
       condition,
       quantity,
       purchase_price,
+      manual_price,
       purchase_date: strOrNull(formData, "purchase_date"),
       card_type: strOrNull(formData, "card_type"),
       language: str(formData, "language") || "FR",

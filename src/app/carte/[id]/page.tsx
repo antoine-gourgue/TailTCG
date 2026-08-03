@@ -107,6 +107,11 @@ export default async function CartePage({
                 <span className="num text-base font-semibold text-foreground">
                   {formatEur(item.current_price)}
                 </span>
+                {item.manual_price != null && (
+                  <span className="ml-1 text-xs" title="Cote saisie à la main">
+                    ✎ perso
+                  </span>
+                )}
               </p>
               <p className="text-muted">
                 Plus-value{" "}
@@ -160,6 +165,7 @@ export default async function CartePage({
                 condition: item.condition,
                 quantity: item.quantity ?? 1,
                 purchase_price: item.purchase_price,
+                manual_price: item.manual_price,
                 purchase_date: item.purchase_date,
                 source_id: item.source_id,
                 cardmarket_url: item.cardmarket_url,

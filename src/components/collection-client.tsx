@@ -18,6 +18,7 @@ export type CollectionItem = {
   quantity: number;
   purchase_price: number | null;
   purchase_date: string | null;
+  manual_price: number | null;
   source_id: string | null;
   graded: boolean;
   grade: string | null;
@@ -321,7 +322,12 @@ export function CollectionClient({
                       {formatEur(item.purchase_price)}
                     </span>
                     {" → "}
-                    <span className="num">{formatEur(item.current_price)}</span>{" "}
+                    <span className="num">
+                      {formatEur(item.current_price)}
+                      {item.manual_price != null && (
+                        <span title="Cote saisie à la main"> ✎</span>
+                      )}
+                    </span>{" "}
                     <GainText value={item.gain} />
                   </p>
                 </div>
@@ -365,7 +371,12 @@ export function CollectionClient({
                   <td className="px-3 py-2 text-muted">{item.card_type ?? "—"}</td>
                   <td className="num px-3 py-2">{item.quantity}</td>
                   <td className="num px-3 py-2 text-right">{formatEur(item.purchase_price)}</td>
-                  <td className="num px-3 py-2 text-right">{formatEur(item.current_price)}</td>
+                  <td className="num px-3 py-2 text-right">
+                    {formatEur(item.current_price)}
+                    {item.manual_price != null && (
+                      <span title="Cote saisie à la main"> ✎</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-right">
                     <GainText value={item.gain} />
                   </td>

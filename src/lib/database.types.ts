@@ -97,6 +97,7 @@ export type Database = {
           image_url: string
           language: string
           local_id: string
+          manual_price: number | null
           notes: string | null
           owner_id: string
           purchase_date: string | null
@@ -119,6 +120,7 @@ export type Database = {
           image_url: string
           language?: string
           local_id: string
+          manual_price?: number | null
           notes?: string | null
           owner_id?: string
           purchase_date?: string | null
@@ -141,6 +143,7 @@ export type Database = {
           image_url?: string
           language?: string
           local_id?: string
+          manual_price?: number | null
           notes?: string | null
           owner_id?: string
           purchase_date?: string | null
@@ -244,6 +247,7 @@ export type Database = {
           image_url: string | null
           language: string | null
           local_id: string | null
+          manual_price: number | null
           notes: string | null
           owner_id: string | null
           purchase_date: string | null
