@@ -1,26 +1,104 @@
 @import "tailwindcss";
 
+/* Classeur de collectionneur : fond sombre et neutre, l'interface se tait,
+   les illustrations des cartes ressortent. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #121215;
+  --surface: #1a1a1f;
+  --border: #2a2a31;
+  --foreground: #e8e8ec;
+  --muted: #9b9ba6;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-edge: var(--border);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-display: var(--font-display);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* Montants et numéros de carte : chiffres alignés en colonne */
+.num {
+  font-family: var(--font-geist-mono), monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Vignette carte : ombre portée, inclinaison au survol --- */
+.card-tile {
+  position: relative;
+  border-radius: 4.5% / 3.5%;
+  overflow: hidden;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    0 6px 16px rgba(0, 0, 0, 0.35);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+  transform-origin: center 70%;
+}
+
+.card-tile:hover {
+  transform: translateY(-6px) rotate(1.4deg) scale(1.025);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.55),
+    0 18px 36px rgba(0, 0, 0, 0.5);
+}
+
+/* --- L'élément signature : le reflet holographique qui balaie la carte --- */
+.card-tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: conic-gradient(
+    from 115deg at 50% 50%,
+    transparent 0deg,
+    rgba(120, 230, 255, 0.16) 40deg,
+    rgba(255, 120, 220, 0.2) 80deg,
+    rgba(255, 235, 130, 0.16) 120deg,
+    transparent 160deg,
+    transparent 360deg
+  );
+  filter: blur(6px);
+  transform: translateX(-70%) skewX(-12deg) scale(1.6);
+  transition: opacity 0.2s ease;
+}
+
+.card-tile:hover::after {
+  opacity: 1;
+  animation: holo-sweep 1.1s ease-out forwards;
+}
+
+@keyframes holo-sweep {
+  from {
+    transform: translateX(-70%) skewX(-12deg) scale(1.6);
+  }
+  to {
+    transform: translateX(70%) skewX(-12deg) scale(1.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-tile,
+  .card-tile::after {
+    transition: none;
+    animation: none;
+  }
+  .card-tile:hover {
+    transform: none;
+  }
+  .card-tile:hover::after {
+    opacity: 0;
+  }
 }

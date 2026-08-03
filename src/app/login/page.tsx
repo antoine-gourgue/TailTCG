@@ -10,9 +10,9 @@ export default function LoginPage() {
   );
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-4">
+    <main className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <h1 className="mb-2 text-center text-2xl font-semibold text-neutral-100">
+        <h1 className="mb-2 text-center font-[family-name:var(--font-display)] text-2xl font-semibold text-neutral-100">
           Pokédex Collection
         </h1>
         <p className="mb-8 text-center text-sm text-neutral-400">
