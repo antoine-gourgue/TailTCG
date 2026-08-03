@@ -2,8 +2,21 @@
 
 import { useState } from "react";
 
-// Image de carte TCGdex avec secours : si l'asset FR est en 404, on tente
-// la version EN du même chemin, sinon placeholder.
+// Image de carte TCGdex avec secours : si l'asset est en 404, on tente le
+// même chemin dans les autres langues, sinon placeholder.
+const LANG_CASCADE = ["fr", "en", "de", "es", "it", "ja"];
+
+function nextLangSrc(src: string): string | null {
+  const match = src.match(/assets\.tcgdex\.net\/([a-z-]+)\//);
+  if (!match) return null;
+  const idx = LANG_CASCADE.indexOf(match[1]);
+  if (idx === -1 || idx + 1 >= LANG_CASCADE.length) return null;
+  return src.replace(
+    `assets.tcgdex.net/${match[1]}/`,
+    `assets.tcgdex.net/${LANG_CASCADE[idx + 1]}/`
+  );
+}
+
 export function CardImage({
   base,
   alt,
@@ -36,13 +49,7 @@ export function CardImage({
       alt={alt}
       loading="lazy"
       className={className}
-      onError={() => {
-        if (src.includes("/fr/")) {
-          setSrc(src.replace("/fr/", "/en/"));
-        } else {
-          setSrc(null);
-        }
-      }}
+      onError={() => setSrc(nextLangSrc(src))}
     />
   );
 }

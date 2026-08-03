@@ -86,12 +86,37 @@ export type TcgdexCard = {
   pricing?: { cardmarket?: CardmarketPricing };
 };
 
+/** Langues tentées dans l'ordre quand l'image FR manque */
+const FALLBACK_LANGS = ["en", "de", "es", "it", "ja"] as const;
+
+/** Cherche l'image d'une carte dans les autres langues, première trouvée */
+async function findImageInOtherLangs(cardId: string): Promise<string | null> {
+  for (const lang of FALLBACK_LANGS) {
+    try {
+      const res = await fetch(
+        `https://api.tcgdex.net/v2/${lang}/cards/${encodeURIComponent(cardId)}`,
+        { next: { revalidate: DAY_SECONDS } }
+      );
+      if (!res.ok) continue;
+      const c: TcgdexCardBrief = await res.json();
+      if (c.image) return c.image;
+    } catch {
+      // langue suivante
+    }
+  }
+  return null;
+}
+
 export async function getCard(id: string): Promise<TcgdexCard | null> {
   const res = await fetch(`${TCGDEX_BASE}/cards/${encodeURIComponent(id)}`, {
     next: { revalidate: DAY_SECONDS },
   });
   if (!res.ok) return null;
-  return res.json();
+  const card: TcgdexCard = await res.json();
+  if (!card.image) {
+    card.image = (await findImageInOtherLangs(id)) ?? undefined;
+  }
+  return card;
 }
 
 /** L'API ne fournit pas d'URL Cardmarket : lien de recherche pré-rempli, éditable */
@@ -135,22 +160,12 @@ export async function searchCards(query: string): Promise<CardSearchResult[]> {
     };
   });
 
-  // Certaines cartes n'ont pas d'image française : on récupère l'anglaise
-  // (fiches EN mises en cache 24 h, 20 max par recherche)
+  // Certaines cartes n'ont pas d'image française : cascade sur les autres
+  // langues (fiches mises en cache 24 h, 20 cartes max par recherche)
   const missing = results.filter((r) => !r.image).slice(0, 20);
   await Promise.all(
     missing.map(async (r) => {
-      try {
-        const res = await fetch(
-          `https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(r.id)}`,
-          { next: { revalidate: DAY_SECONDS } }
-        );
-        if (!res.ok) return;
-        const c: TcgdexCardBrief = await res.json();
-        if (c.image) r.image = c.image;
-      } catch {
-        // tant pis, placeholder côté client
-      }
+      r.image = await findImageInOtherLangs(r.id);
     })
   );
 
