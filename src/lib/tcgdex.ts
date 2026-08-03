@@ -63,6 +63,7 @@ export type CardmarketPricing = {
   avg30?: number | null;
   "trend-holo"?: number | null;
   "avg30-holo"?: number | null;
+  "low-holo"?: number | null;
 };
 
 export type TcgdexCard = {

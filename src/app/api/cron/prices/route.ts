@@ -39,13 +39,22 @@ export async function GET(request: NextRequest) {
         skipped++;
         continue;
       }
-      const card: { pricing?: { cardmarket?: CardmarketPricing } } =
-        await res.json();
+      const card: {
+        pricing?: { cardmarket?: CardmarketPricing };
+        variants?: { normal?: boolean; holo?: boolean };
+      } = await res.json();
       const cm = card.pricing?.cardmarket;
-      // Cartes holo anciennes : seul trend-holo est renseigné
-      const trend = cm?.trend ?? cm?.["trend-holo"] ?? null;
-      const low = cm?.low ?? null;
-      const avg30 = cm?.avg30 ?? cm?.["avg30-holo"] ?? null;
+      // Carte qui n'existe qu'en holo (Prime, EX…) : la série -holo est la
+      // cote pertinente, `trend` mélange toutes les versions
+      const holoOnly = card.variants?.holo === true && card.variants?.normal === false;
+      const trend =
+        (holoOnly ? cm?.["trend-holo"] ?? cm?.trend : cm?.trend ?? cm?.["trend-holo"]) ??
+        null;
+      const low =
+        (holoOnly ? cm?.["low-holo"] ?? cm?.low : cm?.low ?? cm?.["low-holo"]) ?? null;
+      const avg30 =
+        (holoOnly ? cm?.["avg30-holo"] ?? cm?.avg30 : cm?.avg30 ?? cm?.["avg30-holo"]) ??
+        null;
 
       if (trend == null && low == null && avg30 == null) {
         skipped++;
