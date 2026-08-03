@@ -8,6 +8,7 @@ import {
   SearchIcon,
   MapPin,
   BarChart3,
+  Settings,
   Sun,
   Moon,
   LogOut,
@@ -47,6 +48,7 @@ const NAV = [
   { href: "/recherche", label: "Ajouter", Icon: SearchIcon },
   { href: "/boutiques", label: "Boutiques", Icon: MapPin },
   { href: "/stats", label: "Stats", Icon: BarChart3 },
+  { href: "/parametres", label: "Paramètres", Icon: Settings },
 ];
 
 function isActive(href: string, pathname: string) {
