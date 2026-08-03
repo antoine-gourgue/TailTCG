@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { LayoutGrid, List, ArrowUp, ArrowDown } from "lucide-react";
 import { formatEur } from "@/lib/domain";
 import { CardImage } from "@/components/card-image";
+import { Logo } from "@/components/logo";
 
 export type CollectionItem = {
   id: string;
@@ -159,7 +160,7 @@ export function CollectionClient({
   if (items.length === 0) {
     return (
       <div className="panel rise-in flex flex-col items-center gap-3 p-12 text-center">
-        <span className="text-4xl">🃏</span>
+        <Logo variant="mark" size={56} />
         <p className="display text-xl font-semibold">Ton classeur est vide</p>
         <p className="max-w-sm text-sm text-muted">
           Cherche une carte par son nom, l&apos;image et le set se remplissent

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ImageOff } from "lucide-react";
 
 // Image de carte TCGdex avec secours : si l'asset est en 404, on tente le
 // même chemin dans les autres langues, sinon placeholder.
@@ -35,8 +36,8 @@ export function CardImage({
 
   if (!src) {
     return (
-      <div className="flex h-full w-full flex-col items-center justify-center gap-2 border border-edge p-3 text-center">
-        <span className="text-2xl">🃏</span>
+      <div className="flex h-full w-full flex-col items-center justify-center gap-2 border border-edge p-3 text-center text-faint">
+        <ImageOff size={22} strokeWidth={1.6} aria-hidden />
         <span className="text-xs text-muted">Pas d&apos;image</span>
       </div>
     );
