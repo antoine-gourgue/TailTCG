@@ -73,7 +73,7 @@ export default async function AjouterPage({
               )}
               <div className="mt-3 rounded-lg border border-edge p-3 text-sm">
                 <p className="mb-1 text-xs uppercase tracking-wide text-muted">
-                  Cote Cardmarket du jour
+                  Tendance Cardmarket (indicatif)
                 </p>
                 <p>
                   Tendance : <span className="num">{formatEur(trend)}</span>

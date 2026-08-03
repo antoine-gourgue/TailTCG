@@ -219,7 +219,7 @@ export default async function StatsPage() {
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <StatTile label="Cartes" value={String(count)} />
               <StatTile label="Total investi" value={formatEur(invested)} />
-              <StatTile label="Valeur actuelle" value={formatEur(hasValue ? value : null)} />
+              <StatTile label="Valeur estimée" value={formatEur(hasValue ? value : null)} />
               <StatTile
                 label="Plus-value"
                 value={gain == null ? "—" : `${gain > 0 ? "+" : ""}${formatEur(gain)}`}

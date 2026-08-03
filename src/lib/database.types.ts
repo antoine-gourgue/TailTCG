@@ -248,6 +248,7 @@ export type Database = {
           language: string | null
           local_id: string | null
           manual_price: number | null
+          market_trend: number | null
           notes: string | null
           owner_id: string | null
           purchase_date: string | null

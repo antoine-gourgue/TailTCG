@@ -103,16 +103,22 @@ export default async function CartePage({
                 </span>
               </p>
               <p className="text-muted">
-                Cote actuelle{" "}
+                Valeur estimée{" "}
                 <span className="num text-base font-semibold text-foreground">
                   {formatEur(item.current_price)}
                 </span>
-                {item.manual_price != null && (
-                  <span className="ml-1 text-xs" title="Cote saisie à la main">
-                    ✎ perso
-                  </span>
-                )}
               </p>
+              {item.market_trend != null && (
+                <p
+                  className="text-muted"
+                  title="Tendance Cardmarket, tous états confondus — indicatif, n'entre pas dans tes totaux"
+                >
+                  Tendance marché{" "}
+                  <span className="num text-base text-foreground/70">
+                    {formatEur(item.market_trend)}
+                  </span>
+                </p>
+              )}
               <p className="text-muted">
                 Plus-value{" "}
                 <span
@@ -147,9 +153,13 @@ export default async function CartePage({
             </div>
 
             <section className="mb-8">
-              <h2 className="mb-3 font-[family-name:var(--font-display)] text-xl font-semibold">
-                Évolution de la cote
+              <h2 className="mb-1 font-[family-name:var(--font-display)] text-xl font-semibold">
+                Tendance Cardmarket
               </h2>
+              <p className="mb-3 text-xs text-muted">
+                Indicatif : tendance du marché tous états confondus, relevée
+                chaque matin. N&apos;entre pas dans tes totaux.
+              </p>
               <PriceHistoryChart points={pricePoints ?? []} />
             </section>
 

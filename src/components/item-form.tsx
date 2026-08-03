@@ -228,19 +228,19 @@ export function ItemForm({
         </div>
         <div>
           <label htmlFor="manual_price" className={labelCls}>
-            Cote perso (€)
+            Valeur estimée (€)
           </label>
           <input
             id="manual_price"
             type="text"
             inputMode="decimal"
             name="manual_price"
-            placeholder="auto (Cardmarket)"
+            placeholder="ex. 90"
             defaultValue={defaults.manual_price ?? ""}
             className={`${inputCls} num`}
           />
           <p className="mt-1 text-[11px] text-muted">
-            Remplace la cote Cardmarket. Vide = automatique.
+            Ton estimation de cet exemplaire (état, gradation…).
           </p>
         </div>
         <div>

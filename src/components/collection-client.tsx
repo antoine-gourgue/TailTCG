@@ -166,7 +166,7 @@ export function CollectionClient({
             </span>
           </p>
           <p className="text-sm text-muted">
-            Valeur actuelle{" "}
+            Valeur estimée{" "}
             <span className="num text-lg font-semibold text-foreground">
               {formatEur(summary.value)}
             </span>
@@ -256,7 +256,7 @@ export function CollectionClient({
           <option value="date">Tri : date d&apos;achat</option>
           <option value="name">Tri : nom</option>
           <option value="paid">Tri : prix payé</option>
-          <option value="price">Tri : cote</option>
+          <option value="price">Tri : valeur estimée</option>
           <option value="gain">Tri : plus-value</option>
         </select>
         <button
@@ -322,12 +322,7 @@ export function CollectionClient({
                       {formatEur(item.purchase_price)}
                     </span>
                     {" → "}
-                    <span className="num">
-                      {formatEur(item.current_price)}
-                      {item.manual_price != null && (
-                        <span title="Cote saisie à la main"> ✎</span>
-                      )}
-                    </span>{" "}
+                    <span className="num">{formatEur(item.current_price)}</span>{" "}
                     <GainText value={item.gain} />
                   </p>
                 </div>
@@ -347,7 +342,7 @@ export function CollectionClient({
                 <th className="px-3 py-2 font-medium">Type</th>
                 <th className="px-3 py-2 font-medium">Qté</th>
                 <th className="px-3 py-2 text-right font-medium">Payé</th>
-                <th className="px-3 py-2 text-right font-medium">Cote</th>
+                <th className="px-3 py-2 text-right font-medium">Estimé</th>
                 <th className="px-3 py-2 text-right font-medium">+/-</th>
                 <th className="px-3 py-2 font-medium">Source</th>
               </tr>
@@ -371,12 +366,7 @@ export function CollectionClient({
                   <td className="px-3 py-2 text-muted">{item.card_type ?? "—"}</td>
                   <td className="num px-3 py-2">{item.quantity}</td>
                   <td className="num px-3 py-2 text-right">{formatEur(item.purchase_price)}</td>
-                  <td className="num px-3 py-2 text-right">
-                    {formatEur(item.current_price)}
-                    {item.manual_price != null && (
-                      <span title="Cote saisie à la main"> ✎</span>
-                    )}
-                  </td>
+                  <td className="num px-3 py-2 text-right">{formatEur(item.current_price)}</td>
                   <td className="px-3 py-2 text-right">
                     <GainText value={item.gain} />
                   </td>
