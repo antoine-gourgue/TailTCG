@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { FileJson, FileSpreadsheet, ShieldOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app-shell";
+import { SetPasswordForm } from "@/components/set-password-form";
 import { signOutEverywhere } from "./actions";
 
 export const metadata = {
@@ -56,6 +57,19 @@ export default async function ParametresPage() {
               Révoque toutes les sessions actives (ordinateur, téléphone…). Tu
               devras redemander un lien magique partout.
             </p>
+          </section>
+
+          {/* Connexion */}
+          <section className="panel p-5">
+            <h2 className="display mb-1 text-base font-semibold">
+              Mot de passe
+            </h2>
+            <p className="mb-4 text-sm text-muted">
+              Définis un mot de passe pour te connecter instantanément, sans
+              email ni limite d&apos;envois. Le lien magique reste disponible en
+              secours.
+            </p>
+            <SetPasswordForm />
           </section>
 
           {/* Sauvegardes */}
