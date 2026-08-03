@@ -8,7 +8,12 @@ import {
   type SourceRef,
 } from "@/components/collection-client";
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ source?: string }>;
+}) {
+  const { source: initialSource } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -46,6 +51,7 @@ export default async function Home() {
         <CollectionClient
           items={(items ?? []) as CollectionItem[]}
           sources={(sources ?? []) as SourceRef[]}
+          initialSource={initialSource ?? ""}
         />
       </main>
     </>

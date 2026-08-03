@@ -89,6 +89,16 @@ body {
   }
 }
 
+/* Marqueur boutique sur la carte Leaflet */
+.shop-pin {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #ef4444;
+  border: 2.5px solid #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .card-tile,
   .card-tile::after {

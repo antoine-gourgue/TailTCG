@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { geocodeAddress } from "@/lib/geocode";
 import { CONDITION_CODES, type ConditionCode } from "@/lib/domain";
 import type { Database } from "@/lib/database.types";
 
@@ -145,15 +146,24 @@ export async function createSource(input: {
     return { error: "Type de source invalide." };
   }
 
+  const address = input.address?.trim() || null;
+  const city = input.city?.trim() || null;
+
+  // Boutique physique : géocodée à l'enregistrement (Nominatim, 1 requête)
+  const coords =
+    input.kind === "shop" ? await geocodeAddress(address, city) : null;
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("sources")
     .insert({
       name,
       kind: input.kind,
-      address: input.address?.trim() || null,
-      city: input.city?.trim() || null,
+      address,
+      city,
       url: input.url?.trim() || null,
+      lat: coords?.lat ?? null,
+      lng: coords?.lng ?? null,
     })
     .select("id, name, kind, city, url")
     .single();

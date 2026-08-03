@@ -4,6 +4,7 @@ import { signOut } from "@/app/actions";
 const links = [
   { href: "/", label: "Collection" },
   { href: "/recherche", label: "Ajouter" },
+  { href: "/boutiques", label: "Boutiques" },
 ];
 
 export function SiteHeader() {

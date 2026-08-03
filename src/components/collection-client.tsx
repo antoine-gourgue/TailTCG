@@ -47,16 +47,18 @@ function GainText({ value }: { value: number | null }) {
 export function CollectionClient({
   items,
   sources,
+  initialSource = "",
 }: {
   items: CollectionItem[];
   sources: SourceRef[];
+  initialSource?: string;
 }) {
   const [view, setView] = useState<"grid" | "table">("grid");
   const [fSet, setFSet] = useState("");
   const [fCondition, setFCondition] = useState("");
   const [fType, setFType] = useState("");
   const [fLanguage, setFLanguage] = useState("");
-  const [fSource, setFSource] = useState("");
+  const [fSource, setFSource] = useState(initialSource);
   const [fGraded, setFGraded] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(false);
