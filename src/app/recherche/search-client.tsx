@@ -63,7 +63,7 @@ export function SearchClient() {
         onChange={(e) => handleChange(e.target.value)}
         placeholder="Nom de la carte… (ex. aligatueur)"
         autoFocus
-        className="mb-8 w-full max-w-md rounded-lg border border-edge bg-surface px-4 py-3 text-foreground placeholder:text-muted focus:border-neutral-500 focus:outline-none"
+        className="field mb-8 max-w-md !px-4 !py-3 !text-base"
       />
 
       {status === "idle" && (
@@ -78,14 +78,15 @@ export function SearchClient() {
           {Array.from({ length: 10 }, (_, i) => (
             <div
               key={i}
-              className="aspect-[63/88] animate-pulse rounded-lg bg-surface"
+              className="aspect-[63/88] animate-pulse rounded-xl bg-surface"
+              style={{ animationDelay: `${i * 60}ms` }}
             />
           ))}
         </div>
       )}
 
       {status === "error" && (
-        <p className="text-sm text-red-400">
+        <p className="text-sm text-loss">
           TCGdex est injoignable, réessaie dans un instant.
         </p>
       )}
@@ -102,22 +103,25 @@ export function SearchClient() {
             <span className="num">{cards.length}</span> carte
             {cards.length > 1 ? "s" : ""} trouvée{cards.length > 1 ? "s" : ""}
           </p>
-          <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+          <ul className="rise-in grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {cards.map((card) => (
               <li key={card.id}>
-                <Link href={`/ajouter?card=${encodeURIComponent(card.id)}`}>
-                <div className="card-tile aspect-[63/88] bg-surface">
-                  <CardImage base={card.image} alt={card.name} />
-                </div>
-                <div className="mt-2 px-0.5">
-                  <p className="truncate text-sm font-medium">{card.name}</p>
-                  <p className="truncate text-xs text-muted">
-                    {card.setName}{" "}
-                    <span className="num">
-                      · {card.localId}
-                    </span>
-                  </p>
-                </div>
+                <Link
+                  href={`/ajouter?card=${encodeURIComponent(card.id)}`}
+                  className="group block"
+                >
+                  <div className="card-tile aspect-[63/88]">
+                    <CardImage base={card.image} alt={card.name} />
+                  </div>
+                  <div className="mt-2.5 px-0.5">
+                    <p className="truncate text-sm font-medium leading-tight group-hover:text-accent-strong">
+                      {card.name}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-muted">
+                      {card.setName}{" "}
+                      <span className="num text-faint">· {card.localId}</span>
+                    </p>
+                  </div>
                 </Link>
               </li>
             ))}

@@ -9,16 +9,17 @@ export const metadata = {
   title: "Statistiques — Pokédex Collection",
 };
 
-const ACCENT = "#38bdf8";
-// Rampe séquentielle (état = échelle ordonnée MT → PO), du clair au foncé
+const ACCENT = "var(--accent)";
+// Rampe séquentielle (état = échelle ordonnée MT → PO), du clair au foncé,
+// dans la teinte or du thème
 const CONDITION_RAMP: Record<string, string> = {
-  MT: "#bae6fd",
-  NM: "#7dd3fc",
-  EX: "#38bdf8",
-  GD: "#0ea5e9",
-  LP: "#0284c7",
-  PL: "#0369a1",
-  PO: "#075985",
+  MT: "#f3ddab",
+  NM: "#e7c877",
+  EX: "#d9a83f",
+  GD: "#b8892b",
+  LP: "#946c1e",
+  PL: "#6f4f15",
+  PO: "#4a340d",
 };
 
 function StatTile({
@@ -31,11 +32,11 @@ function StatTile({
   tone?: "up" | "down";
 }) {
   return (
-    <div className="rounded-xl border border-edge bg-surface p-4">
+    <div className="panel p-4">
       <p className="mb-1 text-xs uppercase tracking-wide text-muted">{label}</p>
       <p
-        className={`num font-[family-name:var(--font-display)] text-2xl font-semibold ${
-          tone === "up" ? "text-emerald-400" : tone === "down" ? "text-red-400" : ""
+        className={`num display text-2xl font-bold ${
+          tone === "up" ? "text-gain" : tone === "down" ? "text-loss" : ""
         }`}
       >
         {value}
@@ -59,7 +60,7 @@ function BarRow({
     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5">
       <p className="truncate text-sm">{label}</p>
       <p className="num text-right text-sm text-muted">{display}</p>
-      <div className="col-span-2 h-2.5 overflow-hidden rounded-r bg-white/5">
+      <div className="col-span-2 h-2.5 overflow-hidden rounded-r bg-foreground/5">
         <div
           className="h-full rounded-r"
           style={{
@@ -206,7 +207,7 @@ export default async function StatsPage() {
     <>
       <SiteHeader />
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <h1 className="mb-6 font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight">
+        <h1 className="mb-6 display text-3xl font-bold tracking-tight">
           Statistiques
         </h1>
 
@@ -229,7 +230,7 @@ export default async function StatsPage() {
 
             <div className="grid gap-10 lg:grid-cols-2">
               <section>
-                <h2 className="mb-4 font-[family-name:var(--font-display)] text-xl font-semibold">
+                <h2 className="mb-4 display text-xl font-semibold">
                   Répartition par set
                 </h2>
                 <div className="flex flex-col gap-3">
@@ -246,14 +247,14 @@ export default async function StatsPage() {
               </section>
 
               <section>
-                <h2 className="mb-4 font-[family-name:var(--font-display)] text-xl font-semibold">
+                <h2 className="mb-4 display text-xl font-semibold">
                   Répartition par état
                 </h2>
                 <ConditionDonut counts={byCondition} />
               </section>
 
               <section>
-                <h2 className="mb-4 font-[family-name:var(--font-display)] text-xl font-semibold">
+                <h2 className="mb-4 display text-xl font-semibold">
                   Dépenses par source
                 </h2>
                 {sourceBars.length === 0 ? (
@@ -274,7 +275,7 @@ export default async function StatsPage() {
               </section>
 
               <section>
-                <h2 className="mb-4 font-[family-name:var(--font-display)] text-xl font-semibold">
+                <h2 className="mb-4 display text-xl font-semibold">
                   Progression par set
                 </h2>
                 <div className="flex flex-col gap-3">
@@ -290,7 +291,7 @@ export default async function StatsPage() {
                             {owned} / {official}
                           </p>
                         </div>
-                        <div className="h-2.5 overflow-hidden rounded-r bg-white/5">
+                        <div className="h-2.5 overflow-hidden rounded-r bg-foreground/5">
                           <div
                             className="h-full rounded-r"
                             style={{
@@ -309,7 +310,7 @@ export default async function StatsPage() {
             {withGain.length > 0 && (
               <div className="grid gap-10 lg:grid-cols-2">
                 <section>
-                  <h2 className="mb-4 font-[family-name:var(--font-display)] text-xl font-semibold">
+                  <h2 className="mb-4 display text-xl font-semibold">
                     Top 5 plus-values
                   </h2>
                   <ul className="flex flex-col gap-2">
@@ -319,7 +320,7 @@ export default async function StatsPage() {
                           {i.card_name}{" "}
                           <span className="text-xs text-muted">({i.set_name})</span>
                         </Link>
-                        <span className={`num shrink-0 ${i.gain! >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                        <span className={`num shrink-0 ${i.gain! >= 0 ? "text-gain" : "text-loss"}`}>
                           {i.gain! > 0 ? "+" : ""}
                           {formatEur(i.gain)}
                         </span>
@@ -328,7 +329,7 @@ export default async function StatsPage() {
                   </ul>
                 </section>
                 <section>
-                  <h2 className="mb-4 font-[family-name:var(--font-display)] text-xl font-semibold">
+                  <h2 className="mb-4 display text-xl font-semibold">
                     Pires plus-values
                   </h2>
                   <ul className="flex flex-col gap-2">
@@ -338,7 +339,7 @@ export default async function StatsPage() {
                           {i.card_name}{" "}
                           <span className="text-xs text-muted">({i.set_name})</span>
                         </Link>
-                        <span className={`num shrink-0 ${i.gain! >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                        <span className={`num shrink-0 ${i.gain! >= 0 ? "text-gain" : "text-loss"}`}>
                           {i.gain! > 0 ? "+" : ""}
                           {formatEur(i.gain)}
                         </span>

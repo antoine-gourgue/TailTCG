@@ -59,15 +59,18 @@ export default async function CartePage({
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <Link href="/" className="mb-6 inline-block text-sm text-muted hover:text-foreground">
+      <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8">
+        <Link
+          href="/"
+          className="mb-6 inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground"
+        >
           ← Collection
         </Link>
 
         <div className="flex flex-col gap-8 lg:flex-row">
           {/* Image officielle en haute qualité */}
-          <aside className="w-full max-w-sm shrink-0">
-            <div className="card-tile aspect-[63/88] bg-surface">
+          <aside className="w-full max-w-sm shrink-0 lg:sticky lg:top-20 lg:self-start">
+            <div className="card-tile aspect-[63/88]">
               <CardImage
                 base={item.image_url || null}
                 alt={item.card_name ?? ""}
@@ -77,51 +80,51 @@ export default async function CartePage({
           </aside>
 
           <div className="min-w-0 flex-1">
-            <h1 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight">
+            <h1 className="display text-3xl font-bold tracking-tight">
               {item.card_name}
             </h1>
-            <p className="mb-4 text-muted">
-              {item.set_name} <span className="num">· {item.local_id}</span>
+            <p className="mb-5 mt-1 text-muted">
+              {item.set_name} <span className="num text-faint">· {item.local_id}</span>
             </p>
 
-            <div className="mb-6 flex flex-wrap gap-x-8 gap-y-2 rounded-xl border border-edge bg-surface p-4 text-sm">
-              <p className="text-muted">
-                Payé{" "}
-                <span className="num text-base font-semibold text-foreground">
+            <div className="panel mb-6 flex flex-wrap items-center gap-x-10 gap-y-4 px-6 py-4">
+              <div className="flex flex-col gap-0.5">
+                <span className="label-xs">Payé</span>
+                <span className="display num text-xl font-bold leading-none">
                   {formatEur(item.purchase_price)}
                 </span>
-              </p>
-              <p className="text-muted">
-                Valeur estimée{" "}
-                <span className="num text-base font-semibold text-foreground">
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="label-xs">Valeur estimée</span>
+                <span className="display num text-xl font-bold leading-none">
                   {formatEur(item.current_price)}
                 </span>
-              </p>
-              <p className="text-muted">
-                Plus-value{" "}
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="label-xs">Plus-value</span>
                 <span
-                  className={`num text-base font-semibold ${
+                  className={`display num text-xl font-bold leading-none ${
                     item.gain == null
-                      ? "text-muted"
+                      ? "text-faint"
                       : item.gain > 0
-                        ? "text-emerald-400"
+                        ? "text-gain"
                         : item.gain < 0
-                          ? "text-red-400"
+                          ? "text-loss"
                           : ""
                   }`}
                 >
                   {item.gain != null && item.gain > 0 ? "+" : ""}
                   {formatEur(item.gain)}
                 </span>
-              </p>
+              </div>
               {item.cardmarket_url && (
                 <a
                   href={item.cardmarket_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-auto self-center text-muted underline transition hover:text-foreground"
+                  className="btn btn-ghost ml-auto !py-1.5 text-[13px]"
                 >
-                  Voir sur Cardmarket ↗
+                  Cardmarket ↗
                 </a>
               )}
             </div>
@@ -130,9 +133,7 @@ export default async function CartePage({
               <PhotoGallery itemId={item.id ?? id} photos={photos} />
             </div>
 
-            <h2 className="mb-4 font-[family-name:var(--font-display)] text-xl font-semibold">
-              Modifier
-            </h2>
+            <h2 className="display mb-4 text-xl font-semibold">Modifier</h2>
             <ItemForm
               mode="edit"
               itemId={item.id ?? id}

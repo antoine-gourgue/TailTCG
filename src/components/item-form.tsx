@@ -34,10 +34,6 @@ export type CardMeta = {
   imageBase: string;
 };
 
-const inputCls =
-  "w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-neutral-500 focus:outline-none";
-const labelCls = "mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted";
-
 // Filtres d'URL Cardmarket : mêmes échelles que nos états / langues
 const CM_MIN_CONDITION: Record<string, string> = {
   MT: "1",
@@ -76,6 +72,29 @@ function syncCardmarketUrl(
   } catch {
     return url;
   }
+}
+
+function Section({
+  step,
+  title,
+  hint,
+  children,
+}: {
+  step: string;
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="panel p-5">
+      <div className="mb-4 flex items-baseline gap-2.5">
+        <span className="display num text-sm font-bold text-accent">{step}</span>
+        <h2 className="display text-base font-semibold">{title}</h2>
+        {hint && <span className="text-xs text-faint">{hint}</span>}
+      </div>
+      {children}
+    </section>
+  );
 }
 
 export function ItemForm({
@@ -138,7 +157,7 @@ export function ItemForm({
   }
 
   return (
-    <form action={formAction} className="flex max-w-2xl flex-col gap-6">
+    <form action={formAction} className="flex max-w-2xl flex-col gap-4">
       {mode === "create" && card && (
         <>
           <input type="hidden" name="tcgdex_id" value={card.tcgdexId} />
@@ -153,18 +172,14 @@ export function ItemForm({
         <input type="hidden" name="item_id" value={itemId} />
       )}
 
-      {/* État — boutons segmentés avec signification */}
-      <fieldset>
-        <legend className={labelCls}>État</legend>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+      {/* 1 — État */}
+      <Section step="01" title="État de la carte">
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
           {CONDITIONS.map((c) => (
             <label
               key={c.code}
-              className={`flex cursor-pointer flex-col items-center gap-0.5 rounded-lg border px-2 py-2.5 text-center transition ${
-                condition === c.code
-                  ? "border-neutral-300 bg-neutral-100 text-neutral-950"
-                  : "border-edge bg-surface text-foreground hover:border-neutral-500"
-              }`}
+              data-on={condition === c.code}
+              className="seg flex cursor-pointer flex-col items-center gap-1 px-1 py-2.5 text-center"
             >
               <input
                 type="radio"
@@ -178,122 +193,154 @@ export function ItemForm({
                 className="sr-only"
                 required
               />
-              <span className="num text-sm font-semibold">{c.code}</span>
               <span
-                className={`text-[10px] leading-tight ${
-                  condition === c.code ? "text-neutral-600" : "text-muted"
+                className={`num text-sm font-bold ${
+                  condition === c.code ? "text-accent-strong" : ""
                 }`}
               >
-                {c.label}
+                {c.code}
               </span>
+              <span className="text-[10px] leading-tight text-muted">{c.label}</span>
             </label>
           ))}
         </div>
-      </fieldset>
+      </Section>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div>
-          <label htmlFor="card_type" className={labelCls}>
-            Type
-          </label>
-          <select
-            id="card_type"
-            name="card_type"
-            defaultValue={defaults.card_type ?? ""}
-            className={inputCls}
-          >
-            <option value="">—</option>
-            {CARD_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+      {/* 2 — La carte */}
+      <Section step="02" title="Exemplaire">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div>
+            <label htmlFor="card_type" className="label-xs mb-1.5 block">
+              Type
+            </label>
+            <select
+              id="card_type"
+              name="card_type"
+              defaultValue={defaults.card_type ?? ""}
+              className="field"
+            >
+              <option value="">—</option>
+              {CARD_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="language" className="label-xs mb-1.5 block">
+              Langue
+            </label>
+            <select
+              id="language"
+              name="language"
+              value={language}
+              onChange={(e) => {
+                setLanguage(e.target.value);
+                setCmUrl((url) => syncCardmarketUrl(url, condition, e.target.value));
+              }}
+              className="field"
+            >
+              {LANGUAGES.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="quantity" className="label-xs mb-1.5 block">
+              Quantité
+            </label>
+            <input
+              id="quantity"
+              type="number"
+              name="quantity"
+              min={1}
+              step={1}
+              defaultValue={defaults.quantity}
+              required
+              className="field num"
+            />
+          </div>
+          <div className="flex flex-col justify-end">
+            <label className="seg flex cursor-pointer items-center justify-center gap-2 px-3 py-2 text-sm" data-on={graded}>
+              <input
+                type="checkbox"
+                name="graded"
+                checked={graded}
+                onChange={(e) => setGraded(e.target.checked)}
+                className="sr-only"
+              />
+              <span className={graded ? "font-medium text-accent-strong" : "text-muted"}>
+                Gradée
+              </span>
+            </label>
+          </div>
         </div>
-        <div>
-          <label htmlFor="language" className={labelCls}>
-            Langue
-          </label>
-          <select
-            id="language"
-            name="language"
-            value={language}
-            onChange={(e) => {
-              setLanguage(e.target.value);
-              setCmUrl((url) => syncCardmarketUrl(url, condition, e.target.value));
-            }}
-            className={inputCls}
-          >
-            {LANGUAGES.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="quantity" className={labelCls}>
-            Quantité
-          </label>
-          <input
-            id="quantity"
-            type="number"
-            name="quantity"
-            min={1}
-            step={1}
-            defaultValue={defaults.quantity}
-            required
-            className={`${inputCls} num`}
-          />
-        </div>
-        <div>
-          <label htmlFor="purchase_price" className={labelCls}>
-            Prix payé (€)
-          </label>
-          <input
-            id="purchase_price"
-            type="text"
-            inputMode="decimal"
-            name="purchase_price"
-            placeholder="12,50"
-            defaultValue={defaults.purchase_price ?? ""}
-            className={`${inputCls} num`}
-          />
-        </div>
-      </div>
+        {graded && (
+          <div className="mt-3">
+            <label htmlFor="grade" className="label-xs mb-1.5 block">
+              Grade
+            </label>
+            <input
+              id="grade"
+              type="text"
+              name="grade"
+              placeholder="PSA 9"
+              defaultValue={defaults.grade ?? ""}
+              className="field max-w-40"
+            />
+          </div>
+        )}
+      </Section>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <div>
-          <label htmlFor="purchase_date" className={labelCls}>
-            Date d&apos;achat
-          </label>
-          <input
-            id="purchase_date"
-            type="date"
-            name="purchase_date"
-            defaultValue={defaults.purchase_date ?? ""}
-            className={`${inputCls} num`}
-          />
+      {/* 3 — Achat et valeur */}
+      <Section step="03" title="Achat & valeur">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <div>
+            <label htmlFor="purchase_price" className="label-xs mb-1.5 block">
+              Prix payé (€)
+            </label>
+            <input
+              id="purchase_price"
+              type="text"
+              inputMode="decimal"
+              name="purchase_price"
+              placeholder="12,50"
+              defaultValue={defaults.purchase_price ?? ""}
+              className="field num"
+            />
+          </div>
+          <div>
+            <label htmlFor="manual_price" className="label-xs mb-1.5 block">
+              Valeur estimée (€)
+            </label>
+            <input
+              id="manual_price"
+              type="text"
+              inputMode="decimal"
+              name="manual_price"
+              placeholder="ex. 90"
+              defaultValue={defaults.manual_price ?? ""}
+              className="field num"
+            />
+          </div>
+          <div>
+            <label htmlFor="purchase_date" className="label-xs mb-1.5 block">
+              Date d&apos;achat
+            </label>
+            <input
+              id="purchase_date"
+              type="date"
+              name="purchase_date"
+              defaultValue={defaults.purchase_date ?? ""}
+              className="field num"
+            />
+          </div>
         </div>
-        <div>
-          <label htmlFor="manual_price" className={labelCls}>
-            Valeur estimée (€)
-          </label>
-          <input
-            id="manual_price"
-            type="text"
-            inputMode="decimal"
-            name="manual_price"
-            placeholder="ex. 90"
-            defaultValue={defaults.manual_price ?? ""}
-            className={`${inputCls} num`}
-          />
-          <p className="mt-1 text-[11px] text-muted">
-            Ton estimation de cet exemplaire (état, gradation…).
-          </p>
-        </div>
-        <div>
-          <label htmlFor="cardmarket_url" className={labelCls}>
+        <div className="mt-3">
+          <label htmlFor="cardmarket_url" className="label-xs mb-1.5 block">
             Lien Cardmarket
           </label>
           <input
@@ -304,17 +351,16 @@ export function ItemForm({
             value={cmUrl}
             onChange={(e) => setCmUrl(e.target.value)}
             onBlur={() => setCmUrl((url) => syncCardmarketUrl(url, condition, language))}
-            className={inputCls}
+            className="field"
           />
-          <p className="mt-1 text-[11px] text-muted">
-            Les filtres état min. et langue se règlent seuls sur l&apos;URL.
+          <p className="mt-1.5 text-[11px] text-faint">
+            Les filtres état minimum et langue se règlent seuls sur l&apos;URL.
           </p>
         </div>
-      </div>
+      </Section>
 
-      {/* Source — deux onglets : boutique / web */}
-      <fieldset>
-        <legend className={labelCls}>Source d&apos;achat</legend>
+      {/* 4 — Source */}
+      <Section step="04" title="Source d'achat" hint="optionnel">
         <input type="hidden" name="source_id" value={sourceId} />
         <div className="mb-3 flex gap-2">
           {(
@@ -327,15 +373,14 @@ export function ItemForm({
             <button
               key={label}
               type="button"
+              data-on={sourceKind === kind}
               onClick={() => {
                 setSourceKind(kind);
                 setSourceId("");
                 setCreatingSource(false);
               }}
-              className={`rounded-lg border px-3 py-1.5 text-sm transition ${
-                sourceKind === kind
-                  ? "border-neutral-300 bg-neutral-100 text-neutral-950"
-                  : "border-edge bg-surface text-muted hover:border-neutral-500"
+              className={`seg px-3.5 py-1.5 text-sm ${
+                sourceKind === kind ? "font-medium text-accent-strong" : "text-muted"
               }`}
             >
               {label}
@@ -349,7 +394,7 @@ export function ItemForm({
               <select
                 value={sourceId}
                 onChange={(e) => setSourceId(e.target.value)}
-                className={inputCls}
+                className="field"
               >
                 <option value="">
                   {sourceKind === "shop" ? "Choisir une boutique…" : "Choisir un site…"}
@@ -367,18 +412,20 @@ export function ItemForm({
               <button
                 type="button"
                 onClick={() => setCreatingSource(true)}
-                className="self-start text-sm text-muted underline transition hover:text-foreground"
+                className="self-start text-sm text-accent underline-offset-2 transition hover:text-accent-strong hover:underline"
               >
                 + {sourceKind === "shop" ? "Nouvelle boutique" : "Nouveau site"}
               </button>
             ) : (
-              <div className="flex flex-col gap-2 rounded-lg border border-edge p-3">
+              <div className="flex flex-col gap-2 rounded-xl border border-dashed border-edge-strong p-3.5">
                 <input
                   type="text"
-                  placeholder={sourceKind === "shop" ? "Nom (ex. Snoop Bayonne)" : "Nom (ex. Cardmarket)"}
+                  placeholder={
+                    sourceKind === "shop" ? "Nom (ex. Snoop Bayonne)" : "Nom (ex. Cardmarket)"
+                  }
                   value={newSource.name}
                   onChange={(e) => setNewSource({ ...newSource, name: e.target.value })}
-                  className={inputCls}
+                  className="field"
                 />
                 {sourceKind === "shop" ? (
                   <div className="grid grid-cols-2 gap-2">
@@ -389,7 +436,7 @@ export function ItemForm({
                       onChange={(e) =>
                         setNewSource({ ...newSource, address: e.target.value })
                       }
-                      className={inputCls}
+                      className="field"
                     />
                     <input
                       type="text"
@@ -398,7 +445,7 @@ export function ItemForm({
                       onChange={(e) =>
                         setNewSource({ ...newSource, city: e.target.value })
                       }
-                      className={inputCls}
+                      className="field"
                     />
                   </div>
                 ) : (
@@ -407,25 +454,23 @@ export function ItemForm({
                     placeholder="https://…"
                     value={newSource.url}
                     onChange={(e) => setNewSource({ ...newSource, url: e.target.value })}
-                    className={inputCls}
+                    className="field"
                   />
                 )}
-                {sourceError && (
-                  <p className="text-xs text-red-400">{sourceError}</p>
-                )}
+                {sourceError && <p className="text-xs text-loss">{sourceError}</p>}
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={submitNewSource}
                     disabled={savingSource}
-                    className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-950 transition hover:bg-white disabled:opacity-50"
+                    className="btn btn-primary !py-1.5 text-sm"
                   >
                     {savingSource ? "Création…" : "Créer"}
                   </button>
                   <button
                     type="button"
                     onClick={() => setCreatingSource(false)}
-                    className="text-sm text-muted hover:text-foreground"
+                    className="btn btn-ghost !py-1.5 text-sm"
                   >
                     Annuler
                   </button>
@@ -434,51 +479,23 @@ export function ItemForm({
             )}
           </div>
         )}
-      </fieldset>
+      </Section>
 
-      {/* Gradée */}
-      <div className="flex items-center gap-4">
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            name="graded"
-            checked={graded}
-            onChange={(e) => setGraded(e.target.checked)}
-            className="h-4 w-4 accent-neutral-100"
-          />
-          Carte gradée
-        </label>
-        {graded && (
-          <input
-            type="text"
-            name="grade"
-            placeholder="PSA 9"
-            defaultValue={defaults.grade ?? ""}
-            className={`${inputCls} max-w-40`}
-          />
-        )}
-      </div>
-
-      <div>
-        <label htmlFor="notes" className={labelCls}>
-          Notes
-        </label>
+      {/* 5 — Notes */}
+      <Section step="05" title="Notes" hint="optionnel">
         <textarea
           id="notes"
           name="notes"
           rows={3}
+          placeholder="Particularités, défauts, souvenirs…"
           defaultValue={defaults.notes ?? ""}
-          className={inputCls}
+          className="field resize-y"
         />
-      </div>
+      </Section>
 
-      {state && <p className="text-sm text-red-400">{state.message}</p>}
+      {state && <p className="text-sm text-loss">{state.message}</p>}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="self-start rounded-lg bg-neutral-100 px-6 py-2.5 font-medium text-neutral-950 transition hover:bg-white disabled:opacity-50"
-      >
+      <button type="submit" disabled={pending} className="btn btn-primary self-start !px-7 !py-3">
         {pending
           ? "Enregistrement…"
           : mode === "create"

@@ -32,17 +32,37 @@ export type SourceRef = { id: string; name: string };
 
 type SortKey = "name" | "paid" | "price" | "gain" | "date";
 
-const selectCls =
-  "rounded-lg border border-edge bg-surface px-2.5 py-1.5 text-sm text-foreground focus:border-neutral-500 focus:outline-none";
-
 function GainText({ value }: { value: number | null }) {
-  if (value == null) return <span className="num text-muted">—</span>;
-  const cls = value > 0 ? "text-emerald-400" : value < 0 ? "text-red-400" : "text-muted";
+  if (value == null) return <span className="num text-faint">—</span>;
+  const cls = value > 0 ? "text-gain" : value < 0 ? "text-loss" : "text-muted";
   return (
     <span className={`num ${cls}`}>
       {value > 0 ? "+" : ""}
       {formatEur(value)}
     </span>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: React.ReactNode;
+  tone?: "up" | "down";
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="label-xs">{label}</span>
+      <span
+        className={`display num text-xl font-bold leading-none ${
+          tone === "up" ? "text-gain" : tone === "down" ? "text-loss" : ""
+        }`}
+      >
+        {value}
+      </span>
+    </div>
   );
 }
 
@@ -106,7 +126,8 @@ export function CollectionClient({
       name: (a, b) => a.card_name.localeCompare(b.card_name, "fr"),
       paid: (a, b) => (a.purchase_price ?? -1) - (b.purchase_price ?? -1),
       price: (a, b) => (a.current_price ?? -1) - (b.current_price ?? -1),
-      gain: (a, b) => (a.gain ?? Number.NEGATIVE_INFINITY) - (b.gain ?? Number.NEGATIVE_INFINITY),
+      gain: (a, b) =>
+        (a.gain ?? Number.NEGATIVE_INFINITY) - (b.gain ?? Number.NEGATIVE_INFINITY),
       date: (a, b) =>
         (a.purchase_date ?? a.created_at).localeCompare(b.purchase_date ?? b.created_at),
     };
@@ -136,52 +157,71 @@ export function CollectionClient({
 
   if (items.length === 0) {
     return (
-      <div className="rounded-xl border border-edge bg-surface p-10 text-center">
-        <p className="mb-2 text-lg">Ton classeur est vide.</p>
-        <p className="text-sm text-muted">
-          Passe par la{" "}
-          <Link href="/recherche" className="underline hover:text-foreground">
-            recherche
-          </Link>{" "}
-          pour ajouter ta première carte.
+      <div className="panel rise-in flex flex-col items-center gap-3 p-12 text-center">
+        <span className="text-4xl">🃏</span>
+        <p className="display text-xl font-semibold">Ton classeur est vide</p>
+        <p className="max-w-sm text-sm text-muted">
+          Cherche une carte par son nom, l&apos;image et le set se remplissent
+          tout seuls — il ne reste qu&apos;à noter l&apos;état et le prix.
         </p>
+        <Link href="/recherche" className="btn btn-primary mt-2">
+          Ajouter ma première carte
+        </Link>
       </div>
     );
   }
 
+  const selectCls = "field !w-auto text-[13px]";
+
   return (
     <div>
-      {/* Barre de résumé collée en haut */}
-      <div className="sticky top-0 z-10 -mx-4 mb-6 border-b border-edge bg-background/85 px-4 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-baseline gap-x-8 gap-y-1">
-          <p className="text-sm text-muted">
-            <span className="num text-lg font-semibold text-foreground">
-              {summary.count}
-            </span>{" "}
-            carte{summary.count > 1 ? "s" : ""}
-          </p>
-          <p className="text-sm text-muted">
-            Investi{" "}
-            <span className="num text-lg font-semibold text-foreground">
-              {formatEur(summary.invested)}
-            </span>
-          </p>
-          <p className="text-sm text-muted">
-            Valeur estimée{" "}
-            <span className="num text-lg font-semibold text-foreground">
-              {formatEur(summary.value)}
-            </span>
-          </p>
-          <p className="text-sm text-muted">
-            Plus-value{" "}
-            <span className="text-lg font-semibold">
-              <GainText value={summary.gain} />
-            </span>
-          </p>
+      {/* Résumé : la valeur du classeur, toujours visible */}
+      <div className="panel rise-in mb-5 flex flex-wrap items-center gap-x-10 gap-y-4 px-6 py-4">
+        <Stat label="Cartes" value={summary.count} />
+        <Stat label="Investi" value={formatEur(summary.invested)} />
+        <Stat label="Valeur estimée" value={formatEur(summary.value)} />
+        <Stat
+          label="Plus-value"
+          value={
+            summary.gain == null
+              ? "—"
+              : `${summary.gain > 0 ? "+" : ""}${formatEur(summary.gain)}`
+          }
+          tone={
+            summary.gain == null ? undefined : summary.gain >= 0 ? "up" : "down"
+          }
+        />
+        <div className="ml-auto hidden items-center sm:flex">
+          <div className="flex overflow-hidden rounded-lg border border-edge">
+            <button
+              type="button"
+              onClick={() => setView("grid")}
+              aria-pressed={view === "grid"}
+              className={`px-3 py-1.5 text-[13px] transition ${
+                view === "grid"
+                  ? "bg-accent-soft font-medium text-accent-strong"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              ▦ Grille
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("table")}
+              aria-pressed={view === "table"}
+              className={`border-l border-edge px-3 py-1.5 text-[13px] transition ${
+                view === "table"
+                  ? "bg-accent-soft font-medium text-accent-strong"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              ☰ Tableau
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Filtres, tri, bascule */}
+      {/* Filtres et tri */}
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <select value={fSet} onChange={(e) => setFSet(e.target.value)} className={selectCls}>
           <option value="">Tous les sets</option>
@@ -263,56 +303,50 @@ export function CollectionClient({
         <button
           type="button"
           onClick={() => setSortAsc((v) => !v)}
-          className={`${selectCls} num`}
+          className="btn btn-ghost num !px-2.5 !py-1.5 text-[13px]"
           title={sortAsc ? "Croissant" : "Décroissant"}
         >
           {sortAsc ? "↑" : "↓"}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setView(view === "grid" ? "table" : "grid")}
-          className={`${selectCls} ml-auto`}
-        >
-          {view === "grid" ? "☰ Tableau" : "▦ Grille"}
         </button>
       </div>
 
       {filtered.length === 0 ? (
         <p className="text-sm text-muted">Aucune carte ne correspond aux filtres.</p>
       ) : view === "grid" ? (
-        <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        <ul className="rise-in grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {filtered.map((item) => (
             <li key={item.id}>
-              <Link href={`/carte/${item.id}`}>
-                <div className="card-tile aspect-[63/88] bg-surface">
+              <Link href={`/carte/${item.id}`} className="group block">
+                <div className="card-tile aspect-[63/88]">
                   <CardImage base={item.image_url || null} alt={item.card_name} />
-                  <span className="num absolute left-1.5 top-1.5 z-10 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-semibold">
+                  <span className="tile-badge num left-1.5 top-1.5">
                     {item.condition}
                   </span>
                   {item.quantity > 1 && (
-                    <span className="num absolute right-1.5 top-1.5 z-10 rounded bg-black/70 px-1.5 py-0.5 text-[11px]">
+                    <span className="tile-badge num right-1.5 top-1.5">
                       ×{item.quantity}
                     </span>
                   )}
                   {item.graded && (
-                    <span className="absolute bottom-1.5 left-1.5 z-10 rounded bg-amber-400/90 px-1.5 py-0.5 text-[11px] font-semibold text-black">
+                    <span className="tile-badge bottom-1.5 left-1.5 !bg-accent !text-accent-ink">
                       {item.grade ?? "Gradée"}
                     </span>
                   )}
                 </div>
-                <div className="mt-2 px-0.5">
-                  <p className="truncate text-sm font-medium">{item.card_name}</p>
-                  <p className="truncate text-xs text-muted">
-                    {item.set_name} <span className="num">· {item.local_id}</span>
+                <div className="mt-2.5 px-0.5">
+                  <p className="truncate text-sm font-medium leading-tight group-hover:text-accent-strong">
+                    {item.card_name}
                   </p>
-                  <p className="mt-0.5 text-xs">
-                    <span className="num text-muted">
-                      {formatEur(item.purchase_price)}
+                  <p className="mt-0.5 truncate text-xs text-muted">
+                    {item.set_name} <span className="num text-faint">· {item.local_id}</span>
+                  </p>
+                  <p className="mt-1 flex items-baseline gap-1.5 text-xs">
+                    <span className="num text-faint">{formatEur(item.purchase_price)}</span>
+                    <span className="text-faint">→</span>
+                    <span className="num font-medium">{formatEur(item.current_price)}</span>
+                    <span className="ml-auto">
+                      <GainText value={item.gain} />
                     </span>
-                    {" → "}
-                    <span className="num">{formatEur(item.current_price)}</span>{" "}
-                    <GainText value={item.gain} />
                   </p>
                 </div>
               </Link>
@@ -320,46 +354,51 @@ export function CollectionClient({
           ))}
         </ul>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-edge">
+        <div className="panel rise-in overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-edge bg-surface text-left text-xs uppercase tracking-wide text-muted">
-                <th className="px-3 py-2 font-medium">Carte</th>
-                <th className="px-3 py-2 font-medium">Set</th>
-                <th className="px-3 py-2 font-medium">N°</th>
-                <th className="px-3 py-2 font-medium">État</th>
-                <th className="px-3 py-2 font-medium">Type</th>
-                <th className="px-3 py-2 font-medium">Qté</th>
-                <th className="px-3 py-2 text-right font-medium">Payé</th>
-                <th className="px-3 py-2 text-right font-medium">Estimé</th>
-                <th className="px-3 py-2 text-right font-medium">+/-</th>
-                <th className="px-3 py-2 font-medium">Source</th>
+              <tr className="border-b border-edge text-left">
+                <th className="label-xs px-4 py-3">Carte</th>
+                <th className="label-xs px-4 py-3">Set</th>
+                <th className="label-xs px-4 py-3">N°</th>
+                <th className="label-xs px-4 py-3">État</th>
+                <th className="label-xs px-4 py-3">Type</th>
+                <th className="label-xs px-4 py-3">Qté</th>
+                <th className="label-xs px-4 py-3 text-right">Payé</th>
+                <th className="label-xs px-4 py-3 text-right">Estimé</th>
+                <th className="label-xs px-4 py-3 text-right">+/-</th>
+                <th className="label-xs px-4 py-3">Source</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((item) => (
-                <tr key={item.id} className="border-b border-edge/50 last:border-0 hover:bg-surface">
-                  <td className="px-3 py-2">
-                    <Link href={`/carte/${item.id}`} className="font-medium hover:underline">
+                <tr
+                  key={item.id}
+                  className="border-b border-edge/50 transition last:border-0 hover:bg-raised"
+                >
+                  <td className="px-4 py-2.5">
+                    <Link href={`/carte/${item.id}`} className="font-medium hover:text-accent-strong">
                       {item.card_name}
                     </Link>
                     {item.graded && (
-                      <span className="ml-2 rounded bg-amber-400/90 px-1 py-0.5 text-[10px] font-semibold text-black">
+                      <span className="ml-2 rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-ink">
                         {item.grade ?? "Gradée"}
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-muted">{item.set_name}</td>
-                  <td className="num px-3 py-2 text-muted">{item.local_id}</td>
-                  <td className="num px-3 py-2">{item.condition}</td>
-                  <td className="px-3 py-2 text-muted">{item.card_type ?? "—"}</td>
-                  <td className="num px-3 py-2">{item.quantity}</td>
-                  <td className="num px-3 py-2 text-right">{formatEur(item.purchase_price)}</td>
-                  <td className="num px-3 py-2 text-right">{formatEur(item.current_price)}</td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-4 py-2.5 text-muted">{item.set_name}</td>
+                  <td className="num px-4 py-2.5 text-muted">{item.local_id}</td>
+                  <td className="num px-4 py-2.5">{item.condition}</td>
+                  <td className="px-4 py-2.5 text-muted">{item.card_type ?? "—"}</td>
+                  <td className="num px-4 py-2.5">{item.quantity}</td>
+                  <td className="num px-4 py-2.5 text-right">{formatEur(item.purchase_price)}</td>
+                  <td className="num px-4 py-2.5 text-right font-medium">
+                    {formatEur(item.current_price)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
                     <GainText value={item.gain} />
                   </td>
-                  <td className="px-3 py-2 text-muted">
+                  <td className="px-4 py-2.5 text-muted">
                     {item.source_id ? sourceName.get(item.source_id) ?? "—" : "—"}
                   </td>
                 </tr>

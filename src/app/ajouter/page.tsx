@@ -34,27 +34,29 @@ export default async function AjouterPage({
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <h1 className="mb-6 font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight">
+      <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8">
+        <h1 className="display mb-6 text-3xl font-bold tracking-tight">
           Ajouter une carte
         </h1>
 
         <div className="flex flex-col gap-8 md:flex-row">
           {/* La carte choisie, pré-remplie depuis TCGdex */}
-          <aside className="w-full max-w-60 shrink-0">
-            <div className="card-tile aspect-[63/88] bg-surface">
+          <aside className="w-full max-w-60 shrink-0 md:sticky md:top-20 md:self-start">
+            <div className="card-tile aspect-[63/88]">
               <CardImage base={card.image ?? null} alt={card.name} />
             </div>
-            <div className="mt-3">
-              <p className="font-medium">{card.name}</p>
-              <p className="text-sm text-muted">
-                {card.set.name} <span className="num">· {card.localId}</span>
+            <div className="mt-4">
+              <p className="display text-lg font-semibold leading-tight">{card.name}</p>
+              <p className="mt-1 text-sm text-muted">
+                {card.set.name} <span className="num text-faint">· {card.localId}</span>
                 {card.set.cardCount?.official ? (
-                  <span className="num"> / {card.set.cardCount.official}</span>
+                  <span className="num text-faint"> / {card.set.cardCount.official}</span>
                 ) : null}
               </p>
               {card.rarity && (
-                <p className="mt-1 text-xs text-muted">{card.rarity}</p>
+                <p className="mt-2 inline-block rounded-md bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong">
+                  {card.rarity}
+                </p>
               )}
             </div>
           </aside>

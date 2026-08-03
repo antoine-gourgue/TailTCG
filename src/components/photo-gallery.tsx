@@ -101,11 +101,9 @@ export function PhotoGallery({
   return (
     <section>
       <div className="mb-3 flex items-center gap-4">
-        <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold">
-          Mes photos
-        </h2>
+        <h2 className="display text-xl font-semibold">Mes photos</h2>
         <label
-          className={`cursor-pointer rounded-lg border border-edge px-3 py-1.5 text-sm transition hover:border-neutral-500 ${
+          className={`btn btn-ghost cursor-pointer !py-1.5 text-[13px] ${
             busy ? "pointer-events-none opacity-50" : ""
           }`}
         >
@@ -127,9 +125,7 @@ export function PhotoGallery({
       </div>
 
       {state && (
-        <p
-          className={`mb-3 text-sm ${state.ok ? "text-emerald-400" : "text-red-400"}`}
-        >
+        <p className={`mb-3 text-sm ${state.ok ? "text-gain" : "text-loss"}`}>
           {state.message}
         </p>
       )}

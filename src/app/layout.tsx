@@ -22,6 +22,9 @@ export const metadata: Metadata = {
   description: "Ma collection de cartes Pokémon",
 };
 
+// Applique le thème avant le premier rendu pour éviter le flash
+const themeInit = `(function(){try{var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark"){t=window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"}document.documentElement.dataset.theme=t}catch(e){}})()`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -30,9 +33,14 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
+      data-theme="dark"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${display.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="relative min-h-full flex flex-col">
+        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        {children}
+      </body>
     </html>
   );
 }

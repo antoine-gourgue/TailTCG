@@ -36,15 +36,10 @@ export default async function Home({
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight">
-            Collection
-          </h1>
-          <Link
-            href="/recherche"
-            className="rounded-lg bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-950 transition hover:bg-white"
-          >
+          <h1 className="display text-3xl font-bold tracking-tight">Collection</h1>
+          <Link href="/recherche" className="btn btn-primary">
             + Ajouter une carte
           </Link>
         </div>

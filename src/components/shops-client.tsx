@@ -33,8 +33,7 @@ export type SourceWithStats = {
   spent: number;
 };
 
-const inputCls =
-  "w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-neutral-500 focus:outline-none";
+const inputCls = "field";
 
 function SourceFields({
   kind,
@@ -107,7 +106,7 @@ function EditSourceForm({
       <input type="hidden" name="source_id" value={source.id} />
       <SourceFields kind={source.kind} source={source} />
       {state && (
-        <p className={`text-xs ${state.ok ? "text-emerald-400" : "text-red-400"}`}>
+        <p className={`text-xs ${state.ok ? "text-gain" : "text-loss"}`}>
           {state.message}
         </p>
       )}
@@ -115,7 +114,7 @@ function EditSourceForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-950 transition hover:bg-white disabled:opacity-50"
+          className="btn btn-primary !py-1.5 text-sm"
         >
           {pending ? "Enregistrement…" : "Enregistrer"}
         </button>
@@ -135,14 +134,14 @@ function SourceRow({ source }: { source: SourceWithStats }) {
   const [editing, setEditing] = useState(false);
 
   return (
-    <li className="rounded-xl border border-edge bg-surface p-4">
+    <li className="panel p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-medium">
             {source.name}
             {source.kind === "shop" && source.lat == null && (
               <span
-                className="ml-2 text-xs text-amber-400"
+                className="ml-2 text-xs text-accent-strong"
                 title="Adresse non géolocalisée : absente de la carte"
               >
                 ⚠ non géolocalisée
@@ -192,7 +191,7 @@ function SourceRow({ source }: { source: SourceWithStats }) {
             }}
           >
             <input type="hidden" name="source_id" value={source.id} />
-            <button type="submit" className="text-red-400 transition hover:text-red-300">
+            <button type="submit" className="text-loss transition hover:opacity-80">
               Supprimer
             </button>
           </form>
@@ -213,7 +212,7 @@ function CreateSourceForm() {
   return (
     <form
       action={formAction}
-      className="flex flex-col gap-2 rounded-xl border border-edge p-4"
+      className="panel flex flex-col gap-2 p-4"
     >
       <div className="flex gap-2">
         {(
@@ -225,11 +224,10 @@ function CreateSourceForm() {
           <button
             key={k}
             type="button"
+            data-on={kind === k}
             onClick={() => setKind(k)}
-            className={`rounded-lg border px-3 py-1.5 text-sm transition ${
-              kind === k
-                ? "border-neutral-300 bg-neutral-100 text-neutral-950"
-                : "border-edge bg-surface text-muted hover:border-neutral-500"
+            className={`seg px-3.5 py-1.5 text-sm ${
+              kind === k ? "font-medium text-accent-strong" : "text-muted"
             }`}
           >
             {label}
@@ -239,14 +237,14 @@ function CreateSourceForm() {
       <input type="hidden" name="kind" value={kind} />
       <SourceFields kind={kind} />
       {state && (
-        <p className={`text-xs ${state.ok ? "text-emerald-400" : "text-red-400"}`}>
+        <p className={`text-xs ${state.ok ? "text-gain" : "text-loss"}`}>
           {state.message}
         </p>
       )}
       <button
         type="submit"
         disabled={pending}
-        className="self-start rounded-lg bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-950 transition hover:bg-white disabled:opacity-50"
+        className="btn btn-primary self-start"
       >
         {pending
           ? kind === "shop"
@@ -270,7 +268,7 @@ export function ShopsClient({ sources }: { sources: SourceWithStats[] }) {
 
       <div className="grid gap-8 lg:grid-cols-2">
         <section>
-          <h2 className="mb-3 font-[family-name:var(--font-display)] text-xl font-semibold">
+          <h2 className="mb-3 display text-xl font-semibold">
             En boutique
           </h2>
           {shops.length === 0 ? (
@@ -285,7 +283,7 @@ export function ShopsClient({ sources }: { sources: SourceWithStats[] }) {
         </section>
 
         <section>
-          <h2 className="mb-3 font-[family-name:var(--font-display)] text-xl font-semibold">
+          <h2 className="mb-3 display text-xl font-semibold">
             Sur le web
           </h2>
           {webs.length === 0 ? (
@@ -301,7 +299,7 @@ export function ShopsClient({ sources }: { sources: SourceWithStats[] }) {
       </div>
 
       <section>
-        <h2 className="mb-3 font-[family-name:var(--font-display)] text-xl font-semibold">
+        <h2 className="mb-3 display text-xl font-semibold">
           Ajouter une source
         </h2>
         <CreateSourceForm />
