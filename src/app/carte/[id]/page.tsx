@@ -7,7 +7,6 @@ import { SiteHeader } from "@/components/site-header";
 import { ItemForm } from "@/components/item-form";
 import { DeleteItemButton } from "@/components/delete-item-button";
 import { PhotoGallery, type GalleryPhoto } from "@/components/photo-gallery";
-import { PriceHistoryChart } from "@/components/price-history-chart";
 import type { SourceOption } from "@/app/items/actions";
 
 export const metadata = {
@@ -39,12 +38,6 @@ export default async function CartePage({
     ]);
 
   if (!item) notFound();
-
-  const { data: pricePoints } = await supabase
-    .from("price_snapshots")
-    .select("captured_at, trend")
-    .eq("tcgdex_id", item.tcgdex_id ?? "")
-    .order("captured_at");
 
   // URLs signées 1 h, générées côté serveur (bucket privé)
   let photos: GalleryPhoto[] = [];
@@ -108,17 +101,6 @@ export default async function CartePage({
                   {formatEur(item.current_price)}
                 </span>
               </p>
-              {item.market_trend != null && (
-                <p
-                  className="text-muted"
-                  title="Tendance Cardmarket, tous états confondus — indicatif, n'entre pas dans tes totaux"
-                >
-                  Tendance marché{" "}
-                  <span className="num text-base text-foreground/70">
-                    {formatEur(item.market_trend)}
-                  </span>
-                </p>
-              )}
               <p className="text-muted">
                 Plus-value{" "}
                 <span
@@ -151,17 +133,6 @@ export default async function CartePage({
             <div className="mb-8">
               <PhotoGallery itemId={item.id ?? id} photos={photos} />
             </div>
-
-            <section className="mb-8">
-              <h2 className="mb-1 font-[family-name:var(--font-display)] text-xl font-semibold">
-                Tendance Cardmarket
-              </h2>
-              <p className="mb-3 text-xs text-muted">
-                Indicatif : tendance du marché tous états confondus, relevée
-                chaque matin. N&apos;entre pas dans tes totaux.
-              </p>
-              <PriceHistoryChart points={pricePoints ?? []} />
-            </section>
 
             <h2 className="mb-4 font-[family-name:var(--font-display)] text-xl font-semibold">
               Modifier

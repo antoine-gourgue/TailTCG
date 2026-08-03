@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCard, cardImageUrl, cardmarketSearchUrl } from "@/lib/tcgdex";
-import { formatEur } from "@/lib/domain";
 import { SiteHeader } from "@/components/site-header";
 import { ItemForm } from "@/components/item-form";
 import type { SourceOption } from "@/app/items/actions";
@@ -26,10 +25,6 @@ export default async function AjouterPage({
     .from("sources")
     .select("id, name, kind, city, url")
     .order("name");
-
-  const cm = card.pricing?.cardmarket;
-  const trend = cm?.trend ?? null;
-  const trendHolo = cm?.["trend-holo"] ?? null;
 
   // Pré-sélection du type d'après les variantes du set
   const defaultType =
@@ -71,28 +66,6 @@ export default async function AjouterPage({
               {card.rarity && (
                 <p className="mt-1 text-xs text-muted">{card.rarity}</p>
               )}
-              <div className="mt-3 rounded-lg border border-edge p-3 text-sm">
-                <p className="mb-1 text-xs uppercase tracking-wide text-muted">
-                  Tendance Cardmarket (indicatif)
-                </p>
-                <p>
-                  Tendance : <span className="num">{formatEur(trend)}</span>
-                </p>
-                {trendHolo != null && (
-                  <p>
-                    Tendance holo :{" "}
-                    <span className="num">{formatEur(trendHolo)}</span>
-                  </p>
-                )}
-                {cm?.avg30 != null && (
-                  <p className="text-muted">
-                    Moy. 30 j : <span className="num">{formatEur(cm.avg30)}</span>
-                  </p>
-                )}
-                {!cm && (
-                  <p className="text-muted">Carte non cotée sur Cardmarket.</p>
-                )}
-              </div>
             </div>
           </aside>
 
