@@ -5,7 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { signOutEverywhere } from "./actions";
 
 export const metadata = {
-  title: "Paramètres — Pokédex Collection",
+  title: "Paramètres — TailTCG",
 };
 
 export default async function ParametresPage() {

@@ -7,7 +7,7 @@ import { ItemForm } from "@/components/item-form";
 import type { SourceOption } from "@/app/items/actions";
 
 export const metadata = {
-  title: "Ajouter — Pokédex Collection",
+  title: "Ajouter — TailTCG",
 };
 
 export default async function AjouterPage({

@@ -13,7 +13,7 @@ const mono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pokédex Collection",
+  title: "TailTCG",
   description: "Ma collection de cartes Pokémon",
 };
 

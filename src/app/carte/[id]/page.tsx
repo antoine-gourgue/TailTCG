@@ -11,7 +11,7 @@ import { CardImage } from "@/components/card-image";
 import type { SourceOption } from "@/app/items/actions";
 
 export const metadata = {
-  title: "Fiche carte — Pokédex Collection",
+  title: "Fiche carte — TailTCG",
 };
 
 export default async function CartePage({

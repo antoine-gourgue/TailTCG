@@ -6,7 +6,7 @@ import { formatEur, CONDITIONS } from "@/lib/domain";
 import { AppShell } from "@/components/app-shell";
 
 export const metadata = {
-  title: "Statistiques — Pokédex Collection",
+  title: "Statistiques — TailTCG",
 };
 
 const ACCENT = "var(--accent)";

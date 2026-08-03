@@ -15,6 +15,7 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import { signOut } from "@/app/actions";
+import { Logo } from "@/components/logo";
 import { ThemeToggle, useTheme } from "@/components/theme-toggle";
 
 /* État de la sidebar : vit sur <html data-sidebar>, comme le thème */
@@ -29,18 +30,6 @@ function subscribeSidebar(cb: () => void) {
 
 function getSidebar(): "open" | "rail" {
   return document.documentElement.dataset.sidebar === "rail" ? "rail" : "open";
-}
-
-function Pokeball({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
-      <circle cx="12" cy="12" r="10" fill="var(--accent)" />
-      <path d="M2 12h20a10 10 0 0 1-20 0Z" fill="#fff" opacity="0.92" />
-      <rect x="2" y="11" width="20" height="2" rx="1" fill="#1a1a1d" />
-      <circle cx="12" cy="12" r="3.2" fill="#1a1a1d" />
-      <circle cx="12" cy="12" r="1.8" fill="#fff" />
-    </svg>
-  );
 }
 
 const NAV = [
@@ -91,9 +80,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             rail ? "h-auto flex-col gap-2 py-4" : "h-16 justify-between pl-5 pr-3"
           }`}
         >
-          <Link href="/" className="flex items-center gap-2.5">
-            <Pokeball />
-            <span className="nav-label display text-[15px]">Pokédex</span>
+          <Link href="/" className="flex items-center">
+            {rail ? (
+              <Logo variant="mark" size={30} />
+            ) : (
+              <Logo variant="lockup" size={30} />
+            )}
           </Link>
           <button
             type="button"
@@ -173,7 +165,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* ——— Barre haute (mobile) ——— */}
       <header className="sticky top-0 z-40 border-b border-edge bg-surface/90 backdrop-blur-md md:hidden">
         <div className="flex h-13 items-center gap-2 px-3 py-2">
-          <Pokeball size={20} />
+          <Logo variant="mark" size={26} />
           <nav className="scrollbar-none flex flex-1 items-center gap-0.5 overflow-x-auto text-sm">
             {NAV.map((item) => {
               const active = isActive(item.href, pathname);

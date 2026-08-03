@@ -321,6 +321,59 @@ a:hover .card-tile,
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
 }
 
+/* ————— Logo TailTCG ————— */
+
+:root,
+:root[data-theme="dark"] {
+  --foil: #e8b44a;
+  --ink-hi: #f2f3f5;
+  --ink-lo: #8a90a0;
+}
+
+:root[data-theme="light"] {
+  --foil: #a8781b;
+  --ink-hi: #211f23;
+  --ink-lo: #746d5e;
+}
+
+.logo--interactive .logo__sweep {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+}
+
+.logo--interactive:hover .logo__sweep {
+  animation: shine 0.9s ease-out;
+}
+
+.logo--interactive .logo__tail {
+  transition: opacity 0.35s ease;
+}
+
+.logo--interactive:hover .logo__tail {
+  opacity: 1;
+}
+
+@keyframes shine {
+  0% {
+    opacity: 0;
+    transform: translateX(-26px);
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo--interactive:hover .logo__sweep {
+    animation: none;
+  }
+}
+
 /* Barre de nav mobile : défilement sans ascenseur visible */
 .scrollbar-none {
   scrollbar-width: none;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { Logo } from "@/components/logo";
 import { sendMagicLink, type LoginState } from "./actions";
 
 export default function LoginPage() {
@@ -12,14 +13,9 @@ export default function LoginPage() {
   return (
     <main className="relative flex min-h-screen items-center justify-center px-4">
       <div className="rise-in w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <span className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-2xl text-accent-ink shadow-lg">
-            ◓
-          </span>
-          <h1 className="display text-3xl font-bold tracking-tight">
-            Pokédex Collection
-          </h1>
-          <p className="mt-2 text-sm text-muted">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <Logo variant="lockup" baseline size={64} />
+          <p className="mt-4 text-sm text-muted">
             Le classeur est fermé à clé — connexion par lien magique.
           </p>
         </div>

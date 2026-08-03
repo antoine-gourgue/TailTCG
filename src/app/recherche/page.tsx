@@ -2,7 +2,7 @@ import { AppShell } from "@/components/app-shell";
 import { SearchClient } from "./search-client";
 
 export const metadata = {
-  title: "Recherche — Pokédex Collection",
+  title: "Recherche — TailTCG",
 };
 
 export default function RecherchePage() {

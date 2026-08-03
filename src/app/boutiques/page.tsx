@@ -4,7 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { ShopsClient, type SourceWithStats } from "@/components/shops-client";
 
 export const metadata = {
-  title: "Boutiques — Pokédex Collection",
+  title: "Boutiques — TailTCG",
 };
 
 export default async function BoutiquesPage() {
