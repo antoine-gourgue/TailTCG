@@ -3,6 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
+import {
+  LayoutGrid,
+  SearchIcon,
+  MapPin,
+  BarChart3,
+  Sun,
+  Moon,
+  LogOut,
+  ChevronLeft,
+} from "lucide-react";
 import { signOut } from "@/app/actions";
 import { ThemeToggle, useTheme } from "@/components/theme-toggle";
 
@@ -32,38 +42,11 @@ function Pokeball({ size = 22 }: { size?: number }) {
   );
 }
 
-const icons = {
-  collection: (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="3" y="3" width="8" height="10" rx="1.5" />
-      <rect x="13" y="3" width="8" height="10" rx="1.5" transform="rotate(4 17 8)" />
-      <path d="M5 17h14M5 21h9" />
-    </svg>
-  ),
-  ajouter: (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5M11 8v6M8 11h6" />
-    </svg>
-  ),
-  boutiques: (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M12 21s-7-5.1-7-11a7 7 0 0 1 14 0c0 5.9-7 11-7 11Z" />
-      <circle cx="12" cy="10" r="2.5" />
-    </svg>
-  ),
-  stats: (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
-    </svg>
-  ),
-} as const;
-
 const NAV = [
-  { href: "/", label: "Collection", icon: icons.collection },
-  { href: "/recherche", label: "Ajouter", icon: icons.ajouter },
-  { href: "/boutiques", label: "Boutiques", icon: icons.boutiques },
-  { href: "/stats", label: "Stats", icon: icons.stats },
+  { href: "/", label: "Collection", Icon: LayoutGrid },
+  { href: "/recherche", label: "Ajouter", Icon: SearchIcon },
+  { href: "/boutiques", label: "Boutiques", Icon: MapPin },
+  { href: "/stats", label: "Stats", Icon: BarChart3 },
 ];
 
 function isActive(href: string, pathname: string) {
@@ -117,20 +100,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label={rail ? "Déplier la navigation" : "Replier la navigation"}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-faint transition hover:bg-raised hover:text-foreground"
           >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <ChevronLeft
+              size={14}
               className={`transition-transform ${rail ? "rotate-180" : ""}`}
               aria-hidden
-            >
-              <path d="m15 6-6 6 6 6" />
-            </svg>
+            />
           </button>
         </div>
 
@@ -150,7 +124,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     : "text-muted hover:bg-raised hover:text-foreground"
                 }`}
               >
-                <span className="shrink-0">{item.icon}</span>
+                <item.Icon size={17} strokeWidth={1.9} className="shrink-0" aria-hidden />
                 <span className="nav-label">{item.label}</span>
               </Link>
             );
@@ -168,14 +142,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <span className="shrink-0">
               {theme === "dark" ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-                  <circle cx="12" cy="12" r="4" />
-                  <path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4m11.4-11.4 1.4-1.4" />
-                </svg>
+                <Sun size={16} strokeWidth={1.9} aria-hidden />
               ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
-                </svg>
+                <Moon size={16} strokeWidth={1.9} aria-hidden />
               )}
             </span>
             <span className="nav-label">
@@ -191,9 +160,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               }`}
             >
               <span className="shrink-0">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-                </svg>
+                <LogOut size={16} strokeWidth={1.9} aria-hidden />
               </span>
               <span className="nav-label">Déconnexion</span>
             </button>

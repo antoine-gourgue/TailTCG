@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { LayoutGrid, List, ArrowUp, ArrowDown } from "lucide-react";
 import { formatEur } from "@/lib/domain";
 import { CardImage } from "@/components/card-image";
 
@@ -197,25 +198,25 @@ export function CollectionClient({
               type="button"
               onClick={() => setView("grid")}
               aria-pressed={view === "grid"}
-              className={`px-3 py-1.5 text-[13px] transition ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-[13px] transition ${
                 view === "grid"
                   ? "bg-accent-soft font-medium text-accent-strong"
                   : "text-muted hover:text-foreground"
               }`}
             >
-              ▦ Grille
+              <LayoutGrid size={13} aria-hidden /> Grille
             </button>
             <button
               type="button"
               onClick={() => setView("table")}
               aria-pressed={view === "table"}
-              className={`border-l border-edge px-3 py-1.5 text-[13px] transition ${
+              className={`flex items-center gap-1.5 border-l border-edge px-3 py-1.5 text-[13px] transition ${
                 view === "table"
                   ? "bg-accent-soft font-medium text-accent-strong"
                   : "text-muted hover:text-foreground"
               }`}
             >
-              ☰ Tableau
+              <List size={13} aria-hidden /> Tableau
             </button>
           </div>
         </div>
@@ -303,10 +304,10 @@ export function CollectionClient({
         <button
           type="button"
           onClick={() => setSortAsc((v) => !v)}
-          className="btn btn-ghost num !px-2.5 !py-1.5 text-[13px]"
+          className="btn btn-ghost !px-2.5 !py-1.5"
           title={sortAsc ? "Croissant" : "Décroissant"}
         >
-          {sortAsc ? "↑" : "↓"}
+          {sortAsc ? <ArrowUp size={14} aria-hidden /> : <ArrowDown size={14} aria-hidden />}
         </button>
       </div>
 

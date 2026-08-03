@@ -34,46 +34,6 @@ export type CardMeta = {
   imageBase: string;
 };
 
-// Filtres d'URL Cardmarket : mêmes échelles que nos états / langues
-const CM_MIN_CONDITION: Record<string, string> = {
-  MT: "1",
-  NM: "2",
-  EX: "3",
-  GD: "4",
-  LP: "5",
-  PL: "6",
-  PO: "7",
-};
-const CM_LANGUAGE: Record<string, string> = {
-  EN: "1",
-  FR: "2",
-  DE: "3",
-  ES: "4",
-  IT: "5",
-  JP: "7",
-};
-
-function syncCardmarketUrl(
-  url: string,
-  condition: string,
-  language: string
-): string {
-  if (!url) return url;
-  try {
-    const u = new URL(url);
-    if (!u.hostname.endsWith("cardmarket.com")) return url;
-    if (CM_MIN_CONDITION[condition]) {
-      u.searchParams.set("minCondition", CM_MIN_CONDITION[condition]);
-    }
-    if (CM_LANGUAGE[language]) {
-      u.searchParams.set("language", CM_LANGUAGE[language]);
-    }
-    return u.toString();
-  } catch {
-    return url;
-  }
-}
-
 function Section({
   step,
   title,
@@ -117,8 +77,6 @@ export function ItemForm({
   );
 
   const [condition, setCondition] = useState(defaults.condition ?? "");
-  const [language, setLanguage] = useState(defaults.language);
-  const [cmUrl, setCmUrl] = useState(defaults.cardmarket_url ?? "");
   const [graded, setGraded] = useState(defaults.graded);
 
   // --- source ---
@@ -186,10 +144,7 @@ export function ItemForm({
                 name="condition"
                 value={c.code}
                 checked={condition === c.code}
-                onChange={() => {
-                  setCondition(c.code);
-                  setCmUrl((url) => syncCardmarketUrl(url, c.code, language));
-                }}
+                onChange={() => setCondition(c.code)}
                 className="sr-only"
                 required
               />
@@ -234,11 +189,7 @@ export function ItemForm({
             <select
               id="language"
               name="language"
-              value={language}
-              onChange={(e) => {
-                setLanguage(e.target.value);
-                setCmUrl((url) => syncCardmarketUrl(url, condition, e.target.value));
-              }}
+              defaultValue={defaults.language}
               className="field"
             >
               {LANGUAGES.map((l) => (
@@ -347,15 +298,10 @@ export function ItemForm({
             id="cardmarket_url"
             type="url"
             name="cardmarket_url"
-            placeholder="Colle l'URL produit Cardmarket…"
-            value={cmUrl}
-            onChange={(e) => setCmUrl(e.target.value)}
-            onBlur={() => setCmUrl((url) => syncCardmarketUrl(url, condition, language))}
+            placeholder="https://…"
+            defaultValue={defaults.cardmarket_url ?? ""}
             className="field"
           />
-          <p className="mt-1.5 text-[11px] text-faint">
-            Les filtres état minimum et langue se règlent seuls sur l&apos;URL.
-          </p>
         </div>
       </Section>
 

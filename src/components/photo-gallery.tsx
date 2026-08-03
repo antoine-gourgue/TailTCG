@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { X, ChevronLeft, ChevronRight, ImagePlus } from "lucide-react";
 import {
   uploadItemPhotos,
   deleteItemPhoto,
@@ -107,11 +108,8 @@ export function PhotoGallery({
             busy ? "pointer-events-none opacity-50" : ""
           }`}
         >
-          {compressing
-            ? "Compression…"
-            : pending
-              ? "Envoi…"
-              : "+ Ajouter des photos"}
+          <ImagePlus size={14} aria-hidden />
+          {compressing ? "Compression…" : pending ? "Envoi…" : "Ajouter des photos"}
           <input
             ref={inputRef}
             type="file"
@@ -162,9 +160,9 @@ export function PhotoGallery({
                 <button
                   type="submit"
                   aria-label="Supprimer la photo"
-                  className="rounded bg-black/70 px-1.5 py-0.5 text-xs text-red-300 opacity-0 transition group-hover:opacity-100 focus:opacity-100"
+                  className="flex h-6 w-6 items-center justify-center rounded-md bg-black/70 text-red-300 opacity-0 transition group-hover:opacity-100 focus:opacity-100"
                 >
-                  ✕
+                  <X size={12} aria-hidden />
                 </button>
               </form>
             </li>
@@ -196,9 +194,9 @@ export function PhotoGallery({
                   e.stopPropagation();
                   setLightbox((lightbox - 1 + photos.length) % photos.length);
                 }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-3 py-2 text-xl"
+                className="absolute left-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white"
               >
-                ←
+                <ChevronLeft size={20} aria-hidden />
               </button>
               <button
                 type="button"
@@ -207,9 +205,9 @@ export function PhotoGallery({
                   e.stopPropagation();
                   setLightbox((lightbox + 1) % photos.length);
                 }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-3 py-2 text-xl"
+                className="absolute right-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white"
               >
-                →
+                <ChevronRight size={20} aria-hidden />
               </button>
             </>
           )}
@@ -217,9 +215,9 @@ export function PhotoGallery({
             type="button"
             aria-label="Fermer"
             onClick={close}
-            className="absolute right-4 top-4 rounded-full bg-black/60 px-3 py-2 text-xl"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white"
           >
-            ✕
+            <X size={18} aria-hidden />
           </button>
         </div>
       )}
