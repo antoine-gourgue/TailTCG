@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { formatEur } from "@/lib/domain";
+import { CardImage } from "@/components/card-image";
 
 export type CollectionItem = {
   id: string;
@@ -285,19 +286,7 @@ export function CollectionClient({
             <li key={item.id}>
               <Link href={`/carte/${item.id}`}>
                 <div className="card-tile aspect-[63/88] bg-surface">
-                  {item.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={`${item.image_url}/low.webp`}
-                      alt={item.card_name}
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-muted">
-                      🃏
-                    </div>
-                  )}
+                  <CardImage base={item.image_url || null} alt={item.card_name} />
                   <span className="num absolute left-1.5 top-1.5 z-10 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-semibold">
                     {item.condition}
                   </span>

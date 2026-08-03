@@ -300,6 +300,7 @@ export function ItemForm({
             id="cardmarket_url"
             type="url"
             name="cardmarket_url"
+            placeholder="Colle l'URL produit Cardmarket…"
             value={cmUrl}
             onChange={(e) => setCmUrl(e.target.value)}
             onBlur={() => setCmUrl((url) => syncCardmarketUrl(url, condition, language))}

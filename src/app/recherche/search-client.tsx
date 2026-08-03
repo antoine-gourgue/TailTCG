@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { CardSearchResult } from "@/lib/tcgdex";
+import { CardImage } from "@/components/card-image";
 
 type Status = "idle" | "loading" | "done" | "error";
 
@@ -106,24 +107,7 @@ export function SearchClient() {
               <li key={card.id}>
                 <Link href={`/ajouter?card=${encodeURIComponent(card.id)}`}>
                 <div className="card-tile aspect-[63/88] bg-surface">
-                  {card.image ? (
-                    /* Images TCGdex déjà optimisées : balise img classique
-                       pour préserver le quota next/image du plan Hobby */
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={`${card.image}/low.webp`}
-                      alt={card.name}
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full flex-col items-center justify-center gap-2 border border-edge p-3 text-center">
-                      <span className="text-2xl">🃏</span>
-                      <span className="text-xs text-muted">
-                        Pas d&apos;image
-                      </span>
-                    </div>
-                  )}
+                  <CardImage base={card.image} alt={card.name} />
                 </div>
                 <div className="mt-2 px-0.5">
                   <p className="truncate text-sm font-medium">{card.name}</p>

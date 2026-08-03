@@ -123,7 +123,7 @@ export async function searchCards(query: string): Promise<CardSearchResult[]> {
 
   const cards: TcgdexCardBrief[] = await cardsRes.json();
 
-  return cards.map((c) => {
+  const results = cards.map((c) => {
     const setId = setIdFromCardId(c.id);
     return {
       id: c.id,
@@ -134,4 +134,25 @@ export async function searchCards(query: string): Promise<CardSearchResult[]> {
       setName: setsIndex.get(setId)?.name ?? setId,
     };
   });
+
+  // Certaines cartes n'ont pas d'image française : on récupère l'anglaise
+  // (fiches EN mises en cache 24 h, 20 max par recherche)
+  const missing = results.filter((r) => !r.image).slice(0, 20);
+  await Promise.all(
+    missing.map(async (r) => {
+      try {
+        const res = await fetch(
+          `https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(r.id)}`,
+          { next: { revalidate: DAY_SECONDS } }
+        );
+        if (!res.ok) return;
+        const c: TcgdexCardBrief = await res.json();
+        if (c.image) r.image = c.image;
+      } catch {
+        // tant pis, placeholder côté client
+      }
+    })
+  );
+
+  return results;
 }

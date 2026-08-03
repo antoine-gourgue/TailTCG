@@ -1,11 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import {
-  getCard,
-  cardImageUrl,
-  cardmarketSearchUrl,
-  cardmarketProductUrl,
-} from "@/lib/tcgdex";
+import { getCard } from "@/lib/tcgdex";
+import { CardImage } from "@/components/card-image";
 import { SiteHeader } from "@/components/site-header";
 import { ItemForm } from "@/components/item-form";
 import type { SourceOption } from "@/app/items/actions";
@@ -35,12 +31,6 @@ export default async function AjouterPage({
   const defaultType =
     card.variants?.holo && !card.variants?.normal ? "Holo" : null;
 
-  // URL produit directe si TCGdex connaît l'idProduct, sinon recherche
-  const idProduct = card.pricing?.cardmarket?.idProduct;
-  const cardmarketUrl = idProduct
-    ? cardmarketProductUrl(idProduct)
-    : cardmarketSearchUrl(card.name);
-
   return (
     <>
       <SiteHeader />
@@ -53,18 +43,7 @@ export default async function AjouterPage({
           {/* La carte choisie, pré-remplie depuis TCGdex */}
           <aside className="w-full max-w-60 shrink-0">
             <div className="card-tile aspect-[63/88] bg-surface">
-              {card.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={cardImageUrl(card.image, "low", "webp")}
-                  alt={card.name}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-muted">
-                  🃏
-                </div>
-              )}
+              <CardImage base={card.image ?? null} alt={card.name} />
             </div>
             <div className="mt-3">
               <p className="font-medium">{card.name}</p>
@@ -100,7 +79,7 @@ export default async function AjouterPage({
                 manual_price: null,
                 purchase_date: null,
                 source_id: null,
-                cardmarket_url: cardmarketUrl,
+                cardmarket_url: null,
                 graded: false,
                 grade: null,
                 notes: null,

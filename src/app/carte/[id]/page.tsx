@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/site-header";
 import { ItemForm } from "@/components/item-form";
 import { DeleteItemButton } from "@/components/delete-item-button";
 import { PhotoGallery, type GalleryPhoto } from "@/components/photo-gallery";
+import { CardImage } from "@/components/card-image";
 import type { SourceOption } from "@/app/items/actions";
 
 export const metadata = {
@@ -67,16 +68,11 @@ export default async function CartePage({
           {/* Image officielle en haute qualité */}
           <aside className="w-full max-w-sm shrink-0">
             <div className="card-tile aspect-[63/88] bg-surface">
-              {item.image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={`${item.image_url}/high.png`}
-                  alt={item.card_name ?? ""}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-muted">🃏</div>
-              )}
+              <CardImage
+                base={item.image_url || null}
+                alt={item.card_name ?? ""}
+                quality="high"
+              />
             </div>
           </aside>
 
