@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { formatEur } from "@/lib/domain";
 import { SiteHeader } from "@/components/site-header";
 import { ItemForm } from "@/components/item-form";
 import { DeleteItemButton } from "@/components/delete-item-button";
+import { PhotoGallery, type GalleryPhoto } from "@/components/photo-gallery";
 import type { SourceOption } from "@/app/items/actions";
 
 export const metadata = {
@@ -24,12 +26,34 @@ export default async function CartePage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: item }, { data: sources }] = await Promise.all([
-    supabase.from("collection_value").select("*").eq("id", id).single(),
-    supabase.from("sources").select("id, name, kind, city, url").order("name"),
-  ]);
+  const [{ data: item }, { data: sources }, { data: photoRows }] =
+    await Promise.all([
+      supabase.from("collection_value").select("*").eq("id", id).single(),
+      supabase.from("sources").select("id, name, kind, city, url").order("name"),
+      supabase
+        .from("item_photos")
+        .select("id, path, label, position")
+        .eq("item_id", id)
+        .order("position"),
+    ]);
 
   if (!item) notFound();
+
+  // URLs signées 1 h, générées côté serveur (bucket privé)
+  let photos: GalleryPhoto[] = [];
+  if (photoRows && photoRows.length > 0) {
+    const admin = createAdminClient();
+    const { data: signed } = await admin.storage
+      .from("card-photos")
+      .createSignedUrls(
+        photoRows.map((p) => p.path),
+        3600
+      );
+    photos = photoRows.flatMap((p, i) => {
+      const url = signed?.[i]?.signedUrl;
+      return url ? [{ id: p.id, url, label: p.label }] : [];
+    });
+  }
 
   return (
     <>
@@ -106,9 +130,12 @@ export default async function CartePage({
               )}
             </div>
 
+            <div className="mb-8">
+              <PhotoGallery itemId={item.id ?? id} photos={photos} />
+            </div>
+
             <p className="mb-4 text-xs text-muted">
-              L&apos;historique de cote et la galerie photos arrivent dans les
-              prochaines phases.
+              L&apos;historique de cote arrivera avec le cron des prix (Phase 6).
             </p>
 
             <h2 className="mb-4 font-[family-name:var(--font-display)] text-xl font-semibold">
