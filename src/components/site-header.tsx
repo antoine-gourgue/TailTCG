@@ -5,6 +5,7 @@ const links = [
   { href: "/", label: "Collection" },
   { href: "/recherche", label: "Ajouter" },
   { href: "/boutiques", label: "Boutiques" },
+  { href: "/stats", label: "Stats" },
 ];
 
 export function SiteHeader() {

@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/site-header";
 import { ItemForm } from "@/components/item-form";
 import { DeleteItemButton } from "@/components/delete-item-button";
 import { PhotoGallery, type GalleryPhoto } from "@/components/photo-gallery";
+import { PriceHistoryChart } from "@/components/price-history-chart";
 import type { SourceOption } from "@/app/items/actions";
 
 export const metadata = {
@@ -38,6 +39,12 @@ export default async function CartePage({
     ]);
 
   if (!item) notFound();
+
+  const { data: pricePoints } = await supabase
+    .from("price_snapshots")
+    .select("captured_at, trend")
+    .eq("tcgdex_id", item.tcgdex_id ?? "")
+    .order("captured_at");
 
   // URLs signées 1 h, générées côté serveur (bucket privé)
   let photos: GalleryPhoto[] = [];
@@ -134,9 +141,12 @@ export default async function CartePage({
               <PhotoGallery itemId={item.id ?? id} photos={photos} />
             </div>
 
-            <p className="mb-4 text-xs text-muted">
-              L&apos;historique de cote arrivera avec le cron des prix (Phase 6).
-            </p>
+            <section className="mb-8">
+              <h2 className="mb-3 font-[family-name:var(--font-display)] text-xl font-semibold">
+                Évolution de la cote
+              </h2>
+              <PriceHistoryChart points={pricePoints ?? []} />
+            </section>
 
             <h2 className="mb-4 font-[family-name:var(--font-display)] text-xl font-semibold">
               Modifier
