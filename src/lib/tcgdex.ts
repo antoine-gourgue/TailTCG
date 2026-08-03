@@ -56,6 +56,7 @@ export async function fetchSetsIndex(): Promise<Map<string, TcgdexSetBrief>> {
 export type CardmarketPricing = {
   updated?: string;
   unit?: string;
+  idProduct?: number;
   trend?: number | null;
   low?: number | null;
   avg?: number | null;
@@ -96,6 +97,16 @@ export async function getCard(id: string): Promise<TcgdexCard | null> {
 /** L'API ne fournit pas d'URL Cardmarket : lien de recherche pré-rempli, éditable */
 export function cardmarketSearchUrl(cardName: string): string {
   return `https://www.cardmarket.com/fr/Pokemon/Products/Search?searchString=${encodeURIComponent(cardName)}`;
+}
+
+/**
+ * URL produit complète via l'idProduct TCGdex : Cardmarket redirige
+ * ?idProduct=… vers la page produit en conservant les filtres.
+ * Attention : le mapping TCGdex→Cardmarket est parfois erroné (mauvaise
+ * variante) — l'URL reste éditable dans le formulaire.
+ */
+export function cardmarketProductUrl(idProduct: number): string {
+  return `https://www.cardmarket.com/fr/Pokemon/Products?idProduct=${idProduct}`;
 }
 
 export async function searchCards(query: string): Promise<CardSearchResult[]> {

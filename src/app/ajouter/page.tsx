@@ -1,6 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCard, cardImageUrl, cardmarketSearchUrl } from "@/lib/tcgdex";
+import {
+  getCard,
+  cardImageUrl,
+  cardmarketSearchUrl,
+  cardmarketProductUrl,
+} from "@/lib/tcgdex";
 import { SiteHeader } from "@/components/site-header";
 import { ItemForm } from "@/components/item-form";
 import type { SourceOption } from "@/app/items/actions";
@@ -29,6 +34,12 @@ export default async function AjouterPage({
   // Pré-sélection du type d'après les variantes du set
   const defaultType =
     card.variants?.holo && !card.variants?.normal ? "Holo" : null;
+
+  // URL produit directe si TCGdex connaît l'idProduct, sinon recherche
+  const idProduct = card.pricing?.cardmarket?.idProduct;
+  const cardmarketUrl = idProduct
+    ? cardmarketProductUrl(idProduct)
+    : cardmarketSearchUrl(card.name);
 
   return (
     <>
@@ -89,7 +100,7 @@ export default async function AjouterPage({
                 manual_price: null,
                 purchase_date: null,
                 source_id: null,
-                cardmarket_url: cardmarketSearchUrl(card.name),
+                cardmarket_url: cardmarketUrl,
                 graded: false,
                 grade: null,
                 notes: null,
