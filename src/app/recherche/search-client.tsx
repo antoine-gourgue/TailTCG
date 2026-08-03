@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { CardSearchResult } from "@/lib/tcgdex";
 
@@ -11,17 +12,22 @@ export function SearchClient() {
   const [status, setStatus] = useState<Status>("idle");
   const abortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    const q = query.trim();
-    abortRef.current?.abort();
-
-    if (q.length < 2) {
+  function handleChange(value: string) {
+    setQuery(value);
+    if (value.trim().length < 2) {
+      abortRef.current?.abort();
       setCards([]);
       setStatus("idle");
-      return;
+    } else {
+      setStatus("loading");
     }
+  }
 
-    setStatus("loading");
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) return;
+
+    abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
@@ -53,7 +59,7 @@ export function SearchClient() {
       <input
         type="search"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => handleChange(e.target.value)}
         placeholder="Nom de la carte… (ex. aligatueur)"
         autoFocus
         className="mb-8 w-full max-w-md rounded-lg border border-edge bg-surface px-4 py-3 text-foreground placeholder:text-muted focus:border-neutral-500 focus:outline-none"
@@ -98,6 +104,7 @@ export function SearchClient() {
           <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {cards.map((card) => (
               <li key={card.id}>
+                <Link href={`/ajouter?card=${encodeURIComponent(card.id)}`}>
                 <div className="card-tile aspect-[63/88] bg-surface">
                   {card.image ? (
                     /* Images TCGdex déjà optimisées : balise img classique
@@ -127,6 +134,7 @@ export function SearchClient() {
                     </span>
                   </p>
                 </div>
+                </Link>
               </li>
             ))}
           </ul>

@@ -3,7 +3,7 @@ import { signOut } from "@/app/actions";
 
 const links = [
   { href: "/", label: "Collection" },
-  { href: "/recherche", label: "Recherche" },
+  { href: "/recherche", label: "Ajouter" },
 ];
 
 export function SiteHeader() {

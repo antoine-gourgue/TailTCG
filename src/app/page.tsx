@@ -2,6 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SiteHeader } from "@/components/site-header";
+import {
+  CollectionClient,
+  type CollectionItem,
+  type SourceRef,
+} from "@/components/collection-client";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -13,20 +18,35 @@ export default async function Home() {
     redirect("/login");
   }
 
+  const [{ data: items }, { data: sources }] = await Promise.all([
+    supabase
+      .from("collection_value")
+      .select(
+        "id, tcgdex_id, card_name, set_name, set_id, local_id, image_url, card_type, language, condition, quantity, purchase_price, purchase_date, source_id, graded, grade, created_at, current_price, gain"
+      )
+      .order("created_at", { ascending: false }),
+    supabase.from("sources").select("id, name").order("name"),
+  ]);
+
   return (
     <>
       <SiteHeader />
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <h1 className="mb-2 font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight">
-          Collection
-        </h1>
-        <p className="mb-8 text-sm text-muted">
-          La grille de collection arrive en Phase 3. En attendant, la{" "}
-          <Link href="/recherche" className="underline hover:text-foreground">
-            recherche TCGdex
-          </Link>{" "}
-          est ouverte.
-        </p>
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight">
+            Collection
+          </h1>
+          <Link
+            href="/recherche"
+            className="rounded-lg bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-950 transition hover:bg-white"
+          >
+            + Ajouter une carte
+          </Link>
+        </div>
+        <CollectionClient
+          items={(items ?? []) as CollectionItem[]}
+          sources={(sources ?? []) as SourceRef[]}
+        />
       </main>
     </>
   );

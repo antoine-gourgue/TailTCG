@@ -52,6 +52,51 @@ export async function fetchSetsIndex(): Promise<Map<string, TcgdexSetBrief>> {
   return new Map(sets.map((s) => [s.id, s]));
 }
 
+/** Prix Cardmarket d'une fiche complète — toute clé peut manquer */
+export type CardmarketPricing = {
+  updated?: string;
+  unit?: string;
+  trend?: number | null;
+  low?: number | null;
+  avg?: number | null;
+  avg7?: number | null;
+  avg30?: number | null;
+  "trend-holo"?: number | null;
+  "avg30-holo"?: number | null;
+};
+
+export type TcgdexCard = {
+  id: string;
+  localId: string;
+  name: string;
+  image?: string;
+  set: { id: string; name: string; cardCount?: { total: number; official: number } };
+  rarity?: string;
+  category?: string;
+  illustrator?: string;
+  variants?: {
+    normal?: boolean;
+    holo?: boolean;
+    reverse?: boolean;
+    firstEdition?: boolean;
+    wPromo?: boolean;
+  };
+  pricing?: { cardmarket?: CardmarketPricing };
+};
+
+export async function getCard(id: string): Promise<TcgdexCard | null> {
+  const res = await fetch(`${TCGDEX_BASE}/cards/${encodeURIComponent(id)}`, {
+    next: { revalidate: DAY_SECONDS },
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+/** L'API ne fournit pas d'URL Cardmarket : lien de recherche pré-rempli, éditable */
+export function cardmarketSearchUrl(cardName: string): string {
+  return `https://www.cardmarket.com/fr/Pokemon/Products/Search?searchString=${encodeURIComponent(cardName)}`;
+}
+
 export async function searchCards(query: string): Promise<CardSearchResult[]> {
   const [cardsRes, setsIndex] = await Promise.all([
     fetch(`${TCGDEX_BASE}/cards?name=like:${encodeURIComponent(query)}`, {
