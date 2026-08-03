@@ -14,7 +14,16 @@ const mono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "TailTCG",
-  description: "Ma collection de cartes Pokémon",
+  description: "Ta collection de cartes Pokémon, organisée et valorisée.",
+  appleWebApp: {
+    capable: true,
+    title: "TailTCG",
+    statusBarStyle: "black-translucent",
+  },
+};
+
+export const viewport = {
+  themeColor: "#131215",
 };
 
 // Applique thème (sombre par défaut) et état de la sidebar avant le premier

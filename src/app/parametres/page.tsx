@@ -1,5 +1,13 @@
 import { redirect } from "next/navigation";
-import { FileJson, FileSpreadsheet, ShieldOff } from "lucide-react";
+import {
+  FileJson,
+  FileSpreadsheet,
+  ShieldOff,
+  Share,
+  SquarePlus,
+  EllipsisVertical,
+  Smartphone,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app-shell";
 import { SetPasswordForm } from "@/components/set-password-form";
@@ -70,6 +78,61 @@ export default async function ParametresPage() {
               secours.
             </p>
             <SetPasswordForm />
+          </section>
+
+          {/* Installer l'app */}
+          <section className="panel p-5">
+            <h2 className="display mb-1 flex items-center gap-2 text-base font-semibold">
+              <Smartphone size={16} aria-hidden />
+              Installer sur ton téléphone
+            </h2>
+            <p className="mb-4 text-sm text-muted">
+              TailTCG s&apos;installe comme une vraie app, avec son icône sur
+              l&apos;écran d&apos;accueil — pratique pour photographier tes
+              cartes.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-edge p-4">
+                <p className="label-xs mb-2.5">iPhone / iPad (Safari)</p>
+                <ol className="flex flex-col gap-2 text-sm text-muted">
+                  <li className="flex items-center gap-2">
+                    <span className="num shrink-0 font-semibold text-foreground">1.</span>
+                    Ouvre tailtcg.vercel.app dans Safari
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="num shrink-0 font-semibold text-foreground">2.</span>
+                    Touche <Share size={14} className="inline shrink-0" aria-label="Partager" />{" "}
+                    (Partager) en bas de l&apos;écran
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="num shrink-0 font-semibold text-foreground">3.</span>
+                    Choisis{" "}
+                    <span className="inline-flex items-center gap-1 text-foreground">
+                      <SquarePlus size={14} aria-hidden /> « Sur l&apos;écran d&apos;accueil »
+                    </span>
+                  </li>
+                </ol>
+              </div>
+              <div className="rounded-xl border border-edge p-4">
+                <p className="label-xs mb-2.5">Android (Chrome)</p>
+                <ol className="flex flex-col gap-2 text-sm text-muted">
+                  <li className="flex items-center gap-2">
+                    <span className="num shrink-0 font-semibold text-foreground">1.</span>
+                    Ouvre tailtcg.vercel.app dans Chrome
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="num shrink-0 font-semibold text-foreground">2.</span>
+                    Touche le menu{" "}
+                    <EllipsisVertical size={14} className="inline shrink-0" aria-label="Menu" /> en
+                    haut à droite
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="num shrink-0 font-semibold text-foreground">3.</span>
+                    Choisis « Ajouter à l&apos;écran d&apos;accueil »
+                  </li>
+                </ol>
+              </div>
+            </div>
           </section>
 
           {/* Sauvegardes */}
