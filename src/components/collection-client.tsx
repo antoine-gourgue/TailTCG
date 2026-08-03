@@ -177,22 +177,24 @@ export function CollectionClient({
   return (
     <div>
       {/* Résumé : la valeur du classeur, toujours visible */}
-      <div className="panel rise-in mb-5 flex flex-wrap items-center gap-x-10 gap-y-4 px-6 py-4">
-        <Stat label="Cartes" value={summary.count} />
-        <Stat label="Investi" value={formatEur(summary.invested)} />
-        <Stat label="Valeur estimée" value={formatEur(summary.value)} />
-        <Stat
-          label="Plus-value"
-          value={
-            summary.gain == null
-              ? "—"
-              : `${summary.gain > 0 ? "+" : ""}${formatEur(summary.gain)}`
-          }
-          tone={
-            summary.gain == null ? undefined : summary.gain >= 0 ? "up" : "down"
-          }
-        />
-        <div className="ml-auto hidden items-center sm:flex">
+      <div className="panel rise-in mb-5 flex flex-col gap-4 px-5 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-10 sm:px-6">
+        <div className="grid grid-cols-2 gap-4 sm:contents">
+          <Stat label="Cartes" value={summary.count} />
+          <Stat label="Investi" value={formatEur(summary.invested)} />
+          <Stat label="Valeur estimée" value={formatEur(summary.value)} />
+          <Stat
+            label="Plus-value"
+            value={
+              summary.gain == null
+                ? "—"
+                : `${summary.gain > 0 ? "+" : ""}${formatEur(summary.gain)}`
+            }
+            tone={
+              summary.gain == null ? undefined : summary.gain >= 0 ? "up" : "down"
+            }
+          />
+        </div>
+        <div className="flex items-center sm:ml-auto">
           <div className="flex overflow-hidden rounded-lg border border-edge">
             <button
               type="button"
@@ -356,7 +358,7 @@ export function CollectionClient({
         </ul>
       ) : (
         <div className="panel rise-in overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b border-edge text-left">
                 <th className="label-xs px-4 py-3">Carte</th>

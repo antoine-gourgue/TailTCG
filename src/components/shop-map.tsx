@@ -23,7 +23,7 @@ export default function ShopMap({ shops }: { shops: SourceWithStats[] }) {
       center={[46.6, 2.4]}
       zoom={6}
       scrollWheelZoom={false}
-      className="z-0 h-105 w-full rounded-xl border border-edge"
+      className="z-0 h-64 w-full rounded-2xl border border-edge md:h-105"
     >
       <TileLayer
         attribution='&copy; les contributeurs <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

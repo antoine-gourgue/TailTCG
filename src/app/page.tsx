@@ -37,7 +37,7 @@ export default async function Home({
     <>
       <AppShell>
       <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="display text-3xl font-bold tracking-tight">Collection</h1>
           <Link href="/recherche" className="btn btn-primary">
             + Ajouter une carte

@@ -15,7 +15,7 @@ import { formatEur } from "@/lib/domain";
 const ShopMap = dynamic(() => import("./shop-map"), {
   ssr: false,
   loading: () => (
-    <div className="h-105 w-full animate-pulse rounded-xl border border-edge bg-surface" />
+    <div className="h-64 w-full animate-pulse rounded-2xl border border-edge bg-surface md:h-105" />
   ),
 });
 

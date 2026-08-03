@@ -172,27 +172,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* ——— Barre haute (mobile) ——— */}
       <header className="sticky top-0 z-40 border-b border-edge bg-surface/90 backdrop-blur-md md:hidden">
-        <div className="flex h-13 items-center gap-2 px-4 py-2">
+        <div className="flex h-13 items-center gap-2 px-3 py-2">
           <Pokeball size={20} />
-          <nav className="flex flex-1 items-center gap-0.5 overflow-x-auto text-sm">
+          <nav className="scrollbar-none flex flex-1 items-center gap-0.5 overflow-x-auto text-sm">
             {NAV.map((item) => {
               const active = isActive(item.href, pathname);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`shrink-0 rounded-full px-3 py-1.5 transition ${
+                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 transition ${
                     active
                       ? "bg-accent-soft font-semibold text-accent-strong"
                       : "text-muted"
                   }`}
                 >
+                  <item.Icon size={14} aria-hidden />
                   {item.label}
                 </Link>
               );
             })}
           </nav>
           <ThemeToggle />
+          <form action={signOut}>
+            <button
+              type="submit"
+              aria-label="Déconnexion"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-edge text-muted"
+            >
+              <LogOut size={14} aria-hidden />
+            </button>
+          </form>
         </div>
       </header>
 

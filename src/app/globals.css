@@ -321,6 +321,15 @@ a:hover .card-tile,
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
 }
 
+/* Barre de nav mobile : défilement sans ascenseur visible */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* Apparition douce */
 @keyframes rise-in {
   from {
