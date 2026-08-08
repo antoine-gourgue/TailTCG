@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { Trash2 } from "lucide-react";
 import type { CardSearchResult, SerieWithSets, CatalogLang } from "@/lib/tcgdex";
+import { deleteCustomCard } from "@/app/ajouter/manuel/actions";
 import { CardImage } from "@/components/card-image";
+import { ConfirmAction } from "@/components/confirm-action";
 import { ExtensionsBrowser } from "@/components/extensions-browser";
 
 type Status = "idle" | "loading" | "done" | "error";
@@ -78,7 +81,7 @@ export function SearchClient({
         type="search"
         value={query}
         onChange={(e) => handleChange(e.target.value)}
-        placeholder="Nom ou nom + numéro… (ex. pikachu ex 764/742)"
+        placeholder="Nom ou nom + numéro… (ex. pikachu 27)"
         autoFocus
         className="field mb-8 max-w-md !px-4 !py-3 !text-base"
       />
@@ -97,8 +100,8 @@ export function SearchClient({
               </div>
               <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                 {customCards.map((card) => (
-                  <li key={card.id}>
-                    <Link href={`/ajouter?card=custom:${card.id}`} className="group block">
+                  <li key={card.id} className="group relative">
+                    <Link href={`/ajouter?card=custom:${card.id}`} className="block">
                       <div className="card-tile aspect-[63/88]">
                         <CardImage base={card.image} alt={card.name} direct />
                       </div>
@@ -112,6 +115,17 @@ export function SearchClient({
                         </p>
                       </div>
                     </Link>
+                    <div className="absolute right-2 top-2 z-20 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
+                      <ConfirmAction
+                        action={deleteCustomCard}
+                        fields={{ card_id: card.id }}
+                        title={`Supprimer « ${card.name} » ?`}
+                        message="La carte, sa photo ET tes exemplaires en collection (avec leurs photos) seront supprimés définitivement."
+                        trigger={<Trash2 size={13} aria-hidden />}
+                        triggerAriaLabel="Supprimer la carte hors catalogue"
+                        triggerClassName="flex h-7 w-7 items-center justify-center rounded-lg bg-black/70 text-white backdrop-blur-sm transition hover:bg-loss"
+                      />
+                    </div>
                   </li>
                 ))}
               </ul>

@@ -57,8 +57,8 @@ export default async function RecherchePage({
           Ajouter une carte
         </h1>
         <p className="mb-6 text-sm text-muted">
-          Cherche une carte par son nom (« pikachu ex 764/742 » marche aussi),
-          feuillette les extensions ci-dessous — ou{" "}
+          Cherche une carte par son nom ou son numéro, feuillette les
+          extensions ci-dessous — ou{" "}
           <a
             href="/ajouter/manuel"
             className="text-accent underline-offset-2 hover:underline"

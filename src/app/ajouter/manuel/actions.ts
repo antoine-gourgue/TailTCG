@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -62,4 +63,49 @@ export async function createCustomCard(
   }
 
   redirect(`/ajouter?card=custom:${created.id}`);
+}
+
+// Supprime une carte hors catalogue ET tout ce qui s'y rattache :
+// exemplaires en collection, photos d'exemplaires, photo de la carte
+export async function deleteCustomCard(formData: FormData): Promise<void> {
+  const cardId = String(formData.get("card_id") ?? "");
+  if (!cardId) return;
+
+  const supabase = await createClient();
+  const { data: card } = await supabase
+    .from("custom_cards")
+    .select("id, image_path")
+    .eq("id", cardId)
+    .single();
+  if (!card) return;
+
+  const admin = createAdminClient();
+  const tcgdexId = `custom:${card.id}`;
+
+  // Photos des exemplaires liés (fichiers du bucket)
+  const { data: items } = await supabase
+    .from("items")
+    .select("id")
+    .eq("tcgdex_id", tcgdexId);
+  if (items && items.length > 0) {
+    const { data: photos } = await supabase
+      .from("item_photos")
+      .select("path")
+      .in(
+        "item_id",
+        items.map((i) => i.id)
+      );
+    if (photos && photos.length > 0) {
+      await admin.storage
+        .from("card-photos")
+        .remove(photos.map((p) => p.path));
+    }
+    await supabase.from("items").delete().eq("tcgdex_id", tcgdexId);
+  }
+
+  await admin.storage.from("card-photos").remove([card.image_path]);
+  await supabase.from("custom_cards").delete().eq("id", card.id);
+
+  revalidatePath("/recherche");
+  revalidatePath("/");
 }
