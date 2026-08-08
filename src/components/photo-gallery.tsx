@@ -139,7 +139,7 @@ export function PhotoGallery({
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {/* Tuile d'ajout */}
         <label
           className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-edge-strong text-muted transition hover:border-accent hover:bg-accent-soft/40 hover:text-accent ${

@@ -162,7 +162,7 @@ export default async function CartePage({
           </div>
         </div>
 
-        <div className="flex flex-col gap-8 lg:min-h-[calc(100vh-10rem)] lg:flex-row">
+        <div className="flex flex-col gap-8 lg:flex-row">
           {/* Image officielle en haute qualité */}
           <aside className="flex w-full max-w-96 shrink-0 flex-col">
             <div className="card-tile aspect-[63/88]">
@@ -173,11 +173,7 @@ export default async function CartePage({
               />
             </div>
             {tcgdexCard && (
-              <section
-                className={`panel mt-5 p-5 ${
-                  valueHistory && valueHistory.length > 0 ? "" : "lg:flex-1"
-                }`}
-              >
+              <section className="panel mt-5 p-5 lg:flex-1">
                 <h2 className="display mb-4 text-base font-semibold">La carte</h2>
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
                   {tcgdexCard.rarity && (
@@ -213,17 +209,6 @@ export default async function CartePage({
               </section>
             )}
 
-            {valueHistory && valueHistory.length > 0 && (
-              <section className="panel mt-5 p-5 lg:flex-1">
-                <h2 className="display mb-1 text-base font-semibold">
-                  Ma valeur estimée
-                </h2>
-                <p className="mb-3 text-xs text-faint">
-                  Chaque actualisation est datée.
-                </p>
-                <ValueHistoryChart points={valueHistory} />
-              </section>
-            )}
           </aside>
 
           <div className="flex min-w-0 flex-1 flex-col">
@@ -356,7 +341,7 @@ export default async function CartePage({
             ) : (
               <>
                 {/* Détails de l'exemplaire */}
-                <section className="panel mb-6 p-5">
+                <section className="panel p-5 lg:flex-1">
                   <h2 className="display mb-4 text-base font-semibold">
                     Cet exemplaire
                   </h2>
@@ -419,16 +404,29 @@ export default async function CartePage({
                     </div>
                   )}
                 </section>
-
-                <PhotoGallery
-                  itemId={item.id ?? id}
-                  photos={photos}
-                  className="lg:flex-1"
-                />
               </>
             )}
           </div>
         </div>
+
+        {/* Pleine largeur : la courbe respire, la galerie garde sa hauteur */}
+        {!editing && (
+          <div className="mt-8 flex flex-col gap-8">
+            {valueHistory && valueHistory.length > 0 && (
+              <section className="panel p-5">
+                <h2 className="display mb-1 text-base font-semibold">
+                  Évolution de ma valeur estimée
+                </h2>
+                <p className="mb-3 text-xs text-faint">
+                  Chaque actualisation est datée — bouton « Actualiser la
+                  valeur » en haut de page.
+                </p>
+                <ValueHistoryChart points={valueHistory} />
+              </section>
+            )}
+            <PhotoGallery itemId={item.id ?? id} photos={photos} />
+          </div>
+        )}
       </main>
     </AppShell>
   );
