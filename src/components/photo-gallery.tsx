@@ -1,12 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { X, ChevronLeft, ChevronRight, ImagePlus } from "lucide-react";
+import {
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ImagePlus,
+  Trash2,
+  Loader2,
+  Expand,
+} from "lucide-react";
 import {
   uploadItemPhotos,
   deleteItemPhoto,
   type PhotoActionState,
 } from "@/app/items/photo-actions";
+import { ConfirmAction } from "@/components/confirm-action";
 
 export type GalleryPhoto = {
   id: string;
@@ -100,16 +109,32 @@ export function PhotoGallery({
   }, [lightbox, photos.length, close]);
 
   return (
-    <section>
-      <div className="mb-3 flex items-center gap-4">
-        <h2 className="display text-xl font-semibold">Mes photos</h2>
+    <section className="panel p-5">
+      <div className="mb-4 flex items-baseline gap-2">
+        <h2 className="display text-base font-semibold">Mes photos</h2>
+        {photos.length > 0 && (
+          <span className="num text-sm text-faint">{photos.length}</span>
+        )}
+        <span className="ml-auto text-xs text-faint">
+          recto, verso, défauts…
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+        {/* Tuile d'ajout */}
         <label
-          className={`btn btn-ghost cursor-pointer !py-1.5 text-[13px] ${
-            busy ? "pointer-events-none opacity-50" : ""
+          className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-edge-strong text-muted transition hover:border-accent hover:text-accent ${
+            busy ? "pointer-events-none opacity-60" : ""
           }`}
         >
-          <ImagePlus size={14} aria-hidden />
-          {compressing ? "Compression…" : pending ? "Envoi…" : "Ajouter des photos"}
+          {busy ? (
+            <Loader2 size={22} className="animate-spin" aria-hidden />
+          ) : (
+            <ImagePlus size={22} aria-hidden />
+          )}
+          <span className="px-2 text-center text-xs font-medium">
+            {compressing ? "Compression…" : pending ? "Envoi…" : "Ajouter"}
+          </span>
           <input
             ref={inputRef}
             type="file"
@@ -120,60 +145,51 @@ export function PhotoGallery({
             disabled={busy}
           />
         </label>
+
+        {photos.map((photo, i) => (
+          <div key={photo.id} className="group relative">
+            <button
+              type="button"
+              onClick={() => setLightbox(i)}
+              className="block w-full overflow-hidden rounded-xl border border-edge"
+              aria-label="Agrandir la photo"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={photo.url}
+                alt={photo.label ?? "Photo perso"}
+                loading="lazy"
+                className="aspect-square w-full object-cover transition duration-300 group-hover:scale-105"
+              />
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition group-hover:bg-black/25 group-hover:opacity-100">
+                <Expand size={18} className="text-white drop-shadow" aria-hidden />
+              </span>
+            </button>
+            <div className="absolute right-1.5 top-1.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
+              <ConfirmAction
+                action={deleteItemPhoto}
+                fields={{ photo_id: photo.id }}
+                title="Supprimer cette photo ?"
+                message="Elle sera retirée de la galerie et du stockage, sans retour possible."
+                trigger={<Trash2 size={13} aria-hidden />}
+                triggerAriaLabel="Supprimer la photo"
+                triggerClassName="flex h-7 w-7 items-center justify-center rounded-lg bg-black/70 text-white backdrop-blur-sm transition hover:bg-loss"
+              />
+            </div>
+          </div>
+        ))}
       </div>
 
       {state && (
-        <p className={`mb-3 text-sm ${state.ok ? "text-gain" : "text-loss"}`}>
+        <p className={`mt-3 text-sm ${state.ok ? "text-gain" : "text-loss"}`}>
           {state.message}
         </p>
-      )}
-
-      {photos.length === 0 ? (
-        <p className="text-sm text-muted">
-          Aucune photo perso pour cet exemplaire (recto, verso, défauts…).
-        </p>
-      ) : (
-        <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
-          {photos.map((photo, i) => (
-            <li key={photo.id} className="group relative">
-              <button
-                type="button"
-                onClick={() => setLightbox(i)}
-                className="block w-full overflow-hidden rounded-lg border border-edge"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={photo.url}
-                  alt={photo.label ?? "Photo perso"}
-                  loading="lazy"
-                  className="aspect-square w-full object-cover transition group-hover:scale-105"
-                />
-              </button>
-              <form
-                action={deleteItemPhoto}
-                onSubmit={(e) => {
-                  if (!window.confirm("Supprimer cette photo ?")) e.preventDefault();
-                }}
-                className="absolute right-1 top-1"
-              >
-                <input type="hidden" name="photo_id" value={photo.id} />
-                <button
-                  type="submit"
-                  aria-label="Supprimer la photo"
-                  className="flex h-6 w-6 items-center justify-center rounded-md bg-black/70 text-red-300 opacity-0 transition group-hover:opacity-100 focus:opacity-100"
-                >
-                  <X size={12} aria-hidden />
-                </button>
-              </form>
-            </li>
-          ))}
-        </ul>
       )}
 
       {/* Lightbox */}
       {lightbox !== null && photos[lightbox] && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
           onClick={close}
           role="dialog"
           aria-modal="true"
@@ -182,9 +198,12 @@ export function PhotoGallery({
           <img
             src={photos[lightbox].url}
             alt={photos[lightbox].label ?? "Photo perso"}
-            className="max-h-full max-w-full rounded-lg object-contain"
+            className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
+          <span className="num absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-sm text-white">
+            {lightbox + 1} / {photos.length}
+          </span>
           {photos.length > 1 && (
             <>
               <button
@@ -194,7 +213,7 @@ export function PhotoGallery({
                   e.stopPropagation();
                   setLightbox((lightbox - 1 + photos.length) % photos.length);
                 }}
-                className="absolute left-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white"
+                className="absolute left-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20"
               >
                 <ChevronLeft size={20} aria-hidden />
               </button>
@@ -205,7 +224,7 @@ export function PhotoGallery({
                   e.stopPropagation();
                   setLightbox((lightbox + 1) % photos.length);
                 }}
-                className="absolute right-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white"
+                className="absolute right-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20"
               >
                 <ChevronRight size={20} aria-hidden />
               </button>
@@ -215,7 +234,7 @@ export function PhotoGallery({
             type="button"
             aria-label="Fermer"
             onClick={close}
-            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20"
           >
             <X size={18} aria-hidden />
           </button>

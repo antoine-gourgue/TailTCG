@@ -10,6 +10,7 @@ import {
   type SourceFormState,
 } from "@/app/boutiques/actions";
 import { formatEur } from "@/lib/domain";
+import { ConfirmAction } from "@/components/confirm-action";
 
 // Leaflet touche window : jamais rendu côté serveur
 const ShopMap = dynamic(() => import("./shop-map"), {
@@ -179,22 +180,14 @@ function SourceRow({ source }: { source: SourceWithStats }) {
           >
             {editing ? "Fermer" : "Modifier"}
           </button>
-          <form
+          <ConfirmAction
             action={deleteSource}
-            onSubmit={(e) => {
-              if (
-                !window.confirm(
-                  `Supprimer « ${source.name} » ? Les cartes achetées là perdront leur source.`
-                )
-              )
-                e.preventDefault();
-            }}
-          >
-            <input type="hidden" name="source_id" value={source.id} />
-            <button type="submit" className="text-loss transition hover:opacity-80">
-              Supprimer
-            </button>
-          </form>
+            fields={{ source_id: source.id }}
+            title={`Supprimer « ${source.name} » ?`}
+            message="Les cartes achetées là resteront dans ta collection mais perdront leur source."
+            trigger="Supprimer"
+            triggerClassName="text-loss transition hover:opacity-80"
+          />
         </div>
       </div>
       {editing && <EditSourceForm source={source} onDone={() => setEditing(false)} />}

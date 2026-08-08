@@ -1,21 +1,23 @@
 "use client";
 
+import { Trash2 } from "lucide-react";
 import { deleteItem } from "@/app/items/actions";
+import { ConfirmAction } from "@/components/confirm-action";
 
 export function DeleteItemButton({ itemId }: { itemId: string }) {
   return (
-    <form
+    <ConfirmAction
       action={deleteItem}
-      onSubmit={(e) => {
-        if (!window.confirm("Supprimer cet exemplaire de la collection ?")) {
-          e.preventDefault();
-        }
-      }}
-    >
-      <input type="hidden" name="item_id" value={itemId} />
-      <button type="submit" className="btn btn-danger">
-        Supprimer cet exemplaire
-      </button>
-    </form>
+      fields={{ item_id: itemId }}
+      title="Supprimer cet exemplaire ?"
+      message="La carte, ses photos et son historique disparaîtront de ta collection, sans retour possible."
+      trigger={
+        <>
+          <Trash2 size={15} aria-hidden />
+          Supprimer cet exemplaire
+        </>
+      }
+      triggerClassName="btn btn-danger"
+    />
   );
 }
