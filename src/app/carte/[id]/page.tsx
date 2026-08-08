@@ -12,7 +12,7 @@ import { DeleteItemButton } from "@/components/delete-item-button";
 import { PhotoGallery, type GalleryPhoto } from "@/components/photo-gallery";
 import { CardImage } from "@/components/card-image";
 import { ValueHistoryChart } from "@/components/value-history-chart";
-import { QuickValueEdit } from "@/components/quick-value-edit";
+import { ValueUpdateButton } from "@/components/quick-value-edit";
 import type { SourceOption } from "@/app/items/actions";
 
 export const metadata = {
@@ -240,10 +240,16 @@ export default async function CartePage({
                   Annuler
                 </Link>
               ) : (
-                <Link href={`/carte/${id}?edit`} className="btn btn-primary">
-                  <Pencil size={15} aria-hidden />
-                  Modifier
-                </Link>
+                <div className="flex flex-wrap gap-2">
+                  <ValueUpdateButton
+                    itemId={item.id ?? id}
+                    current={item.current_price}
+                  />
+                  <Link href={`/carte/${id}?edit`} className="btn btn-primary">
+                    <Pencil size={15} aria-hidden />
+                    Modifier
+                  </Link>
+                </div>
               )}
             </div>
 
@@ -257,16 +263,15 @@ export default async function CartePage({
               </div>
               <div className="flex flex-col gap-0.5">
                 <span className="label-xs">Valeur estimée</span>
-                {editing ? (
-                  <span className="display num text-xl font-bold leading-none text-faint">
-                    {item.current_price != null ? formatEur(item.current_price) : "—"}
-                  </span>
-                ) : (
-                  <QuickValueEdit
-                    itemId={item.id ?? id}
-                    current={item.current_price}
-                  />
-                )}
+                <span
+                  className={`display num text-xl font-bold leading-none ${
+                    item.current_price == null ? "text-faint" : ""
+                  }`}
+                >
+                  {item.current_price != null
+                    ? formatEur(item.current_price)
+                    : "—"}
+                </span>
               </div>
               {item.gain != null && (
                 <div className="flex flex-col gap-0.5">
