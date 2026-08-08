@@ -6,6 +6,7 @@ import { useSyncExternalStore } from "react";
 import {
   LayoutGrid,
   SearchIcon,
+  Star,
   MapPin,
   BarChart3,
   Settings,
@@ -35,6 +36,7 @@ function getSidebar(): "open" | "rail" {
 const NAV = [
   { href: "/", label: "Collection", Icon: LayoutGrid },
   { href: "/recherche", label: "Ajouter", Icon: SearchIcon },
+  { href: "/wishlist", label: "Recherchées", Icon: Star },
   { href: "/boutiques", label: "Boutiques", Icon: MapPin },
   { href: "/stats", label: "Stats", Icon: BarChart3 },
   { href: "/parametres", label: "Paramètres", Icon: Settings },

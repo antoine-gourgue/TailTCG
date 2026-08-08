@@ -5,6 +5,7 @@ import { getCard } from "@/lib/tcgdex";
 import { CardImage } from "@/components/card-image";
 import { AppShell } from "@/components/app-shell";
 import { ItemForm, type CardMeta } from "@/components/item-form";
+import { WishlistButton } from "@/components/wishlist-button";
 import type { SourceOption } from "@/app/items/actions";
 
 export const metadata = {
@@ -76,10 +77,14 @@ export default async function AjouterPage({
     defaultType = card.variants?.holo && !card.variants?.normal ? "Holo" : null;
   }
 
-  const { data: sources } = await supabase
-    .from("sources")
-    .select("id, name, kind, city, url")
-    .order("name");
+  const [{ data: sources }, { data: wish }] = await Promise.all([
+    supabase.from("sources").select("id, name, kind, city, url").order("name"),
+    supabase
+      .from("wishlist")
+      .select("id")
+      .eq("tcgdex_id", meta.tcgdexId)
+      .maybeSingle(),
+  ]);
 
   return (
     <AppShell>
@@ -104,6 +109,9 @@ export default async function AjouterPage({
                   {rarity}
                 </p>
               )}
+              <div className="mt-4">
+                <WishlistButton card={meta} initialWished={Boolean(wish)} />
+              </div>
             </div>
           </aside>
 

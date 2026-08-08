@@ -151,13 +151,22 @@ export default async function StatsPage() {
     supabase
       .from("collection_value")
       .select(
-        "id, tcgdex_id, card_name, set_id, set_name, condition, quantity, purchase_price, source_id, current_price, gain"
+        "id, tcgdex_id, card_name, set_id, set_name, condition, quantity, purchase_price, source_id, current_price, gain, sold_price, sold_at"
       ),
     supabase.from("sources").select("id, name"),
     fetchSetsIndex(),
   ]);
 
-  const rows = items ?? [];
+  const allRows = items ?? [];
+  // La collection active ; les ventes alimentent la plus-value réalisée
+  const rows = allRows.filter((r) => r.sold_at == null);
+  const soldRows = allRows.filter((r) => r.sold_at != null);
+  let realized = 0;
+  for (const s of soldRows) {
+    if (s.sold_price != null && s.purchase_price != null) {
+      realized += (s.sold_price - s.purchase_price) * (s.quantity ?? 1);
+    }
+  }
 
   // Totaux
   let count = 0;
@@ -252,6 +261,13 @@ export default async function StatsPage() {
                 value={gain == null ? "—" : `${gain > 0 ? "+" : ""}${formatEur(gain)}`}
                 tone={gain == null ? undefined : gain >= 0 ? "up" : "down"}
               />
+              {soldRows.length > 0 && (
+                <StatTile
+                  label={`Réalisée (${soldRows.length} vente${soldRows.length > 1 ? "s" : ""})`}
+                  value={`${realized > 0 ? "+" : ""}${formatEur(realized)}`}
+                  tone={realized >= 0 ? "up" : "down"}
+                />
+              )}
             </div>
 
             {valueSeries.length > 0 && (

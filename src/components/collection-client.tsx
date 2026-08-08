@@ -28,7 +28,17 @@ export type CollectionItem = {
   created_at: string;
   current_price: number | null;
   gain: number | null;
+  sold_price: number | null;
+  sold_at: string | null;
 };
+
+/** minuscules sans accents, pour la recherche texte */
+function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
 
 export type SourceRef = { id: string; name: string };
 
@@ -80,6 +90,8 @@ export function CollectionClient({
   initialSet?: string;
 }) {
   const [view, setView] = useState<"grid" | "table">("grid");
+  const [q, setQ] = useState("");
+  const [fSold, setFSold] = useState<"active" | "sold" | "all">("active");
   const [fSet, setFSet] = useState(initialSet);
   const [fCondition, setFCondition] = useState("");
   const [fType, setFType] = useState("");
@@ -115,8 +127,15 @@ export function CollectionClient({
   );
 
   const filtered = useMemo(() => {
+    const needle = normalize(q.trim());
     const list = items.filter(
       (i) =>
+        (fSold === "all" ||
+          (fSold === "sold" ? i.sold_at != null : i.sold_at == null)) &&
+        (!needle ||
+          normalize(`${i.card_name} ${i.set_name} ${i.local_id}`).includes(
+            needle
+          )) &&
         (!fSet || i.set_id === fSet) &&
         (!fCondition || i.condition === fCondition) &&
         (!fType || i.card_type === fType) &&
@@ -136,7 +155,7 @@ export function CollectionClient({
         (a.purchase_date ?? a.created_at).localeCompare(b.purchase_date ?? b.created_at),
     };
     return [...list].sort((a, b) => dir * cmp[sortKey](a, b));
-  }, [items, fSet, fCondition, fType, fLanguage, fSource, fGraded, sortKey, sortAsc]);
+  }, [items, q, fSold, fSet, fCondition, fType, fLanguage, fSource, fGraded, sortKey, sortAsc]);
 
   const summary = useMemo(() => {
     let count = 0;
@@ -229,6 +248,22 @@ export function CollectionClient({
 
       {/* Filtres et tri */}
       <div className="mb-6 flex flex-wrap items-center gap-2">
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Chercher dans ma collection…"
+          className="field !w-52 text-[13px]"
+        />
+        <select
+          value={fSold}
+          onChange={(e) => setFSold(e.target.value as "active" | "sold" | "all")}
+          className={selectCls}
+        >
+          <option value="active">En collection</option>
+          <option value="sold">Vendues</option>
+          <option value="all">Toutes</option>
+        </select>
         <select value={fSet} onChange={(e) => setFSet(e.target.value)} className={selectCls}>
           <option value="">Tous les sets</option>
           {sets.map(([id, name]) => (
@@ -336,6 +371,11 @@ export function CollectionClient({
                   {item.graded && (
                     <span className="tile-badge bottom-1.5 left-1.5 !bg-accent !text-accent-ink">
                       {item.grade ?? "Gradée"}
+                    </span>
+                  )}
+                  {item.sold_at != null && (
+                    <span className="tile-badge bottom-1.5 right-1.5 !bg-gain !text-black">
+                      Vendue
                     </span>
                   )}
                 </div>

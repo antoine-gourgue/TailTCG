@@ -110,7 +110,11 @@ export async function createItem(
     await recordValue(supabase, created.id, fields.manual_price);
   }
 
+  // Trouvée ! Elle sort automatiquement des recherchées
+  await supabase.from("wishlist").delete().eq("tcgdex_id", tcgdex_id);
+
   revalidatePath("/");
+  revalidatePath("/wishlist");
   redirect("/");
 }
 
@@ -196,6 +200,49 @@ export async function updateItemValue(
   revalidatePath("/");
   revalidatePath(`/carte/${id}`);
   return { ok: true };
+}
+
+export type SellState = { ok: boolean; message?: string } | null;
+
+// Marque un exemplaire vendu (il sort de la collection active)
+export async function markItemSold(
+  _prev: SellState,
+  formData: FormData
+): Promise<SellState> {
+  const id = str(formData, "item_id");
+  if (!id) return { ok: false, message: "Exemplaire introuvable." };
+
+  const raw = str(formData, "sold_price").replace(",", ".");
+  const sold_price = Number.parseFloat(raw);
+  if (Number.isNaN(sold_price) || sold_price < 0) {
+    return { ok: false, message: "Prix de vente invalide." };
+  }
+  const sold_at =
+    strOrNull(formData, "sold_at") ?? new Date().toISOString().slice(0, 10);
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("items")
+    .update({ sold_price, sold_at })
+    .eq("id", id);
+  if (error) return { ok: false, message: `Impossible : ${error.message}` };
+
+  revalidatePath("/");
+  revalidatePath(`/carte/${id}`);
+  return { ok: true };
+}
+
+// Annule une vente : l'exemplaire revient dans la collection active
+export async function cancelSale(formData: FormData): Promise<void> {
+  const id = str(formData, "item_id");
+  if (!id) return;
+  const supabase = await createClient();
+  await supabase
+    .from("items")
+    .update({ sold_price: null, sold_at: null })
+    .eq("id", id);
+  revalidatePath("/");
+  revalidatePath(`/carte/${id}`);
 }
 
 // Supprime un relevé de valeur erroné et recale la valeur actuelle de la

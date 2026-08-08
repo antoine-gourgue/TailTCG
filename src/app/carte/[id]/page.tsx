@@ -14,6 +14,9 @@ import { CardImage } from "@/components/card-image";
 import { ValueHistoryChart } from "@/components/value-history-chart";
 import { ValueHistoryManager } from "@/components/value-history-manager";
 import { ValueUpdateButton } from "@/components/quick-value-edit";
+import { SellButton } from "@/components/sell-button";
+import { ConfirmAction } from "@/components/confirm-action";
+import { cancelSale } from "@/app/items/actions";
 import type { SourceOption } from "@/app/items/actions";
 
 export const metadata = {
@@ -204,11 +207,31 @@ export default async function CartePage({
                   <X size={15} aria-hidden />
                   Annuler
                 </Link>
+              ) : item.sold_at != null ? (
+                <div className="flex flex-wrap gap-2">
+                  <ConfirmAction
+                    action={cancelSale}
+                    fields={{ item_id: item.id ?? id }}
+                    title="Annuler la vente ?"
+                    message="L'exemplaire reviendra dans ta collection active et la plus-value réalisée sera retirée des stats."
+                    confirmLabel="Annuler la vente"
+                    trigger="Annuler la vente"
+                    triggerClassName="btn btn-ghost"
+                  />
+                  <Link href={`/carte/${id}?edit`} className="btn btn-primary">
+                    <Pencil size={15} aria-hidden />
+                    Modifier
+                  </Link>
+                </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   <ValueUpdateButton
                     itemId={item.id ?? id}
                     current={item.current_price}
+                  />
+                  <SellButton
+                    itemId={item.id ?? id}
+                    purchasePrice={item.purchase_price}
                   />
                   <Link href={`/carte/${id}?edit`} className="btn btn-primary">
                     <Pencil size={15} aria-hidden />
@@ -226,34 +249,75 @@ export default async function CartePage({
                   {formatEur(item.purchase_price)}
                 </span>
               </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="label-xs">Valeur estimée</span>
-                <span
-                  className={`display num text-xl font-bold leading-none ${
-                    item.current_price == null ? "text-faint" : ""
-                  }`}
-                >
-                  {item.current_price != null
-                    ? formatEur(item.current_price)
-                    : "—"}
-                </span>
-              </div>
-              {item.gain != null && (
-                <div className="flex flex-col gap-0.5">
-                  <span className="label-xs">Plus-value</span>
-                  <span
-                    className={`display num text-xl font-bold leading-none ${
-                      item.gain > 0
-                        ? "text-gain"
-                        : item.gain < 0
-                          ? "text-loss"
-                          : ""
-                    }`}
-                  >
-                    {item.gain > 0 ? "+" : ""}
-                    {formatEur(item.gain)}
-                  </span>
-                </div>
+              {item.sold_at != null ? (
+                <>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="label-xs">Vendue</span>
+                    <span className="display num text-xl font-bold leading-none">
+                      {formatEur(item.sold_price)}
+                    </span>
+                    <span className="text-xs text-muted">
+                      le{" "}
+                      {new Date(item.sold_at).toLocaleDateString("fr-FR", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </div>
+                  {item.sold_price != null && item.purchase_price != null && (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="label-xs">Plus-value réalisée</span>
+                      <span
+                        className={`display num text-xl font-bold leading-none ${
+                          item.sold_price - item.purchase_price > 0
+                            ? "text-gain"
+                            : item.sold_price - item.purchase_price < 0
+                              ? "text-loss"
+                              : ""
+                        }`}
+                      >
+                        {item.sold_price - item.purchase_price > 0 ? "+" : ""}
+                        {formatEur(
+                          (item.sold_price - item.purchase_price) *
+                            (item.quantity ?? 1)
+                        )}
+                      </span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="label-xs">Valeur estimée</span>
+                    <span
+                      className={`display num text-xl font-bold leading-none ${
+                        item.current_price == null ? "text-faint" : ""
+                      }`}
+                    >
+                      {item.current_price != null
+                        ? formatEur(item.current_price)
+                        : "—"}
+                    </span>
+                  </div>
+                  {item.gain != null && (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="label-xs">Plus-value</span>
+                      <span
+                        className={`display num text-xl font-bold leading-none ${
+                          item.gain > 0
+                            ? "text-gain"
+                            : item.gain < 0
+                              ? "text-loss"
+                              : ""
+                        }`}
+                      >
+                        {item.gain > 0 ? "+" : ""}
+                        {formatEur(item.gain)}
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
               {item.cardmarket_url && (
                 <a

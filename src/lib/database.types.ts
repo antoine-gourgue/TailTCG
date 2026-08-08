@@ -174,6 +174,8 @@ export type Database = {
           quantity: number
           set_id: string
           set_name: string
+          sold_at: string | null
+          sold_price: number | null
           source_id: string | null
           tcgdex_id: string
         }
@@ -197,6 +199,8 @@ export type Database = {
           quantity?: number
           set_id: string
           set_name: string
+          sold_at?: string | null
+          sold_price?: number | null
           source_id?: string | null
           tcgdex_id: string
         }
@@ -220,6 +224,8 @@ export type Database = {
           quantity?: number
           set_id?: string
           set_name?: string
+          sold_at?: string | null
+          sold_price?: number | null
           source_id?: string | null
           tcgdex_id?: string
         }
@@ -317,6 +323,42 @@ export type Database = {
         }
         Relationships: []
       }
+      wishlist: {
+        Row: {
+          card_name: string
+          created_at: string | null
+          id: string
+          image_url: string
+          local_id: string
+          owner_id: string
+          set_id: string
+          set_name: string
+          tcgdex_id: string
+        }
+        Insert: {
+          card_name: string
+          created_at?: string | null
+          id?: string
+          image_url?: string
+          local_id: string
+          owner_id?: string
+          set_id: string
+          set_name: string
+          tcgdex_id: string
+        }
+        Update: {
+          card_name?: string
+          created_at?: string | null
+          id?: string
+          image_url?: string
+          local_id?: string
+          owner_id?: string
+          set_id?: string
+          set_name?: string
+          tcgdex_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       collection_value: {
@@ -343,6 +385,8 @@ export type Database = {
           quantity: number | null
           set_id: string | null
           set_name: string | null
+          sold_at: string | null
+          sold_price: number | null
           source_id: string | null
           tcgdex_id: string | null
         }

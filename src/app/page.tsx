@@ -30,7 +30,7 @@ export default async function Home({
     supabase
       .from("collection_value")
       .select(
-        "id, tcgdex_id, card_name, set_name, set_id, local_id, image_url, card_type, language, condition, quantity, purchase_price, purchase_date, manual_price, source_id, graded, grade, created_at, current_price, gain"
+        "id, tcgdex_id, card_name, set_name, set_id, local_id, image_url, card_type, language, condition, quantity, purchase_price, purchase_date, manual_price, source_id, graded, grade, created_at, current_price, gain, sold_price, sold_at"
       )
       .order("created_at", { ascending: false }),
     supabase.from("sources").select("id, name").order("name"),
