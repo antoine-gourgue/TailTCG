@@ -162,6 +162,36 @@ export async function updateItem(
   redirect(`/carte/${id}`);
 }
 
+export type QuickValueState = { ok: boolean; message?: string } | null;
+
+// Actualisation rapide de la valeur estimée depuis la fiche (point daté)
+export async function updateItemValue(
+  _prev: QuickValueState,
+  formData: FormData
+): Promise<QuickValueState> {
+  const id = str(formData, "item_id");
+  if (!id) return { ok: false, message: "Exemplaire introuvable." };
+
+  const raw = str(formData, "value").replace(",", ".");
+  const value = Number.parseFloat(raw);
+  if (Number.isNaN(value) || value < 0) {
+    return { ok: false, message: "Valeur invalide." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("items")
+    .update({ manual_price: value })
+    .eq("id", id);
+  if (error) return { ok: false, message: `Impossible : ${error.message}` };
+
+  await recordValue(supabase, id, value);
+
+  revalidatePath("/");
+  revalidatePath(`/carte/${id}`);
+  return { ok: true };
+}
+
 export async function deleteItem(formData: FormData): Promise<void> {
   const id = str(formData, "item_id");
   if (!id) return;
