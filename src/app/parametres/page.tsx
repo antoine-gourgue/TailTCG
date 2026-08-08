@@ -11,6 +11,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app-shell";
 import { SetPasswordForm } from "@/components/set-password-form";
+import { RevalueForm } from "@/components/revalue-form";
 import { signOutEverywhere } from "./actions";
 
 export const metadata = {
@@ -23,6 +24,12 @@ export default async function ParametresPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const { data: settings } = await supabase
+    .from("user_settings")
+    .select("revalue_weeks")
+    .eq("owner_id", user.id)
+    .maybeSingle();
 
   const memberSince = user.created_at
     ? new Date(user.created_at).toLocaleDateString("fr-FR", {
@@ -78,6 +85,20 @@ export default async function ParametresPage() {
               secours.
             </p>
             <SetPasswordForm />
+          </section>
+
+          {/* Rappel de réévaluation */}
+          <section className="panel p-5">
+            <h2 className="display mb-1 text-base font-semibold">
+              Rappel d&apos;actualisation des valeurs
+            </h2>
+            <p className="mb-4 text-sm text-muted">
+              Une notification apparaît sur ta collection quand la valeur
+              estimée d&apos;une carte n&apos;a pas été actualisée depuis la
+              période choisie — chaque saisie est datée et trace la courbe de
+              la carte.
+            </p>
+            <RevalueForm current={settings?.revalue_weeks ?? null} />
           </section>
 
           {/* Installer l'app */}

@@ -82,20 +82,46 @@ export async function createItem(
   }
 
   const supabase = await createClient();
-  const { error: dbError } = await supabase.from("items").insert({
-    ...fields,
-    tcgdex_id,
-    card_name,
-    set_id,
-    set_name,
-    local_id,
-    image_url,
-  });
+  const { data: created, error: dbError } = await supabase
+    .from("items")
+    .insert({
+      ...fields,
+      tcgdex_id,
+      card_name,
+      set_id,
+      set_name,
+      local_id,
+      image_url,
+    })
+    .select("id")
+    .single();
 
-  if (dbError) return { message: `Enregistrement impossible : ${dbError.message}` };
+  if (dbError || !created) {
+    return { message: `Enregistrement impossible : ${dbError?.message}` };
+  }
+
+  if (fields.manual_price != null) {
+    await recordValue(supabase, created.id, fields.manual_price);
+  }
 
   revalidatePath("/");
   redirect("/");
+}
+
+// Historise la valeur estimée du jour (la dernière saisie du jour gagne)
+async function recordValue(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  itemId: string,
+  value: number
+) {
+  await supabase.from("item_value_history").upsert(
+    {
+      item_id: itemId,
+      value,
+      recorded_at: new Date().toISOString().slice(0, 10),
+    },
+    { onConflict: "item_id,recorded_at" }
+  );
 }
 
 export async function updateItem(
@@ -126,6 +152,10 @@ export async function updateItem(
     .eq("id", id);
 
   if (dbError) return { message: `Mise à jour impossible : ${dbError.message}` };
+
+  if (fields.manual_price != null) {
+    await recordValue(supabase, id, fields.manual_price);
+  }
 
   revalidatePath("/");
   revalidatePath(`/carte/${id}`);

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchSetsIndex } from "@/lib/tcgdex";
 import { formatEur, CONDITIONS } from "@/lib/domain";
 import { AppShell } from "@/components/app-shell";
+import { ValueHistoryChart } from "@/components/value-history-chart";
 
 export const metadata = {
   title: "Statistiques — TailTCG",
@@ -203,6 +204,31 @@ export default async function StatsPage() {
   const top5 = [...withGain].sort((a, b) => b.gain! - a.gain!).slice(0, 5);
   const flop5 = [...withGain].sort((a, b) => a.gain! - b.gain!).slice(0, 5);
 
+  // Évolution de la valeur estimée totale : à chaque date de saisie, somme
+  // des dernières valeurs connues × quantités
+  const { data: hist } = await supabase
+    .from("item_value_history")
+    .select("item_id, value, recorded_at")
+    .order("recorded_at");
+  const qtyById = new Map(rows.map((r) => [r.id, r.quantity ?? 1]));
+  const valueSeries: { recorded_at: string; value: number }[] = [];
+  if (hist && hist.length > 0) {
+    const dates = [...new Set(hist.map((h) => h.recorded_at))].sort();
+    const lastValue = new Map<string, number>();
+    for (const d of dates) {
+      for (const h of hist) {
+        if (h.recorded_at === d && qtyById.has(h.item_id)) {
+          lastValue.set(h.item_id, h.value);
+        }
+      }
+      let total = 0;
+      for (const [itemId, v] of lastValue) {
+        total += v * (qtyById.get(itemId) ?? 1);
+      }
+      valueSeries.push({ recorded_at: d, value: total });
+    }
+  }
+
   return (
     <>
       <AppShell>
@@ -227,6 +253,19 @@ export default async function StatsPage() {
                 tone={gain == null ? undefined : gain >= 0 ? "up" : "down"}
               />
             </div>
+
+            {valueSeries.length > 0 && (
+              <section className="panel p-5">
+                <h2 className="display mb-1 text-base font-semibold">
+                  Évolution de la valeur estimée
+                </h2>
+                <p className="mb-3 text-xs text-faint">
+                  Construite à partir de tes actualisations datées, carte par
+                  carte.
+                </p>
+                <ValueHistoryChart points={valueSeries} />
+              </section>
+            )}
 
             <div className="grid gap-10 lg:grid-cols-2">
               <section>

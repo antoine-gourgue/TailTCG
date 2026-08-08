@@ -114,6 +114,45 @@ export type Database = {
           },
         ]
       }
+      item_value_history: {
+        Row: {
+          id: string
+          item_id: string
+          owner_id: string
+          recorded_at: string
+          value: number
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          owner_id?: string
+          recorded_at?: string
+          value: number
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          owner_id?: string
+          recorded_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_value_history_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "collection_value"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_value_history_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       items: {
         Row: {
           card_name: string
@@ -257,6 +296,24 @@ export type Database = {
           notes?: string | null
           owner_id?: string
           url?: string | null
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          owner_id: string
+          revalue_weeks: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          owner_id?: string
+          revalue_weeks?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          owner_id?: string
+          revalue_weeks?: number | null
+          updated_at?: string | null
         }
         Relationships: []
       }

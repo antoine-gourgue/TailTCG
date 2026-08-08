@@ -11,6 +11,7 @@ import { ItemForm } from "@/components/item-form";
 import { DeleteItemButton } from "@/components/delete-item-button";
 import { PhotoGallery, type GalleryPhoto } from "@/components/photo-gallery";
 import { CardImage } from "@/components/card-image";
+import { ValueHistoryChart } from "@/components/value-history-chart";
 import type { SourceOption } from "@/app/items/actions";
 
 export const metadata = {
@@ -83,6 +84,12 @@ export default async function CartePage({
   const [{ image_url: displayImage }] = await signStorageImages([
     { image_url: item.image_url },
   ]);
+
+  const { data: valueHistory } = await supabase
+    .from("item_value_history")
+    .select("recorded_at, value")
+    .eq("item_id", id)
+    .order("recorded_at");
 
   // URLs signées 1 h, générées côté serveur (bucket privé)
   let photos: GalleryPhoto[] = [];
@@ -396,6 +403,19 @@ export default async function CartePage({
                     </div>
                   )}
                 </section>
+
+                {valueHistory && valueHistory.length > 0 && (
+                  <section className="panel mb-6 p-5">
+                    <h2 className="display mb-1 text-base font-semibold">
+                      Évolution de ma valeur estimée
+                    </h2>
+                    <p className="mb-3 text-xs text-faint">
+                      Chaque actualisation de la valeur est datée et
+                      enregistrée.
+                    </p>
+                    <ValueHistoryChart points={valueHistory} />
+                  </section>
+                )}
 
                 <PhotoGallery
                   itemId={item.id ?? id}
