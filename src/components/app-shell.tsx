@@ -43,7 +43,11 @@ const NAV = [
 function isActive(href: string, pathname: string) {
   if (href === "/") return pathname === "/" || pathname.startsWith("/carte");
   if (href === "/recherche")
-    return pathname.startsWith("/recherche") || pathname.startsWith("/ajouter");
+    return (
+      pathname.startsWith("/recherche") ||
+      pathname.startsWith("/ajouter") ||
+      pathname.startsWith("/extensions")
+    );
   return pathname.startsWith(href);
 }
 

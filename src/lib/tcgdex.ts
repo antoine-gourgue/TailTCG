@@ -110,8 +110,16 @@ async function findImageInOtherLangs(cardId: string): Promise<string | null> {
   return null;
 }
 
-export async function getCard(id: string): Promise<TcgdexCard | null> {
-  const res = await fetch(`${TCGDEX_BASE}/cards/${encodeURIComponent(id)}`, {
+/** Catalogues navigables : international (fr) et japonais (ja) */
+export type CatalogLang = "fr" | "ja";
+
+const langBase = (lang: CatalogLang) => `https://api.tcgdex.net/v2/${lang}`;
+
+export async function getCard(
+  id: string,
+  lang: CatalogLang = "fr"
+): Promise<TcgdexCard | null> {
+  const res = await fetch(`${langBase(lang)}/cards/${encodeURIComponent(id)}`, {
     next: { revalidate: DAY_SECONDS },
   });
   if (!res.ok) return null;
@@ -120,6 +128,87 @@ export async function getCard(id: string): Promise<TcgdexCard | null> {
     card.image = (await findImageInOtherLangs(id)) ?? undefined;
   }
   return card;
+}
+
+export type CatalogSet = {
+  id: string;
+  name: string;
+  logo?: string;
+  symbol?: string;
+  cardCount?: { total: number; official: number };
+};
+
+export type SerieWithSets = {
+  id: string;
+  name: string;
+  logo: string | null;
+  releaseDate: string | null;
+  sets: CatalogSet[];
+};
+
+/** Toutes les séries avec leurs sets (logos inclus), plus récentes d'abord */
+export async function fetchSeriesWithSets(
+  lang: CatalogLang
+): Promise<SerieWithSets[]> {
+  const res = await fetch(`${langBase(lang)}/series`, {
+    next: { revalidate: DAY_SECONDS },
+  });
+  if (!res.ok) return [];
+  const list: { id: string; name: string }[] = await res.json();
+
+  const details = await Promise.all(
+    list.map(async (s) => {
+      try {
+        const r = await fetch(
+          `${langBase(lang)}/series/${encodeURIComponent(s.id)}`,
+          { next: { revalidate: DAY_SECONDS } }
+        );
+        if (!r.ok) return null;
+        return (await r.json()) as {
+          id: string;
+          name: string;
+          logo?: string;
+          releaseDate?: string;
+          sets?: CatalogSet[];
+        };
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  return details
+    .filter((d): d is NonNullable<typeof d> => d != null)
+    .map((d) => ({
+      id: d.id,
+      name: d.name,
+      logo: d.logo ?? null,
+      releaseDate: d.releaseDate ?? null,
+      sets: d.sets ?? [],
+    }))
+    .sort((a, b) => (b.releaseDate ?? "").localeCompare(a.releaseDate ?? ""));
+}
+
+export type TcgdexSetDetail = {
+  id: string;
+  name: string;
+  logo?: string;
+  symbol?: string;
+  releaseDate?: string;
+  cardCount?: { total: number; official: number };
+  serie?: { id: string; name: string };
+  cards: TcgdexCardBrief[];
+};
+
+export async function getSet(
+  id: string,
+  lang: CatalogLang
+): Promise<TcgdexSetDetail | null> {
+  const res = await fetch(`${langBase(lang)}/sets/${encodeURIComponent(id)}`, {
+    next: { revalidate: DAY_SECONDS },
+  });
+  if (!res.ok) return null;
+  return res.json();
 }
 
 /** L'API ne fournit pas d'URL Cardmarket : lien de recherche pré-rempli, éditable */

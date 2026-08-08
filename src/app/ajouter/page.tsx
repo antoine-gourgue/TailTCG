@@ -13,12 +13,13 @@ export const metadata = {
 export default async function AjouterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ card?: string }>;
+  searchParams: Promise<{ card?: string; lang?: string }>;
 }) {
-  const { card: cardId } = await searchParams;
+  const { card: cardId, lang: langParam } = await searchParams;
   if (!cardId) redirect("/recherche");
 
-  const card = await getCard(cardId);
+  const lang = langParam === "ja" ? ("ja" as const) : ("fr" as const);
+  const card = await getCard(cardId, lang);
   if (!card) redirect("/recherche");
 
   const supabase = await createClient();
@@ -74,7 +75,7 @@ export default async function AjouterPage({
               }}
               defaults={{
                 card_type: defaultType,
-                language: "FR",
+                language: lang === "ja" ? "JP" : "FR",
                 condition: null,
                 quantity: 1,
                 purchase_price: null,
