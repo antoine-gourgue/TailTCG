@@ -16,9 +16,17 @@ export const metadata = {
   title: "Fiche carte — TailTCG",
 };
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+  className = "",
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div>
+    <div className={className}>
       <dt className="label-xs mb-1">{label}</dt>
       <dd className="text-sm">{children}</dd>
     </div>
@@ -172,10 +180,10 @@ export default async function CartePage({
                   {tcgdexCard.illustrator && (
                     <Field label="Illustrateur">{tcgdexCard.illustrator}</Field>
                   )}
-                  <Field label="Set">
+                  <Field label="Set" className="col-span-2">
                     {tcgdexCard.set.name}
                     {tcgdexCard.set.cardCount?.official ? (
-                      <span className="num text-muted">
+                      <span className="num whitespace-nowrap text-muted">
                         {" "}
                         · {item.local_id} / {tcgdexCard.set.cardCount.official}
                       </span>
