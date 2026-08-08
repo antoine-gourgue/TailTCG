@@ -11,9 +11,9 @@ import {
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string }>;
+  searchParams: Promise<{ source?: string; set?: string }>;
 }) {
-  const { source: initialSource } = await searchParams;
+  const { source: initialSource, set: initialSet } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -47,6 +47,7 @@ export default async function Home({
           items={(items ?? []) as CollectionItem[]}
           sources={(sources ?? []) as SourceRef[]}
           initialSource={initialSource ?? ""}
+          initialSet={initialSet ?? ""}
         />
       </main>
       </AppShell>

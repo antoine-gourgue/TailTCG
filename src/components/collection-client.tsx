@@ -72,13 +72,15 @@ export function CollectionClient({
   items,
   sources,
   initialSource = "",
+  initialSet = "",
 }: {
   items: CollectionItem[];
   sources: SourceRef[];
   initialSource?: string;
+  initialSet?: string;
 }) {
   const [view, setView] = useState<"grid" | "table">("grid");
-  const [fSet, setFSet] = useState("");
+  const [fSet, setFSet] = useState(initialSet);
   const [fCondition, setFCondition] = useState("");
   const [fType, setFType] = useState("");
   const [fLanguage, setFLanguage] = useState("");

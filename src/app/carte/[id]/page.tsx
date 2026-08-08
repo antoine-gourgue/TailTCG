@@ -189,11 +189,24 @@ export default async function CartePage({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h1 className="display text-3xl font-bold tracking-tight">
-                  {item.card_name}
-                </h1>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h1 className="display text-3xl font-bold tracking-tight">
+                    {item.card_name}
+                  </h1>
+                  {tcgdexCard?.rarity && (
+                    <span className="rounded-md bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent-strong">
+                      {tcgdexCard.rarity}
+                    </span>
+                  )}
+                </div>
                 <p className="mt-1 text-muted">
-                  {item.set_name}{" "}
+                  <Link
+                    href={`/?set=${encodeURIComponent(item.set_id ?? "")}`}
+                    className="underline-offset-2 transition hover:text-foreground hover:underline"
+                    title={`Voir toutes mes cartes ${item.set_name}`}
+                  >
+                    {item.set_name}
+                  </Link>{" "}
                   <span className="num text-faint">· {item.local_id}</span>
                 </p>
               </div>
@@ -220,27 +233,40 @@ export default async function CartePage({
               </div>
               <div className="flex flex-col gap-0.5">
                 <span className="label-xs">Valeur estimée</span>
-                <span className="display num text-xl font-bold leading-none">
-                  {formatEur(item.current_price)}
-                </span>
+                {item.current_price != null ? (
+                  <span className="display num text-xl font-bold leading-none">
+                    {formatEur(item.current_price)}
+                  </span>
+                ) : editing ? (
+                  <span className="display num text-xl font-bold leading-none text-faint">
+                    —
+                  </span>
+                ) : (
+                  <Link
+                    href={`/carte/${id}?edit`}
+                    className="btn btn-ghost !px-3 !py-1 text-[13px]"
+                  >
+                    Estimer
+                  </Link>
+                )}
               </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="label-xs">Plus-value</span>
-                <span
-                  className={`display num text-xl font-bold leading-none ${
-                    item.gain == null
-                      ? "text-faint"
-                      : item.gain > 0
+              {item.gain != null && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="label-xs">Plus-value</span>
+                  <span
+                    className={`display num text-xl font-bold leading-none ${
+                      item.gain > 0
                         ? "text-gain"
                         : item.gain < 0
                           ? "text-loss"
                           : ""
-                  }`}
-                >
-                  {item.gain != null && item.gain > 0 ? "+" : ""}
-                  {formatEur(item.gain)}
-                </span>
-              </div>
+                    }`}
+                  >
+                    {item.gain > 0 ? "+" : ""}
+                    {formatEur(item.gain)}
+                  </span>
+                </div>
+              )}
               {item.cardmarket_url && (
                 <a
                   href={item.cardmarket_url}
@@ -324,13 +350,16 @@ export default async function CartePage({
                         "—"
                       )}
                     </Field>
-                    <Field label="N° dans le set">
-                      <span className="num">{item.local_id}</span>
-                    </Field>
                     <Field label="Ajoutée le">
-                      {item.created_at
-                        ? new Date(item.created_at).toLocaleDateString("fr-FR")
-                        : "—"}
+                      <span className="text-muted">
+                        {item.created_at
+                          ? new Date(item.created_at).toLocaleDateString("fr-FR", {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })
+                          : "—"}
+                      </span>
                     </Field>
                   </dl>
                   {item.notes && (

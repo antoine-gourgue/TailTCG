@@ -122,10 +122,20 @@ export function PhotoGallery({
         {photos.length > 0 && (
           <span className="num text-sm text-faint">{photos.length}</span>
         )}
-        <span className="ml-auto text-xs text-faint">
-          recto, verso, défauts…
-        </span>
+        {photos.length > 0 && (
+          <span className="ml-auto text-xs text-faint">
+            recto, verso, défauts…
+          </span>
+        )}
       </div>
+
+      {photos.length === 0 && (
+        <p className="mb-4 text-sm text-muted">
+          Documente ton exemplaire : ajoute le recto, le verso et les éventuels
+          défauts. Les photos sont privées et compressées automatiquement —
+          depuis un téléphone, l&apos;appareil photo s&apos;ouvre directement.
+        </p>
+      )}
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
         {/* Tuile d'ajout */}
