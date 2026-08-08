@@ -8,12 +8,22 @@ import { ExtensionsBrowser } from "@/components/extensions-browser";
 
 type Status = "idle" | "loading" | "done" | "error";
 
+export type CustomCardTile = {
+  id: string;
+  name: string;
+  setName: string;
+  localId: string;
+  image: string | null;
+};
+
 export function SearchClient({
   series,
   lang,
+  customCards = [],
 }: {
   series: SerieWithSets[];
   lang: CatalogLang;
+  customCards?: CustomCardTile[];
 }) {
   const [query, setQuery] = useState("");
   const [cards, setCards] = useState<CardSearchResult[]>([]);
@@ -73,7 +83,43 @@ export function SearchClient({
         className="field mb-8 max-w-md !px-4 !py-3 !text-base"
       />
 
-      {status === "idle" && <ExtensionsBrowser series={series} lang={lang} />}
+      {status === "idle" && (
+        <>
+          {customCards.length > 0 && (
+            <section className="mb-10">
+              <div className="mb-4 flex items-baseline gap-3">
+                <h2 className="display text-xl font-semibold">
+                  Mes cartes hors catalogue
+                </h2>
+                <span className="num text-sm text-faint">
+                  {customCards.length}
+                </span>
+              </div>
+              <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                {customCards.map((card) => (
+                  <li key={card.id}>
+                    <Link href={`/ajouter?card=custom:${card.id}`} className="group block">
+                      <div className="card-tile aspect-[63/88]">
+                        <CardImage base={card.image} alt={card.name} direct />
+                      </div>
+                      <div className="mt-2.5 px-0.5">
+                        <p className="truncate text-sm font-medium leading-tight group-hover:text-accent-strong">
+                          {card.name}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-muted">
+                          {card.setName}{" "}
+                          <span className="num text-faint">· {card.localId}</span>
+                        </p>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          <ExtensionsBrowser series={series} lang={lang} />
+        </>
+      )}
 
       {status === "loading" && (
         <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
