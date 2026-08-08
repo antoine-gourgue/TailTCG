@@ -14,12 +14,15 @@ function SetLogo({
   symbol?: string;
   name: string;
 }) {
-  // Cascade : logo → symbole → icône générique
+  // Cascade : logo (.webp puis .png) → symbole → icône générique
   const candidates = useMemo(
     () =>
-      [logo && `${logo}.webp`, symbol && `${symbol}.webp`].filter(
-        (s): s is string => Boolean(s)
-      ),
+      [
+        logo && `${logo}.webp`,
+        logo && `${logo}.png`,
+        symbol && `${symbol}.webp`,
+        symbol && `${symbol}.png`,
+      ].filter((s): s is string => Boolean(s)),
     [logo, symbol]
   );
   const [idx, setIdx] = useState(0);
@@ -90,7 +93,7 @@ export function ExtensionsBrowser({
         />
         <div className="flex overflow-hidden rounded-xl border border-edge">
           <Link
-            href="/extensions"
+            href="/recherche"
             className={`px-3.5 py-2 text-sm transition ${
               lang === "fr"
                 ? "bg-accent-soft font-semibold text-accent-strong"
@@ -100,7 +103,7 @@ export function ExtensionsBrowser({
             Internationales
           </Link>
           <Link
-            href="/extensions?lang=ja"
+            href="/recherche?lang=ja"
             className={`border-l border-edge px-3.5 py-2 text-sm transition ${
               lang === "ja"
                 ? "bg-accent-soft font-semibold text-accent-strong"
@@ -111,6 +114,14 @@ export function ExtensionsBrowser({
           </Link>
         </div>
       </div>
+
+      {lang === "ja" && (
+        <p className="mb-6 rounded-xl border border-edge bg-surface px-4 py-3 text-sm text-muted">
+          TCGdex ne fournit pas encore les visuels japonais (logos et scans) —
+          tu peux quand même parcourir les sets et ajouter les cartes avec
+          leurs noms officiels.
+        </p>
+      )}
 
       {filtered.length === 0 ? (
         <p className="text-sm text-muted">

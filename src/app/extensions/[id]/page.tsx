@@ -41,7 +41,7 @@ export default async function ExtensionPage({
     <AppShell>
       <main className="mx-auto w-full max-w-6xl px-4 py-8">
         <Link
-          href={`/extensions${lang === "ja" ? "?lang=ja" : ""}`}
+          href={`/recherche${lang === "ja" ? "?lang=ja" : ""}`}
           className="mb-6 inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground"
         >
           ← Extensions
@@ -72,6 +72,13 @@ export default async function ExtensionPage({
             </p>
           </div>
         </div>
+
+        {lang === "ja" && (
+          <p className="mb-6 rounded-xl border border-edge bg-surface px-4 py-3 text-sm text-muted">
+            TCGdex ne fournit pas encore les scans japonais — les cartes sont
+            listées par nom et numéro, et restent ajoutables normalement.
+          </p>
+        )}
 
         <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {set.cards.map((card) => (

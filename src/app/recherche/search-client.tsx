@@ -2,12 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import type { CardSearchResult } from "@/lib/tcgdex";
+import type { CardSearchResult, SerieWithSets, CatalogLang } from "@/lib/tcgdex";
 import { CardImage } from "@/components/card-image";
+import { ExtensionsBrowser } from "@/components/extensions-browser";
 
 type Status = "idle" | "loading" | "done" | "error";
 
-export function SearchClient() {
+export function SearchClient({
+  series,
+  lang,
+}: {
+  series: SerieWithSets[];
+  lang: CatalogLang;
+}) {
   const [query, setQuery] = useState("");
   const [cards, setCards] = useState<CardSearchResult[]>([]);
   const [status, setStatus] = useState<Status>("idle");
@@ -66,12 +73,7 @@ export function SearchClient() {
         className="field mb-8 max-w-md !px-4 !py-3 !text-base"
       />
 
-      {status === "idle" && (
-        <p className="text-sm text-muted">
-          Tape au moins deux lettres pour chercher dans le catalogue français
-          TCGdex.
-        </p>
-      )}
+      {status === "idle" && <ExtensionsBrowser series={series} lang={lang} />}
 
       {status === "loading" && (
         <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
