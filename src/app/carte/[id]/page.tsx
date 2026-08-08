@@ -173,7 +173,11 @@ export default async function CartePage({
               />
             </div>
             {tcgdexCard && (
-              <section className="panel mt-5 p-5">
+              <section
+                className={`panel mt-5 p-5 ${
+                  valueHistory && valueHistory.length > 0 ? "" : "lg:flex-1"
+                }`}
+              >
                 <h2 className="display mb-4 text-base font-semibold">La carte</h2>
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
                   {tcgdexCard.rarity && (
@@ -206,6 +210,18 @@ export default async function CartePage({
                     ) : null}
                   </Field>
                 </dl>
+              </section>
+            )}
+
+            {valueHistory && valueHistory.length > 0 && (
+              <section className="panel mt-5 p-5 lg:flex-1">
+                <h2 className="display mb-1 text-base font-semibold">
+                  Ma valeur estimée
+                </h2>
+                <p className="mb-3 text-xs text-faint">
+                  Chaque actualisation est datée.
+                </p>
+                <ValueHistoryChart points={valueHistory} />
               </section>
             )}
           </aside>
@@ -403,19 +419,6 @@ export default async function CartePage({
                     </div>
                   )}
                 </section>
-
-                {valueHistory && valueHistory.length > 0 && (
-                  <section className="panel mb-6 p-5">
-                    <h2 className="display mb-1 text-base font-semibold">
-                      Évolution de ma valeur estimée
-                    </h2>
-                    <p className="mb-3 text-xs text-faint">
-                      Chaque actualisation de la valeur est datée et
-                      enregistrée.
-                    </p>
-                    <ValueHistoryChart points={valueHistory} />
-                  </section>
-                )}
 
                 <PhotoGallery
                   itemId={item.id ?? id}
