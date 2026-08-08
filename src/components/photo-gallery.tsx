@@ -139,20 +139,20 @@ export function PhotoGallery({
         </p>
       )}
 
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {/* Tuile d'ajout */}
         <label
-          className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-edge-strong text-muted transition hover:border-accent hover:text-accent ${
+          className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-edge-strong text-muted transition hover:border-accent hover:bg-accent-soft/40 hover:text-accent ${
             busy ? "pointer-events-none opacity-60" : ""
           }`}
         >
           {busy ? (
-            <Loader2 size={22} className="animate-spin" aria-hidden />
+            <Loader2 size={26} className="animate-spin" aria-hidden />
           ) : (
-            <ImagePlus size={22} aria-hidden />
+            <ImagePlus size={26} aria-hidden />
           )}
-          <span className="px-2 text-center text-xs font-medium">
-            {compressing ? "Compression…" : pending ? "Envoi…" : "Ajouter"}
+          <span className="px-2 text-center text-sm font-medium">
+            {compressing ? "Compression…" : pending ? "Envoi…" : "Ajouter des photos"}
           </span>
           <input
             ref={inputRef}
@@ -173,7 +173,7 @@ export function PhotoGallery({
                 setLightbox(i);
                 setEditingLabel(false);
               }}
-              className="relative block w-full overflow-hidden rounded-xl border border-edge"
+              className="relative block w-full overflow-hidden rounded-2xl border border-edge shadow-md transition hover:shadow-lg hover:ring-2 hover:ring-accent/40"
               aria-label="Agrandir la photo"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -181,18 +181,18 @@ export function PhotoGallery({
                 src={photo.url}
                 alt={photo.label ?? "Photo perso"}
                 loading="lazy"
-                className="aspect-square w-full object-cover transition duration-300 group-hover:scale-105"
+                className="aspect-square w-full object-cover transition duration-300 group-hover:scale-[1.04]"
               />
               <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition group-hover:bg-black/25 group-hover:opacity-100">
-                <Expand size={18} className="text-white drop-shadow" aria-hidden />
+                <Expand size={22} className="text-white drop-shadow" aria-hidden />
               </span>
               {photo.label && (
-                <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-4 text-left text-[11px] font-medium text-white">
+                <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/75 to-transparent px-3 pb-2 pt-6 text-left text-xs font-medium text-white">
                   {photo.label}
                 </span>
               )}
             </button>
-            <div className="absolute right-1.5 top-1.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
+            <div className="absolute right-2 top-2 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
               <ConfirmAction
                 action={deleteItemPhoto}
                 fields={{ photo_id: photo.id }}
