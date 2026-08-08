@@ -23,14 +23,21 @@ export function CardImage({
   alt,
   quality = "low",
   className = "h-full w-full object-cover",
+  direct = false,
 }: {
   base: string | null;
   alt: string;
   quality?: "low" | "high";
   className?: string;
+  /** base est déjà une URL finale (photo perso signée…), pas une base TCGdex */
+  direct?: boolean;
 }) {
+  const isDirect =
+    direct || (base?.startsWith("http") && !base.includes("assets.tcgdex.net"));
   const initial = base
-    ? `${base}/${quality === "low" ? "low.webp" : "high.png"}`
+    ? isDirect
+      ? base
+      : `${base}/${quality === "low" ? "low.webp" : "high.png"}`
     : null;
   const [src, setSrc] = useState(initial);
 
@@ -50,7 +57,7 @@ export function CardImage({
       alt={alt}
       loading="lazy"
       className={className}
-      onError={() => setSrc(nextLangSrc(src))}
+      onError={() => setSrc(isDirect ? null : nextLangSrc(src))}
     />
   );
 }

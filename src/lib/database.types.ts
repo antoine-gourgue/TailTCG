@@ -39,6 +39,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      custom_cards: {
+        Row: {
+          created_at: string | null
+          id: string
+          image_path: string
+          local_id: string
+          name: string
+          owner_id: string
+          set_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          image_path: string
+          local_id: string
+          name: string
+          owner_id?: string
+          set_name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          image_path?: string
+          local_id?: string
+          name?: string
+          owner_id?: string
+          set_name?: string
+        }
+        Relationships: []
+      }
       item_photos: {
         Row: {
           created_at: string | null

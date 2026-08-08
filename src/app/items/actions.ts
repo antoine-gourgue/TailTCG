@@ -1,10 +1,8 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { geocodeAddress } from "@/lib/geocode";
 import { CONDITION_CODES, type ConditionCode } from "@/lib/domain";
 import type { Database } from "@/lib/database.types";
@@ -73,80 +71,31 @@ export async function createItem(
   const { fields, error } = parseItemFields(formData);
   if (error || !fields) return { message: error ?? "Formulaire invalide." };
 
-  let tcgdex_id = str(formData, "tcgdex_id");
-  let set_id = str(formData, "set_id");
-  let image_url = str(formData, "image_url");
+  const tcgdex_id = str(formData, "tcgdex_id");
+  const set_id = str(formData, "set_id");
+  const image_url = str(formData, "image_url");
   const card_name = str(formData, "card_name");
   const set_name = str(formData, "set_name");
   const local_id = str(formData, "local_id");
-
-  if (!card_name || !set_name || !local_id) {
-    return { message: "Nom, set et numéro sont obligatoires." };
-  }
-  // Ajout manuel (carte absente de TCGdex, ex. promos japonaises) :
-  // identifiant interne, pas d'image officielle — les photos perso font foi
-  const isCustom = !tcgdex_id;
-  const photos = formData
-    .getAll("photos")
-    .filter((f): f is File => f instanceof File && f.size > 0);
-
-  if (isCustom) {
-    if (photos.length === 0) {
-      return { message: "Ajoute au moins une photo de ta carte." };
-    }
-    tcgdex_id = `custom:${randomUUID()}`;
-    set_id = "custom";
-    image_url = "";
+  if (!tcgdex_id || !card_name || !set_id || !set_name || !local_id) {
+    return { message: "Données de carte manquantes, repasse par la recherche." };
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { message: "Non connecté." };
+  const { error: dbError } = await supabase.from("items").insert({
+    ...fields,
+    tcgdex_id,
+    card_name,
+    set_id,
+    set_name,
+    local_id,
+    image_url,
+  });
 
-  const { data: created, error: dbError } = await supabase
-    .from("items")
-    .insert({
-      ...fields,
-      tcgdex_id,
-      card_name,
-      set_id,
-      set_name,
-      local_id,
-      image_url,
-    })
-    .select("id")
-    .single();
-
-  if (dbError || !created) {
-    return { message: `Enregistrement impossible : ${dbError?.message}` };
-  }
-
-  // Photos jointes (déjà compressées côté navigateur)
-  if (photos.length > 0) {
-    const admin = createAdminClient();
-    for (const [index, file] of photos.slice(0, 3).entries()) {
-      if (!["image/webp", "image/jpeg", "image/png"].includes(file.type)) continue;
-      if (file.size > 3 * 1024 * 1024) continue;
-      const ext = file.type === "image/webp" ? "webp" : file.type === "image/png" ? "png" : "jpg";
-      const path = `${user.id}/${created.id}/${randomUUID()}.${ext}`;
-      const { error: upErr } = await admin.storage
-        .from("card-photos")
-        .upload(path, file, { contentType: file.type });
-      if (!upErr) {
-        await supabase.from("item_photos").insert({
-          item_id: created.id,
-          path,
-          label: null,
-          position: index,
-        });
-      }
-    }
-  }
+  if (dbError) return { message: `Enregistrement impossible : ${dbError.message}` };
 
   revalidatePath("/");
-  redirect(isCustom ? `/carte/${created.id}` : "/");
+  redirect("/");
 }
 
 export async function updateItem(

@@ -4,6 +4,7 @@ import { Pencil, ExternalLink, X, ChevronLeft, ChevronRight } from "lucide-react
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCard } from "@/lib/tcgdex";
+import { signStorageImages } from "@/lib/images";
 import { formatEur, CONDITIONS } from "@/lib/domain";
 import { AppShell } from "@/components/app-shell";
 import { ItemForm } from "@/components/item-form";
@@ -77,6 +78,11 @@ export default async function CartePage({
   const isCustom = item.tcgdex_id?.startsWith("custom:") ?? false;
   const tcgdexCard =
     item.tcgdex_id && !isCustom ? await getCard(item.tcgdex_id) : null;
+
+  // Visuel des cartes hors catalogue : photo signée depuis le bucket privé
+  const [{ image_url: displayImage }] = await signStorageImages([
+    { image_url: item.image_url },
+  ]);
 
   // URLs signées 1 h, générées côté serveur (bucket privé)
   let photos: GalleryPhoto[] = [];
@@ -153,7 +159,7 @@ export default async function CartePage({
           <aside className="flex w-full max-w-96 shrink-0 flex-col">
             <div className="card-tile aspect-[63/88]">
               <CardImage
-                base={item.image_url || null}
+                base={displayImage || null}
                 alt={item.card_name ?? ""}
                 quality="high"
               />

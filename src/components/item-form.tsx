@@ -1,7 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState, useTransition } from "react";
-import { ImagePlus, Loader2 } from "lucide-react";
+import { useActionState, useState, useTransition } from "react";
 import {
   createItem,
   updateItem,
@@ -81,44 +80,7 @@ export function ItemForm({
   sources: SourceOption[];
 }) {
   const stepNo = (n: number) =>
-    String(n + (cardFields ? 2 : 0)).padStart(2, "0");
-
-  // Photos obligatoires en ajout manuel : compressées avant soumission
-  const manualPhotos = Boolean(cardFields) && mode === "create";
-  const photoInputRef = useRef<HTMLInputElement>(null);
-  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
-  const [compressingPhotos, setCompressingPhotos] = useState(false);
-
-  async function handleManualPhotos(files: FileList | null) {
-    if (!files || files.length === 0) {
-      setPhotoPreviews([]);
-      return;
-    }
-    setCompressingPhotos(true);
-    try {
-      const { default: imageCompression } = await import(
-        "browser-image-compression"
-      );
-      const dt = new DataTransfer();
-      const previews: string[] = [];
-      for (const file of Array.from(files).slice(0, 3)) {
-        const compressed = await imageCompression(file, {
-          maxWidthOrHeight: 1600,
-          initialQuality: 0.8,
-          fileType: "image/webp",
-          maxSizeMB: 1,
-          useWebWorker: true,
-        });
-        const out = new File([compressed], "photo.webp", { type: "image/webp" });
-        dt.items.add(out);
-        previews.push(URL.createObjectURL(out));
-      }
-      if (photoInputRef.current) photoInputRef.current.files = dt.files;
-      setPhotoPreviews(previews);
-    } finally {
-      setCompressingPhotos(false);
-    }
-  }
+    String(n + (cardFields ? 1 : 0)).padStart(2, "0");
   const action = mode === "create" ? createItem : updateItem;
   const [state, formAction, pending] = useActionState<ItemFormState, FormData>(
     action,
@@ -226,51 +188,6 @@ export function ItemForm({
               />
             </div>
           </div>
-        </Section>
-      )}
-
-      {/* 0bis — Photos de la carte (obligatoires en manuel) */}
-      {manualPhotos && (
-        <Section step="02" title="Photos de ta carte" hint="au moins une — c'est elle le visuel">
-          <div className="flex flex-wrap items-start gap-3">
-            <label
-              className={`flex h-28 w-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-edge-strong text-muted transition hover:border-accent hover:text-accent ${
-                compressingPhotos ? "pointer-events-none opacity-60" : ""
-              }`}
-            >
-              {compressingPhotos ? (
-                <Loader2 size={22} className="animate-spin" aria-hidden />
-              ) : (
-                <ImagePlus size={22} aria-hidden />
-              )}
-              <span className="px-1 text-center text-xs font-medium">
-                {compressingPhotos ? "Compression…" : "Choisir"}
-              </span>
-              <input
-                ref={photoInputRef}
-                type="file"
-                name="photos"
-                accept="image/*"
-                multiple
-                required
-                onChange={(e) => handleManualPhotos(e.target.files)}
-                className="sr-only"
-              />
-            </label>
-            {photoPreviews.map((src, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={i}
-                src={src}
-                alt={`Photo ${i + 1}`}
-                className="h-28 w-28 rounded-2xl border border-edge object-cover"
-              />
-            ))}
-          </div>
-          <p className="mt-2 text-[11px] text-faint">
-            Jusqu&apos;à 3 photos (recto, verso, défaut) — tu pourras en ajouter
-            d&apos;autres ensuite sur la fiche.
-          </p>
         </Section>
       )}
 
@@ -587,7 +504,7 @@ export function ItemForm({
 
       <button
         type="submit"
-        disabled={pending || compressingPhotos}
+        disabled={pending}
         className="btn btn-primary self-start !px-7 !py-3"
       >
         {pending

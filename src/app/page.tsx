@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { signStorageImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
 import {
   CollectionClient,
@@ -44,7 +45,7 @@ export default async function Home({
           </Link>
         </div>
         <CollectionClient
-          items={(items ?? []) as CollectionItem[]}
+          items={await signStorageImages((items ?? []) as CollectionItem[])}
           sources={(sources ?? []) as SourceRef[]}
           initialSource={initialSource ?? ""}
           initialSet={initialSet ?? ""}
