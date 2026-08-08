@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Pencil, ExternalLink, X } from "lucide-react";
+import { Pencil, ExternalLink, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getCard } from "@/lib/tcgdex";
 import { formatEur, CONDITIONS } from "@/lib/domain";
 import { AppShell } from "@/components/app-shell";
 import { ItemForm } from "@/components/item-form";
@@ -40,7 +41,7 @@ export default async function CartePage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: item }, { data: sources }, { data: photoRows }] =
+  const [{ data: item }, { data: sources }, { data: photoRows }, { data: siblings }] =
     await Promise.all([
       supabase.from("collection_value").select("*").eq("id", id).single(),
       supabase.from("sources").select("id, name, kind, city, url").order("name"),
@@ -49,9 +50,23 @@ export default async function CartePage({
         .select("id, path, label, position")
         .eq("item_id", id)
         .order("position"),
+      // Même ordre que la grille (ajout récent d'abord) pour feuilleter
+      supabase
+        .from("items")
+        .select("id")
+        .order("created_at", { ascending: false }),
     ]);
 
   if (!item) notFound();
+
+  // Feuilletage : carte précédente / suivante dans le classeur
+  const ids = (siblings ?? []).map((s) => s.id);
+  const idx = ids.indexOf(id);
+  const prevId = idx > 0 ? ids[idx - 1] : null;
+  const nextId = idx >= 0 && idx < ids.length - 1 ? ids[idx + 1] : null;
+
+  // Fiche officielle TCGdex (cache 24 h), défensif si l'API est indisponible
+  const tcgdexCard = item.tcgdex_id ? await getCard(item.tcgdex_id) : null;
 
   // URLs signées 1 h, générées côté serveur (bucket privé)
   let photos: GalleryPhoto[] = [];
@@ -84,12 +99,44 @@ export default async function CartePage({
   return (
     <AppShell>
       <main className="mx-auto w-full max-w-6xl px-4 py-8">
-        <Link
-          href="/"
-          className="mb-6 inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground"
-        >
-          ← Collection
-        </Link>
+        <div className="mb-6 flex items-center justify-between">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground"
+          >
+            ← Collection
+          </Link>
+          <div className="flex items-center gap-1">
+            {prevId ? (
+              <Link
+                href={`/carte/${prevId}`}
+                title="Carte précédente"
+                aria-label="Carte précédente"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-edge text-muted transition hover:border-edge-strong hover:text-foreground"
+              >
+                <ChevronLeft size={16} aria-hidden />
+              </Link>
+            ) : (
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-edge text-faint opacity-40">
+                <ChevronLeft size={16} aria-hidden />
+              </span>
+            )}
+            {nextId ? (
+              <Link
+                href={`/carte/${nextId}`}
+                title="Carte suivante"
+                aria-label="Carte suivante"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-edge text-muted transition hover:border-edge-strong hover:text-foreground"
+              >
+                <ChevronRight size={16} aria-hidden />
+              </Link>
+            ) : (
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-edge text-faint opacity-40">
+                <ChevronRight size={16} aria-hidden />
+              </span>
+            )}
+          </div>
+        </div>
 
         <div className="flex flex-col gap-8 lg:flex-row">
           {/* Image officielle en haute qualité */}
@@ -259,6 +306,46 @@ export default async function CartePage({
                     </div>
                   )}
                 </section>
+
+                {/* Infos officielles TCGdex */}
+                {tcgdexCard && (
+                  <section className="panel mb-6 p-5">
+                    <h2 className="display mb-4 text-base font-semibold">
+                      La carte
+                    </h2>
+                    <dl className="grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-3">
+                      {tcgdexCard.rarity && (
+                        <Field label="Rareté">{tcgdexCard.rarity}</Field>
+                      )}
+                      {tcgdexCard.category && (
+                        <Field label="Catégorie">{tcgdexCard.category}</Field>
+                      )}
+                      {tcgdexCard.types && tcgdexCard.types.length > 0 && (
+                        <Field label="Type">{tcgdexCard.types.join(" / ")}</Field>
+                      )}
+                      {tcgdexCard.hp != null && (
+                        <Field label="PV">
+                          <span className="num">{tcgdexCard.hp}</span>
+                        </Field>
+                      )}
+                      {tcgdexCard.stage && (
+                        <Field label="Stade">{tcgdexCard.stage}</Field>
+                      )}
+                      {tcgdexCard.illustrator && (
+                        <Field label="Illustrateur">{tcgdexCard.illustrator}</Field>
+                      )}
+                      <Field label="Set">
+                        {tcgdexCard.set.name}
+                        {tcgdexCard.set.cardCount?.official ? (
+                          <span className="num text-muted">
+                            {" "}
+                            · {item.local_id} / {tcgdexCard.set.cardCount.official}
+                          </span>
+                        ) : null}
+                      </Field>
+                    </dl>
+                  </section>
+                )}
 
                 <PhotoGallery itemId={item.id ?? id} photos={photos} />
               </>

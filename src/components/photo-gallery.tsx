@@ -9,10 +9,12 @@ import {
   Trash2,
   Loader2,
   Expand,
+  Pencil,
 } from "lucide-react";
 import {
   uploadItemPhotos,
   deleteItemPhoto,
+  updatePhotoLabel,
   type PhotoActionState,
 } from "@/app/items/photo-actions";
 import { ConfirmAction } from "@/components/confirm-action";
@@ -35,6 +37,7 @@ export function PhotoGallery({
   const [compressing, setCompressing] = useState(false);
   const [pending, startTransition] = useTransition();
   const [lightbox, setLightbox] = useState<number | null>(null);
+  const [editingLabel, setEditingLabel] = useState(false);
 
   const busy = compressing || pending;
 
@@ -91,7 +94,10 @@ export function PhotoGallery({
     }
   }
 
-  const close = useCallback(() => setLightbox(null), []);
+  const close = useCallback(() => {
+    setLightbox(null);
+    setEditingLabel(false);
+  }, []);
 
   useEffect(() => {
     if (lightbox === null) return;
@@ -150,8 +156,11 @@ export function PhotoGallery({
           <div key={photo.id} className="group relative">
             <button
               type="button"
-              onClick={() => setLightbox(i)}
-              className="block w-full overflow-hidden rounded-xl border border-edge"
+              onClick={() => {
+                setLightbox(i);
+                setEditingLabel(false);
+              }}
+              className="relative block w-full overflow-hidden rounded-xl border border-edge"
               aria-label="Agrandir la photo"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -164,6 +173,11 @@ export function PhotoGallery({
               <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition group-hover:bg-black/25 group-hover:opacity-100">
                 <Expand size={18} className="text-white drop-shadow" aria-hidden />
               </span>
+              {photo.label && (
+                <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-4 text-left text-[11px] font-medium text-white">
+                  {photo.label}
+                </span>
+              )}
             </button>
             <div className="absolute right-1.5 top-1.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
               <ConfirmAction
@@ -201,9 +215,50 @@ export function PhotoGallery({
             className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
-          <span className="num absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-sm text-white">
-            {lightbox + 1} / {photos.length}
-          </span>
+          <div
+            className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {editingLabel ? (
+              <form
+                action={updatePhotoLabel}
+                onSubmit={() => setEditingLabel(false)}
+                className="flex items-center gap-1.5 rounded-full bg-black/70 py-1 pl-3 pr-1 backdrop-blur-sm"
+              >
+                <input type="hidden" name="photo_id" value={photos[lightbox].id} />
+                <input
+                  type="text"
+                  name="label"
+                  defaultValue={photos[lightbox].label ?? ""}
+                  placeholder="recto, verso, coin abîmé…"
+                  autoFocus
+                  maxLength={60}
+                  className="w-44 bg-transparent text-sm text-white placeholder:text-white/40 focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white transition hover:bg-white/25"
+                >
+                  OK
+                </button>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingLabel(true)}
+                title="Étiqueter la photo"
+                className="flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1 text-sm text-white backdrop-blur-sm transition hover:bg-black/80"
+              >
+                {photos[lightbox].label ?? (
+                  <span className="text-white/60">Ajouter une étiquette</span>
+                )}
+                <Pencil size={12} aria-hidden />
+              </button>
+            )}
+            <span className="num rounded-full bg-black/60 px-3 py-1 text-sm text-white backdrop-blur-sm">
+              {lightbox + 1} / {photos.length}
+            </span>
+          </div>
           {photos.length > 1 && (
             <>
               <button

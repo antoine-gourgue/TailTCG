@@ -76,6 +76,9 @@ export type TcgdexCard = {
   rarity?: string;
   category?: string;
   illustrator?: string;
+  hp?: number;
+  types?: string[];
+  stage?: string;
   variants?: {
     normal?: boolean;
     holo?: boolean;

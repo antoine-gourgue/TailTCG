@@ -87,6 +87,24 @@ export async function uploadItemPhotos(
   };
 }
 
+// Étiquette d'une photo (« recto », « coin abîmé »…)
+export async function updatePhotoLabel(formData: FormData): Promise<void> {
+  const photoId = String(formData.get("photo_id") ?? "");
+  if (!photoId) return;
+  const label = String(formData.get("label") ?? "").trim() || null;
+
+  const supabase = await createClient();
+  // La RLS garantit que la photo m'appartient
+  const { data: photo } = await supabase
+    .from("item_photos")
+    .update({ label })
+    .eq("id", photoId)
+    .select("item_id")
+    .single();
+
+  if (photo) revalidatePath(`/carte/${photo.item_id}`);
+}
+
 export async function deleteItemPhoto(formData: FormData): Promise<void> {
   const photoId = String(formData.get("photo_id") ?? "");
   if (!photoId) return;
