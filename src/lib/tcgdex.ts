@@ -226,19 +226,66 @@ export function cardmarketProductUrl(idProduct: number): string {
   return `https://www.cardmarket.com/fr/Pokemon/Products?idProduct=${idProduct}`;
 }
 
+async function fetchCardBriefs(queryString: string): Promise<TcgdexCardBrief[]> {
+  const res = await fetch(`${TCGDEX_BASE}/cards${queryString}`, {
+    next: { revalidate: DAY_SECONDS },
+  });
+  if (!res.ok) throw new Error(`TCGdex a répondu ${res.status}`);
+  return res.json();
+}
+
+/** "027" et "27" désignent le même numéro */
+function sameLocalId(a: string, b: string): boolean {
+  const na = Number.parseInt(a, 10);
+  const nb = Number.parseInt(b, 10);
+  if (!Number.isNaN(na) && !Number.isNaN(nb)) return na === nb;
+  return a.toLowerCase() === b.toLowerCase();
+}
+
 export async function searchCards(query: string): Promise<CardSearchResult[]> {
-  const [cardsRes, setsIndex] = await Promise.all([
-    fetch(`${TCGDEX_BASE}/cards?name=like:${encodeURIComponent(query)}`, {
-      next: { revalidate: DAY_SECONDS },
-    }),
-    fetchSetsIndex(),
-  ]);
+  const q = query.trim();
 
-  if (!cardsRes.ok) {
-    throw new Error(`TCGdex a répondu ${cardsRes.status}`);
+  // « pikachu ex 764/742 », « pikachu 27 » ou « 241 » tout seul :
+  // un numéro en fin de requête devient un filtre sur localId
+  const numMatch = q.match(/^(.*?)\s*(\d+)(?:\s*\/\s*\d+)?$/);
+  const name = numMatch ? numMatch[1].trim() : q;
+  const localId = numMatch ? numMatch[2] : null;
+
+  const setsIndex = await fetchSetsIndex();
+  let cards: TcgdexCardBrief[] = [];
+
+  if (localId && name) {
+    cards = (
+      await fetchCardBriefs(
+        `?name=like:${encodeURIComponent(name)}&localId=like:${encodeURIComponent(localId)}`
+      )
+    ).filter((c) => sameLocalId(c.localId, localId));
+
+    if (cards.length === 0 && name.includes(" ")) {
+      // Nom composé (« pikachu ex ») : les noms officiels utilisent parfois
+      // un tiret (« Pikachu-ex ») — premier mot côté API, le reste en filtre
+      const first = name.split(/\s+/)[0];
+      const tokens = name.toLowerCase().split(/\s+/);
+      const raw = await fetchCardBriefs(
+        `?name=like:${encodeURIComponent(first)}&localId=like:${encodeURIComponent(localId)}`
+      );
+      cards = raw.filter((c) => {
+        const n = c.name.toLowerCase().replace(/[-–]/g, " ");
+        return tokens.every((t) => n.includes(t)) && sameLocalId(c.localId, localId);
+      });
+    }
+
+    if (cards.length === 0) {
+      // Repli : la requête entière comme nom (ex. « Porygon2 »)
+      cards = await fetchCardBriefs(`?name=like:${encodeURIComponent(q)}`);
+    }
+  } else if (localId && !name) {
+    cards = (
+      await fetchCardBriefs(`?localId=like:${encodeURIComponent(localId)}`)
+    ).filter((c) => sameLocalId(c.localId, localId));
+  } else {
+    cards = await fetchCardBriefs(`?name=like:${encodeURIComponent(name)}`);
   }
-
-  const cards: TcgdexCardBrief[] = await cardsRes.json();
 
   const results = cards.map((c) => {
     const setId = setIdFromCardId(c.id);

@@ -68,7 +68,7 @@ export function SearchClient({
         type="search"
         value={query}
         onChange={(e) => handleChange(e.target.value)}
-        placeholder="Nom de la carte… (ex. aligatueur)"
+        placeholder="Nom ou nom + numéro… (ex. pikachu ex 764/742)"
         autoFocus
         className="field mb-8 max-w-md !px-4 !py-3 !text-base"
       />
