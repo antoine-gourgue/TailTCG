@@ -18,6 +18,7 @@ import {
   type PhotoActionState,
 } from "@/app/items/photo-actions";
 import { ConfirmAction } from "@/components/confirm-action";
+import { Toast } from "@/components/toast";
 
 export type GalleryPhoto = {
   id: string;
@@ -195,9 +196,11 @@ export function PhotoGallery({
       </div>
 
       {state && (
-        <p className={`mt-3 text-sm ${state.ok ? "text-gain" : "text-loss"}`}>
-          {state.message}
-        </p>
+        <Toast
+          message={state.message}
+          tone={state.ok ? "success" : "error"}
+          onDone={() => setState(null)}
+        />
       )}
 
       {/* Lightbox */}

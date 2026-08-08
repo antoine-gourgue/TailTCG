@@ -140,7 +140,7 @@ export default async function CartePage({
 
         <div className="flex flex-col gap-8 lg:flex-row">
           {/* Image officielle en haute qualité */}
-          <aside className="w-full max-w-sm shrink-0 lg:sticky lg:top-20 lg:self-start">
+          <aside className="w-full max-w-sm shrink-0 lg:sticky lg:top-8 lg:self-start">
             <div className="card-tile aspect-[63/88]">
               <CardImage
                 base={item.image_url || null}
@@ -148,6 +148,42 @@ export default async function CartePage({
                 quality="high"
               />
             </div>
+            {tcgdexCard && (
+              <section className="panel mt-5 p-5">
+                <h2 className="display mb-4 text-base font-semibold">La carte</h2>
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
+                  {tcgdexCard.rarity && (
+                    <Field label="Rareté">{tcgdexCard.rarity}</Field>
+                  )}
+                  {tcgdexCard.category && (
+                    <Field label="Catégorie">{tcgdexCard.category}</Field>
+                  )}
+                  {tcgdexCard.types && tcgdexCard.types.length > 0 && (
+                    <Field label="Type">{tcgdexCard.types.join(" / ")}</Field>
+                  )}
+                  {tcgdexCard.hp != null && (
+                    <Field label="PV">
+                      <span className="num">{tcgdexCard.hp}</span>
+                    </Field>
+                  )}
+                  {tcgdexCard.stage && (
+                    <Field label="Stade">{tcgdexCard.stage}</Field>
+                  )}
+                  {tcgdexCard.illustrator && (
+                    <Field label="Illustrateur">{tcgdexCard.illustrator}</Field>
+                  )}
+                  <Field label="Set">
+                    {tcgdexCard.set.name}
+                    {tcgdexCard.set.cardCount?.official ? (
+                      <span className="num text-muted">
+                        {" "}
+                        · {item.local_id} / {tcgdexCard.set.cardCount.official}
+                      </span>
+                    ) : null}
+                  </Field>
+                </dl>
+              </section>
+            )}
           </aside>
 
           <div className="min-w-0 flex-1">
@@ -306,46 +342,6 @@ export default async function CartePage({
                     </div>
                   )}
                 </section>
-
-                {/* Infos officielles TCGdex */}
-                {tcgdexCard && (
-                  <section className="panel mb-6 p-5">
-                    <h2 className="display mb-4 text-base font-semibold">
-                      La carte
-                    </h2>
-                    <dl className="grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-3">
-                      {tcgdexCard.rarity && (
-                        <Field label="Rareté">{tcgdexCard.rarity}</Field>
-                      )}
-                      {tcgdexCard.category && (
-                        <Field label="Catégorie">{tcgdexCard.category}</Field>
-                      )}
-                      {tcgdexCard.types && tcgdexCard.types.length > 0 && (
-                        <Field label="Type">{tcgdexCard.types.join(" / ")}</Field>
-                      )}
-                      {tcgdexCard.hp != null && (
-                        <Field label="PV">
-                          <span className="num">{tcgdexCard.hp}</span>
-                        </Field>
-                      )}
-                      {tcgdexCard.stage && (
-                        <Field label="Stade">{tcgdexCard.stage}</Field>
-                      )}
-                      {tcgdexCard.illustrator && (
-                        <Field label="Illustrateur">{tcgdexCard.illustrator}</Field>
-                      )}
-                      <Field label="Set">
-                        {tcgdexCard.set.name}
-                        {tcgdexCard.set.cardCount?.official ? (
-                          <span className="num text-muted">
-                            {" "}
-                            · {item.local_id} / {tcgdexCard.set.cardCount.official}
-                          </span>
-                        ) : null}
-                      </Field>
-                    </dl>
-                  </section>
-                )}
 
                 <PhotoGallery itemId={item.id ?? id} photos={photos} />
               </>
