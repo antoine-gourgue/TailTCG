@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchSeriesWithSets, type CatalogLang } from "@/lib/tcgdex";
 import { AppShell } from "@/components/app-shell";
-import { SearchClient, type CustomCardTile } from "./search-client";
+import { SearchClient } from "./search-client";
 
 export const metadata = {
   title: "Ajouter — TailTCG",
@@ -23,32 +22,12 @@ export default async function RecherchePage({
   const { lang: langParam } = await searchParams;
   const lang: CatalogLang = langParam === "ja" ? "ja" : "fr";
 
-  const [series, { data: customs }] = await Promise.all([
+  const [series, { count: customCount }] = await Promise.all([
     fetchSeriesWithSets(lang),
     supabase
       .from("custom_cards")
-      .select("id, name, set_name, local_id, image_path")
-      .order("created_at", { ascending: false }),
+      .select("id", { count: "exact", head: true }),
   ]);
-
-  // Visuels des cartes hors catalogue (bucket privé → URLs signées)
-  let customCards: CustomCardTile[] = [];
-  if (customs && customs.length > 0) {
-    const admin = createAdminClient();
-    const { data: signed } = await admin.storage
-      .from("card-photos")
-      .createSignedUrls(
-        customs.map((c) => c.image_path),
-        3600
-      );
-    customCards = customs.map((c, i) => ({
-      id: c.id,
-      name: c.name,
-      setName: c.set_name,
-      localId: c.local_id,
-      image: signed?.[i]?.signedUrl ?? null,
-    }));
-  }
 
   return (
     <AppShell>
@@ -67,7 +46,11 @@ export default async function RecherchePage({
           </a>
           .
         </p>
-        <SearchClient series={series} lang={lang} customCards={customCards} />
+        <SearchClient
+          series={series}
+          lang={lang}
+          customCount={customCount ?? 0}
+        />
       </main>
     </AppShell>
   );

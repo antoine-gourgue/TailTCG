@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Layers } from "lucide-react";
 import type { SerieWithSets, CatalogLang } from "@/lib/tcgdex";
+import { Logo } from "@/components/logo";
 
 function SetLogo({
   logo,
@@ -52,9 +53,11 @@ function SetLogo({
 export function ExtensionsBrowser({
   series,
   lang,
+  customCount = 0,
 }: {
   series: SerieWithSets[];
   lang: CatalogLang;
+  customCount?: number;
 }) {
   const [q, setQ] = useState("");
 
@@ -129,6 +132,36 @@ export function ExtensionsBrowser({
         </p>
       ) : (
         <div className="flex flex-col gap-10">
+          {customCount > 0 && !q.trim() && (
+            <section>
+              <div className="mb-4 flex items-baseline gap-3">
+                <h2 className="display text-xl font-semibold">Mon catalogue</h2>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                <Link
+                  href="/extensions/perso"
+                  className="panel group flex flex-col gap-3 p-4 transition hover:border-accent hover:shadow-lg"
+                >
+                  <div className="flex h-14 items-center justify-center">
+                    <Logo variant="mark" size={44} interactive={false} />
+                  </div>
+                  <div className="mt-auto">
+                    <p className="truncate text-sm font-medium leading-tight group-hover:text-accent-strong">
+                      Cartes hors catalogue
+                    </p>
+                    <p className="mt-1 flex items-center gap-2 text-xs text-muted">
+                      <span className="num rounded bg-raised px-1.5 py-0.5 uppercase">
+                        perso
+                      </span>
+                      <span className="num">
+                        {customCount} carte{customCount > 1 ? "s" : ""}
+                      </span>
+                    </p>
+                  </div>
+                </Link>
+              </div>
+            </section>
+          )}
           {filtered.map((serie) => (
             <section key={serie.id}>
               <div className="mb-4 flex items-baseline gap-3">
