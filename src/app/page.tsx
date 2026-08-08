@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BellRing } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { daysAgoISO } from "@/lib/domain";
 import { signStorageImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
 import {
@@ -53,9 +54,7 @@ export default async function Home({
     for (const h of hist ?? []) {
       if (!lastByItem.has(h.item_id)) lastByItem.set(h.item_id, h.recorded_at);
     }
-    const cutoff = new Date(Date.now() - weeks * 7 * 86_400_000)
-      .toISOString()
-      .slice(0, 10);
+    const cutoff = daysAgoISO(weeks * 7);
     staleItems = items
       .filter((i) => {
         const last = i.id ? lastByItem.get(i.id) : null;
