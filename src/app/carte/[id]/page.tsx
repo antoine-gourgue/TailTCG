@@ -138,9 +138,9 @@ export default async function CartePage({
           </div>
         </div>
 
-        <div className="flex flex-col gap-8 lg:flex-row">
+        <div className="flex flex-col gap-8 lg:min-h-[calc(100vh-10rem)] lg:flex-row">
           {/* Image officielle en haute qualité */}
-          <aside className="w-full max-w-72 shrink-0 lg:sticky lg:top-8 lg:self-start">
+          <aside className="flex w-full max-w-72 shrink-0 flex-col">
             <div className="card-tile aspect-[63/88]">
               <CardImage
                 base={item.image_url || null}
@@ -149,7 +149,7 @@ export default async function CartePage({
               />
             </div>
             {tcgdexCard && (
-              <section className="panel mt-5 p-5">
+              <section className="panel mt-5 p-5 lg:flex-1">
                 <h2 className="display mb-4 text-base font-semibold">La carte</h2>
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
                   {tcgdexCard.rarity && (
@@ -186,7 +186,7 @@ export default async function CartePage({
             )}
           </aside>
 
-          <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-1 flex-col">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="flex flex-wrap items-center gap-2.5">
@@ -372,7 +372,11 @@ export default async function CartePage({
                   )}
                 </section>
 
-                <PhotoGallery itemId={item.id ?? id} photos={photos} />
+                <PhotoGallery
+                  itemId={item.id ?? id}
+                  photos={photos}
+                  className="lg:flex-1"
+                />
               </>
             )}
           </div>

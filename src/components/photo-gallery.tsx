@@ -29,9 +29,11 @@ export type GalleryPhoto = {
 export function PhotoGallery({
   itemId,
   photos,
+  className = "",
 }: {
   itemId: string;
   photos: GalleryPhoto[];
+  className?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<PhotoActionState>(null);
@@ -116,7 +118,7 @@ export function PhotoGallery({
   }, [lightbox, photos.length, close]);
 
   return (
-    <section className="panel p-5">
+    <section className={`panel p-5 ${className}`}>
       <div className="mb-4 flex items-baseline gap-2">
         <h2 className="display text-base font-semibold">Mes photos</h2>
         {photos.length > 0 && (
