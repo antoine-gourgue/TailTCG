@@ -28,8 +28,8 @@ export default async function AjoutManuelPage() {
         </h1>
         <p className="mb-6 max-w-2xl text-sm text-muted">
           Pour les cartes absentes du catalogue TCGdex — promos japonaises,
-          raretés… Saisis son identité toi-même, et tes photos feront le
-          visuel dans la collection.
+          raretés… Décris ta carte et photographie-la : c&apos;est ta photo qui
+          servira de visuel dans la collection (au moins une, obligatoire).
         </p>
         <ItemForm
           mode="create"
