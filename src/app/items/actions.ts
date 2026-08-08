@@ -198,6 +198,40 @@ export async function updateItemValue(
   return { ok: true };
 }
 
+// Supprime un relevé de valeur erroné et recale la valeur actuelle de la
+// carte sur le dernier relevé restant
+export async function deleteValuePoint(formData: FormData): Promise<void> {
+  const pointId = str(formData, "point_id");
+  if (!pointId) return;
+
+  const supabase = await createClient();
+  // La RLS garantit que le relevé m'appartient
+  const { data: point } = await supabase
+    .from("item_value_history")
+    .select("id, item_id")
+    .eq("id", pointId)
+    .single();
+  if (!point) return;
+
+  await supabase.from("item_value_history").delete().eq("id", pointId);
+
+  const { data: latest } = await supabase
+    .from("item_value_history")
+    .select("value")
+    .eq("item_id", point.item_id)
+    .order("recorded_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  await supabase
+    .from("items")
+    .update({ manual_price: latest?.value ?? null })
+    .eq("id", point.item_id);
+
+  revalidatePath("/");
+  revalidatePath(`/carte/${point.item_id}`);
+}
+
 export async function deleteItem(formData: FormData): Promise<void> {
   const id = str(formData, "item_id");
   if (!id) return;

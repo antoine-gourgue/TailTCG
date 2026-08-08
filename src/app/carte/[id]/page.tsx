@@ -12,6 +12,7 @@ import { DeleteItemButton } from "@/components/delete-item-button";
 import { PhotoGallery, type GalleryPhoto } from "@/components/photo-gallery";
 import { CardImage } from "@/components/card-image";
 import { ValueHistoryChart } from "@/components/value-history-chart";
+import { ValueHistoryManager } from "@/components/value-history-manager";
 import { ValueUpdateButton } from "@/components/quick-value-edit";
 import type { SourceOption } from "@/app/items/actions";
 
@@ -88,7 +89,7 @@ export default async function CartePage({
 
   const { data: valueHistory } = await supabase
     .from("item_value_history")
-    .select("recorded_at, value")
+    .select("id, recorded_at, value")
     .eq("item_id", id)
     .order("recorded_at");
 
@@ -418,9 +419,12 @@ export default async function CartePage({
           <div className="mt-8 flex flex-col gap-8">
             {valueHistory && valueHistory.length > 0 && (
               <section className="panel p-5">
-                <h2 className="display mb-1 text-base font-semibold">
-                  Évolution de ma valeur estimée
-                </h2>
+                <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="display text-base font-semibold">
+                    Évolution de ma valeur estimée
+                  </h2>
+                  <ValueHistoryManager entries={valueHistory} />
+                </div>
                 <p className="mb-3 text-xs text-faint">
                   Chaque actualisation est datée — bouton « Actualiser la
                   valeur » en haut de page.
