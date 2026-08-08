@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { formatEur } from "@/lib/domain";
 
 export type ValuePoint = { recorded_at: string; value: number };
@@ -11,8 +14,18 @@ function fmtDate(iso: string): string {
   return `${d}/${m}`;
 }
 
-// Courbe des valeurs estimées saisies — SVG serveur, série unique
+function fmtDateLong(iso: string): string {
+  return new Date(iso).toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+// Courbe des valeurs estimées saisies, tooltip maison au survol des points
 export function ValueHistoryChart({ points }: { points: ValuePoint[] }) {
+  const [hover, setHover] = useState<number | null>(null);
+
   const data = [...points].sort((a, b) =>
     a.recorded_at.localeCompare(b.recorded_at)
   );
@@ -49,69 +62,115 @@ export function ValueHistoryChart({ points }: { points: ValuePoint[] }) {
   const last = data[data.length - 1];
   const gridYs = min === max ? [min] : [min, (min + max) / 2, max];
 
+  const hovered = hover !== null ? data[hover] : null;
+
   return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      role="img"
-      aria-label={`Évolution de la valeur, de ${formatEur(data[0].value)} à ${formatEur(last.value)}`}
-      className="w-full"
-    >
-      {gridYs.map((v) => (
-        <g key={v}>
-          <line
-            x1={PAD.left}
-            x2={W - PAD.right}
-            y1={y(v)}
-            y2={y(v)}
-            stroke="currentColor"
-            strokeOpacity={0.08}
-          />
-          <text
-            x={W - PAD.right + 6}
-            y={y(v) + 3.5}
-            fontSize={10}
-            fill="var(--muted)"
-            fontFamily="var(--font-geist-mono)"
-          >
-            {formatEur(v)}
-          </text>
-        </g>
-      ))}
-
-      <path d={area} fill="var(--accent)" fillOpacity={0.07} />
-      <path
-        d={path}
-        fill="none"
-        stroke="var(--accent)"
-        strokeWidth={2}
-        strokeLinejoin="round"
-      />
-
-      {data.map((d, i) => (
-        <circle
-          key={d.recorded_at}
-          cx={x(i)}
-          cy={y(d.value)}
-          r={i === data.length - 1 ? 3.5 : 2}
-          fill="var(--accent)"
-        >
-          <title>{`${fmtDate(d.recorded_at)} : ${formatEur(d.value)}`}</title>
-        </circle>
-      ))}
-
-      <text x={PAD.left} y={H - 8} fontSize={10} fill="var(--muted)" fontFamily="var(--font-geist-mono)">
-        {fmtDate(data[0].recorded_at)}
-      </text>
-      <text
-        x={W - PAD.right}
-        y={H - 8}
-        fontSize={10}
-        fill="var(--muted)"
-        textAnchor="end"
-        fontFamily="var(--font-geist-mono)"
+    <div className="relative">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        role="img"
+        aria-label={`Évolution de la valeur, de ${formatEur(data[0].value)} à ${formatEur(last.value)}`}
+        className="w-full"
+        onMouseLeave={() => setHover(null)}
       >
-        {fmtDate(last.recorded_at)}
-      </text>
-    </svg>
+        {gridYs.map((v) => (
+          <g key={v}>
+            <line
+              x1={PAD.left}
+              x2={W - PAD.right}
+              y1={y(v)}
+              y2={y(v)}
+              stroke="currentColor"
+              strokeOpacity={0.08}
+            />
+            <text
+              x={W - PAD.right + 6}
+              y={y(v) + 3.5}
+              fontSize={10}
+              fill="var(--muted)"
+              fontFamily="var(--font-geist-mono)"
+            >
+              {formatEur(v)}
+            </text>
+          </g>
+        ))}
+
+        <path d={area} fill="var(--accent)" fillOpacity={0.07} />
+        <path
+          d={path}
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth={2}
+          strokeLinejoin="round"
+        />
+
+        {/* Repère vertical du point survolé */}
+        {hover !== null && (
+          <line
+            x1={x(hover)}
+            x2={x(hover)}
+            y1={PAD.top}
+            y2={H - PAD.bottom}
+            stroke="var(--accent)"
+            strokeOpacity={0.25}
+            strokeDasharray="3 3"
+          />
+        )}
+
+        {data.map((d, i) => (
+          <g key={d.recorded_at}>
+            <circle
+              cx={x(i)}
+              cy={y(d.value)}
+              r={hover === i ? 5 : i === data.length - 1 ? 3.5 : 2.5}
+              fill="var(--accent)"
+              stroke={hover === i ? "var(--raised)" : "none"}
+              strokeWidth={hover === i ? 2 : 0}
+              className="transition-all duration-100"
+            />
+            {/* Zone de survol large, invisible */}
+            <circle
+              cx={x(i)}
+              cy={y(d.value)}
+              r={14}
+              fill="transparent"
+              onMouseEnter={() => setHover(i)}
+            />
+          </g>
+        ))}
+
+        <text x={PAD.left} y={H - 8} fontSize={10} fill="var(--muted)" fontFamily="var(--font-geist-mono)">
+          {fmtDate(data[0].recorded_at)}
+        </text>
+        <text
+          x={W - PAD.right}
+          y={H - 8}
+          fontSize={10}
+          fill="var(--muted)"
+          textAnchor="end"
+          fontFamily="var(--font-geist-mono)"
+        >
+          {fmtDate(last.recorded_at)}
+        </text>
+      </svg>
+
+      {/* Tooltip maison */}
+      {hovered && hover !== null && (
+        <div
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-xl border border-edge bg-raised px-3 py-1.5 text-center shadow-lg"
+          style={{
+            left: `${(x(hover) / W) * 100}%`,
+            top: `calc(${(y(hovered.value) / H) * 100}% - 10px)`,
+          }}
+        >
+          <p className="num text-sm font-bold leading-tight">
+            {formatEur(hovered.value)}
+          </p>
+          <p className="text-[11px] leading-tight text-muted">
+            {fmtDateLong(hovered.recorded_at)}
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
