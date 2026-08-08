@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Pencil, ExternalLink, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { formatEur } from "@/lib/domain";
+import { formatEur, CONDITIONS } from "@/lib/domain";
 import { AppShell } from "@/components/app-shell";
 import { ItemForm } from "@/components/item-form";
 import { DeleteItemButton } from "@/components/delete-item-button";
@@ -14,12 +15,24 @@ export const metadata = {
   title: "Fiche carte — TailTCG",
 };
 
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="label-xs mb-1">{label}</dt>
+      <dd className="text-sm">{children}</dd>
+    </div>
+  );
+}
+
 export default async function CartePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ edit?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, { edit }] = await Promise.all([params, searchParams]);
+  const editing = edit != null;
 
   const supabase = await createClient();
   const {
@@ -56,10 +69,21 @@ export default async function CartePage({
     });
   }
 
+  const condition = CONDITIONS.find((c) => c.code === item.condition);
+  const source = item.source_id
+    ? (sources ?? []).find((s) => s.id === item.source_id)
+    : null;
+  const purchaseDate = item.purchase_date
+    ? new Date(item.purchase_date).toLocaleDateString("fr-FR", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
+
   return (
-    <>
-      <AppShell>
-      <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8">
+    <AppShell>
+      <main className="mx-auto w-full max-w-6xl px-4 py-8">
         <Link
           href="/"
           className="mb-6 inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground"
@@ -80,14 +104,31 @@ export default async function CartePage({
           </aside>
 
           <div className="min-w-0 flex-1">
-            <h1 className="display text-3xl font-bold tracking-tight">
-              {item.card_name}
-            </h1>
-            <p className="mb-5 mt-1 text-muted">
-              {item.set_name} <span className="num text-faint">· {item.local_id}</span>
-            </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h1 className="display text-3xl font-bold tracking-tight">
+                  {item.card_name}
+                </h1>
+                <p className="mt-1 text-muted">
+                  {item.set_name}{" "}
+                  <span className="num text-faint">· {item.local_id}</span>
+                </p>
+              </div>
+              {editing ? (
+                <Link href={`/carte/${id}`} className="btn btn-ghost">
+                  <X size={15} aria-hidden />
+                  Annuler
+                </Link>
+              ) : (
+                <Link href={`/carte/${id}?edit`} className="btn btn-primary">
+                  <Pencil size={15} aria-hidden />
+                  Modifier
+                </Link>
+              )}
+            </div>
 
-            <div className="panel mb-6 flex flex-wrap items-center gap-x-10 gap-y-4 px-6 py-4">
+            {/* Valeurs clés */}
+            <div className="panel mb-6 mt-5 flex flex-wrap items-center gap-x-10 gap-y-4 px-6 py-4">
               <div className="flex flex-col gap-0.5">
                 <span className="label-xs">Payé</span>
                 <span className="display num text-xl font-bold leading-none">
@@ -124,43 +165,107 @@ export default async function CartePage({
                   rel="noopener noreferrer"
                   className="btn btn-ghost ml-auto !py-1.5 text-[13px]"
                 >
-                  Cardmarket ↗
+                  Cardmarket
+                  <ExternalLink size={13} aria-hidden />
                 </a>
               )}
             </div>
 
-            <div className="mb-8">
-              <PhotoGallery itemId={item.id ?? id} photos={photos} />
-            </div>
+            {editing ? (
+              <>
+                <ItemForm
+                  mode="edit"
+                  itemId={item.id ?? id}
+                  defaults={{
+                    card_type: item.card_type,
+                    language: item.language ?? "FR",
+                    condition: item.condition,
+                    quantity: item.quantity ?? 1,
+                    purchase_price: item.purchase_price,
+                    manual_price: item.manual_price,
+                    purchase_date: item.purchase_date,
+                    source_id: item.source_id,
+                    cardmarket_url: item.cardmarket_url,
+                    graded: item.graded ?? false,
+                    grade: item.grade,
+                    notes: item.notes,
+                  }}
+                  sources={(sources ?? []) as SourceOption[]}
+                />
+                <div className="mt-8 border-t border-edge pt-6">
+                  <DeleteItemButton itemId={item.id ?? id} />
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Détails de l'exemplaire */}
+                <section className="panel mb-6 p-5">
+                  <h2 className="display mb-4 text-base font-semibold">
+                    Cet exemplaire
+                  </h2>
+                  <dl className="grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-3">
+                    <Field label="État">
+                      <span className="inline-flex items-baseline gap-1.5">
+                        <span className="num rounded-md bg-accent-soft px-1.5 py-0.5 text-[13px] font-bold text-accent-strong">
+                          {item.condition}
+                        </span>
+                        {condition && (
+                          <span className="text-muted">{condition.label}</span>
+                        )}
+                      </span>
+                    </Field>
+                    <Field label="Type">{item.card_type ?? "—"}</Field>
+                    <Field label="Langue">{item.language}</Field>
+                    <Field label="Quantité">
+                      <span className="num">×{item.quantity}</span>
+                    </Field>
+                    <Field label="Gradée">
+                      {item.graded ? (
+                        <span className="rounded-md bg-accent px-1.5 py-0.5 text-[13px] font-semibold text-accent-ink">
+                          {item.grade ?? "Oui"}
+                        </span>
+                      ) : (
+                        "Non"
+                      )}
+                    </Field>
+                    <Field label="Date d'achat">{purchaseDate ?? "—"}</Field>
+                    <Field label="Source">
+                      {source ? (
+                        <>
+                          {source.name}
+                          {source.kind === "shop" && source.city
+                            ? ` (${source.city})`
+                            : ""}
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </Field>
+                    <Field label="N° dans le set">
+                      <span className="num">{item.local_id}</span>
+                    </Field>
+                    <Field label="Ajoutée le">
+                      {item.created_at
+                        ? new Date(item.created_at).toLocaleDateString("fr-FR")
+                        : "—"}
+                    </Field>
+                  </dl>
+                  {item.notes && (
+                    <div className="mt-5 border-t border-edge pt-4">
+                      <p className="label-xs mb-1.5">Notes</p>
+                      <p className="whitespace-pre-wrap text-sm text-muted">
+                        {item.notes}
+                      </p>
+                    </div>
+                  )}
+                </section>
 
-            <h2 className="display mb-4 text-xl font-semibold">Modifier</h2>
-            <ItemForm
-              mode="edit"
-              itemId={item.id ?? id}
-              defaults={{
-                card_type: item.card_type,
-                language: item.language ?? "FR",
-                condition: item.condition,
-                quantity: item.quantity ?? 1,
-                purchase_price: item.purchase_price,
-                manual_price: item.manual_price,
-                purchase_date: item.purchase_date,
-                source_id: item.source_id,
-                cardmarket_url: item.cardmarket_url,
-                graded: item.graded ?? false,
-                grade: item.grade,
-                notes: item.notes,
-              }}
-              sources={(sources ?? []) as SourceOption[]}
-            />
-
-            <div className="mt-8 border-t border-edge pt-6">
-              <DeleteItemButton itemId={item.id ?? id} />
-            </div>
+                <PhotoGallery itemId={item.id ?? id} photos={photos} />
+              </>
+            )}
           </div>
         </div>
       </main>
-      </AppShell>
-    </>
+    </AppShell>
   );
 }
