@@ -4,7 +4,13 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geocode";
-import { CONDITION_CODES, type ConditionCode } from "@/lib/domain";
+import {
+  CONDITION_CODES,
+  SOURCE_KIND_VALUES,
+  GEOCODED_KINDS,
+  type ConditionCode,
+  type SourceKind,
+} from "@/lib/domain";
 import type { Database } from "@/lib/database.types";
 
 type ItemInsert = Database["public"]["Tables"]["items"]["Insert"];
@@ -206,21 +212,21 @@ export async function deleteItem(formData: FormData): Promise<void> {
 export type SourceOption = {
   id: string;
   name: string;
-  kind: "shop" | "web";
+  kind: SourceKind;
   city: string | null;
   url: string | null;
 };
 
 export async function createSource(input: {
   name: string;
-  kind: "shop" | "web";
+  kind: SourceKind;
   address?: string;
   city?: string;
   url?: string;
 }): Promise<{ source?: SourceOption; error?: string }> {
   const name = input.name.trim();
   if (!name) return { error: "Le nom est obligatoire." };
-  if (input.kind !== "shop" && input.kind !== "web") {
+  if (!SOURCE_KIND_VALUES.includes(input.kind)) {
     return { error: "Type de source invalide." };
   }
 
@@ -229,7 +235,7 @@ export async function createSource(input: {
 
   // Boutique physique : géocodée à l'enregistrement (Nominatim, 1 requête)
   const coords =
-    input.kind === "shop" ? await geocodeAddress(address, city) : null;
+    GEOCODED_KINDS.includes(input.kind) ? await geocodeAddress(address, city) : null;
 
   const supabase = await createClient();
   const { data, error } = await supabase

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import type { SourceKind } from "@/lib/domain";
 import { AppShell } from "@/components/app-shell";
 import { ShopsClient, type SourceWithStats } from "@/components/shops-client";
 
@@ -34,7 +35,7 @@ export default async function BoutiquesPage() {
 
   const withStats: SourceWithStats[] = (sources ?? []).map((s) => ({
     ...s,
-    kind: s.kind as "shop" | "web",
+    kind: s.kind as SourceKind,
     cards: stats.get(s.id)?.cards ?? 0,
     spent: stats.get(s.id)?.spent ?? 0,
   }));

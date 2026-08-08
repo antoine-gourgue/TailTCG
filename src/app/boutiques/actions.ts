@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geocode";
+import { SOURCE_KIND_VALUES, GEOCODED_KINDS, type SourceKind } from "@/lib/domain";
 
 export type SourceFormState = { ok: boolean; message: string } | null;
 
@@ -17,7 +18,7 @@ export async function createSourceForm(
   const name = str(formData, "name");
   const kind = str(formData, "kind");
   if (!name) return { ok: false, message: "Le nom est obligatoire." };
-  if (kind !== "shop" && kind !== "web") {
+  if (!SOURCE_KIND_VALUES.includes(kind as SourceKind)) {
     return { ok: false, message: "Type invalide." };
   }
 
@@ -26,7 +27,9 @@ export async function createSourceForm(
   const url = str(formData, "url") || null;
   const notes = str(formData, "notes") || null;
 
-  const coords = kind === "shop" ? await geocodeAddress(address, city) : null;
+  const coords = GEOCODED_KINDS.includes(kind as SourceKind)
+    ? await geocodeAddress(address, city)
+    : null;
 
   const supabase = await createClient();
   const { error } = await supabase.from("sources").insert({
@@ -72,7 +75,7 @@ export async function updateSourceForm(
 
   // Re-géocoder uniquement si l'adresse a changé
   const addressChanged =
-    existing.kind === "shop" &&
+    GEOCODED_KINDS.includes(existing.kind as SourceKind) &&
     (address !== existing.address || city !== existing.city);
   const coords = addressChanged ? await geocodeAddress(address, city) : null;
 

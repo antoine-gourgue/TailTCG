@@ -8,7 +8,15 @@ import {
   type ItemFormState,
   type SourceOption,
 } from "@/app/items/actions";
-import { CONDITIONS, CARD_TYPES, LANGUAGES } from "@/lib/domain";
+import {
+  CONDITIONS,
+  CARD_TYPES,
+  LANGUAGES,
+  SOURCE_KINDS,
+  GEOCODED_KINDS,
+  sourceKindLabel,
+  type SourceKind,
+} from "@/lib/domain";
 
 export type ItemDefaults = {
   card_type: string | null;
@@ -94,7 +102,7 @@ export function ItemForm({
   const [sources, setSources] = useState(initialSources);
   const initialKind =
     initialSources.find((s) => s.id === defaults.source_id)?.kind ?? null;
-  const [sourceKind, setSourceKind] = useState<"shop" | "web" | null>(initialKind);
+  const [sourceKind, setSourceKind] = useState<SourceKind | null>(initialKind);
   const [sourceId, setSourceId] = useState(defaults.source_id ?? "");
   const [creatingSource, setCreatingSource] = useState(false);
   const [newSource, setNewSource] = useState({ name: "", address: "", city: "", url: "" });
@@ -369,16 +377,24 @@ export function ItemForm({
       {/* 4 — Source */}
       <Section step={stepNo(4)} title="Source d'achat" hint="optionnel">
         <input type="hidden" name="source_id" value={sourceId} />
-        <div className="mb-3 flex gap-2">
-          {(
-            [
-              [null, "Aucune"],
-              ["shop", "En boutique"],
-              ["web", "Sur le web"],
-            ] as const
-          ).map(([kind, label]) => (
+        <div className="mb-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            data-on={sourceKind === null}
+            onClick={() => {
+              setSourceKind(null);
+              setSourceId("");
+              setCreatingSource(false);
+            }}
+            className={`seg px-3.5 py-1.5 text-sm ${
+              sourceKind === null ? "font-medium text-accent-strong" : "text-muted"
+            }`}
+          >
+            Aucune
+          </button>
+          {SOURCE_KINDS.map(({ kind, label }) => (
             <button
-              key={label}
+              key={kind}
               type="button"
               data-on={sourceKind === kind}
               onClick={() => {
@@ -403,13 +419,11 @@ export function ItemForm({
                 onChange={(e) => setSourceId(e.target.value)}
                 className="field"
               >
-                <option value="">
-                  {sourceKind === "shop" ? "Choisir une boutique…" : "Choisir un site…"}
-                </option>
+                <option value="">Choisir…</option>
                 {visibleSources.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
-                    {s.kind === "shop" && s.city ? ` (${s.city})` : ""}
+                    {GEOCODED_KINDS.includes(s.kind) && s.city ? ` (${s.city})` : ""}
                   </option>
                 ))}
               </select>
@@ -421,24 +435,32 @@ export function ItemForm({
                 onClick={() => setCreatingSource(true)}
                 className="self-start text-sm text-accent underline-offset-2 transition hover:text-accent-strong hover:underline"
               >
-                + {sourceKind === "shop" ? "Nouvelle boutique" : "Nouveau site"}
+                + Nouvelle source ({sourceKindLabel(sourceKind).toLowerCase()})
               </button>
             ) : (
               <div className="flex flex-col gap-2 rounded-xl border border-dashed border-edge-strong p-3.5">
                 <input
                   type="text"
                   placeholder={
-                    sourceKind === "shop" ? "Nom (ex. Snoop Bayonne)" : "Nom (ex. Cardmarket)"
+                    sourceKind === "shop"
+                      ? "Nom (ex. Snoop Bayonne)"
+                      : sourceKind === "web"
+                        ? "Nom (ex. Cardmarket)"
+                        : sourceKind === "flea"
+                          ? "Nom (ex. Brocante de Biarritz)"
+                          : sourceKind === "trade"
+                            ? "Nom (ex. Échange avec Lucas)"
+                            : "Nom (ex. Booster Déchaînement)"
                   }
                   value={newSource.name}
                   onChange={(e) => setNewSource({ ...newSource, name: e.target.value })}
                   className="field"
                 />
-                {sourceKind === "shop" ? (
+                {GEOCODED_KINDS.includes(sourceKind) && (
                   <div className="grid grid-cols-2 gap-2">
                     <input
                       type="text"
-                      placeholder="Adresse"
+                      placeholder={sourceKind === "flea" ? "Lieu (facultatif)" : "Adresse"}
                       value={newSource.address}
                       onChange={(e) =>
                         setNewSource({ ...newSource, address: e.target.value })
@@ -455,7 +477,8 @@ export function ItemForm({
                       className="field"
                     />
                   </div>
-                ) : (
+                )}
+                {sourceKind === "web" && (
                   <input
                     type="url"
                     placeholder="https://…"

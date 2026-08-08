@@ -338,7 +338,8 @@ export default async function CartePage({
                       {source ? (
                         <>
                           {source.name}
-                          {source.kind === "shop" && source.city
+                          {(source.kind === "shop" || source.kind === "flea") &&
+                          source.city
                             ? ` (${source.city})`
                             : ""}
                         </>
