@@ -140,7 +140,7 @@ export default async function CartePage({
 
         <div className="flex flex-col gap-8 lg:flex-row">
           {/* Image officielle en haute qualité */}
-          <aside className="w-full max-w-sm shrink-0 lg:sticky lg:top-8 lg:self-start">
+          <aside className="w-full max-w-72 shrink-0 lg:sticky lg:top-8 lg:self-start">
             <div className="card-tile aspect-[63/88]">
               <CardImage
                 base={item.image_url || null}
