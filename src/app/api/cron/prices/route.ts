@@ -25,7 +25,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const ids = [...new Set((rows ?? []).map((r) => r.tcgdex_id))];
+  // Les cartes ajoutées à la main (custom:) n'existent pas chez TCGdex
+  const ids = [...new Set((rows ?? []).map((r) => r.tcgdex_id))].filter(
+    (id) => !id.startsWith("custom:")
+  );
   const today = new Date().toISOString().slice(0, 10);
   let updated = 0;
   let skipped = 0;

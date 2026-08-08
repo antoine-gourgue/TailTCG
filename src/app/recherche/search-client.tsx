@@ -94,9 +94,19 @@ export function SearchClient({
       )}
 
       {status === "done" && cards.length === 0 && (
-        <p className="text-sm text-muted">
-          Aucune carte trouvée pour « {query.trim()} ».
-        </p>
+        <div className="panel max-w-md p-5 text-sm">
+          <p className="mb-2">Aucune carte trouvée pour « {query.trim()} ».</p>
+          <p className="text-muted">
+            Promo japonaise ou carte absente du catalogue ?{" "}
+            <Link
+              href="/ajouter/manuel"
+              className="text-accent underline-offset-2 hover:underline"
+            >
+              Ajoute-la manuellement
+            </Link>
+            .
+          </p>
+        </div>
       )}
 
       {status === "done" && cards.length > 0 && (

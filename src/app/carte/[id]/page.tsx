@@ -73,8 +73,10 @@ export default async function CartePage({
   const prevId = idx > 0 ? ids[idx - 1] : null;
   const nextId = idx >= 0 && idx < ids.length - 1 ? ids[idx + 1] : null;
 
-  // Fiche officielle TCGdex (cache 24 h), défensif si l'API est indisponible
-  const tcgdexCard = item.tcgdex_id ? await getCard(item.tcgdex_id) : null;
+  // Fiche officielle TCGdex (cache 24 h) — sauf cartes ajoutées à la main
+  const isCustom = item.tcgdex_id?.startsWith("custom:") ?? false;
+  const tcgdexCard =
+    item.tcgdex_id && !isCustom ? await getCard(item.tcgdex_id) : null;
 
   // URLs signées 1 h, générées côté serveur (bucket privé)
   let photos: GalleryPhoto[] = [];
@@ -293,6 +295,15 @@ export default async function CartePage({
                 <ItemForm
                   mode="edit"
                   itemId={item.id ?? id}
+                  cardFields={
+                    isCustom
+                      ? {
+                          card_name: item.card_name ?? "",
+                          set_name: item.set_name ?? "",
+                          local_id: item.local_id ?? "",
+                        }
+                      : undefined
+                  }
                   defaults={{
                     card_type: item.card_type,
                     language: item.language ?? "FR",

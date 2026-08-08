@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -71,14 +72,22 @@ export async function createItem(
   const { fields, error } = parseItemFields(formData);
   if (error || !fields) return { message: error ?? "Formulaire invalide." };
 
-  const tcgdex_id = str(formData, "tcgdex_id");
+  let tcgdex_id = str(formData, "tcgdex_id");
+  let set_id = str(formData, "set_id");
+  let image_url = str(formData, "image_url");
   const card_name = str(formData, "card_name");
-  const set_id = str(formData, "set_id");
   const set_name = str(formData, "set_name");
   const local_id = str(formData, "local_id");
-  const image_url = str(formData, "image_url");
-  if (!tcgdex_id || !card_name || !set_id || !set_name || !local_id) {
-    return { message: "Données de carte manquantes, repasse par la recherche." };
+
+  if (!card_name || !set_name || !local_id) {
+    return { message: "Nom, set et numéro sont obligatoires." };
+  }
+  // Ajout manuel (carte absente de TCGdex, ex. promos japonaises) :
+  // identifiant interne, pas d'image officielle — les photos perso font foi
+  if (!tcgdex_id) {
+    tcgdex_id = `custom:${randomUUID()}`;
+    set_id = "custom";
+    image_url = "";
   }
 
   const supabase = await createClient();
@@ -108,10 +117,21 @@ export async function updateItem(
   const { fields, error } = parseItemFields(formData);
   if (error || !fields) return { message: error ?? "Formulaire invalide." };
 
+  // Cartes manuelles : nom/set/numéro également éditables
+  const card_name = strOrNull(formData, "card_name");
+  const metaFields =
+    card_name != null
+      ? {
+          card_name,
+          set_name: str(formData, "set_name") || "—",
+          local_id: str(formData, "local_id") || "—",
+        }
+      : {};
+
   const supabase = await createClient();
   const { error: dbError } = await supabase
     .from("items")
-    .update(fields)
+    .update({ ...fields, ...metaFields })
     .eq("id", id);
 
   if (dbError) return { message: `Mise à jour impossible : ${dbError.message}` };

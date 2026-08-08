@@ -30,8 +30,15 @@ export default async function RecherchePage({
           Ajouter une carte
         </h1>
         <p className="mb-6 text-sm text-muted">
-          Cherche une carte par son nom, ou feuillette les extensions
-          ci-dessous — internationales et japonaises.
+          Cherche une carte par son nom (« pikachu ex 764/742 » marche aussi),
+          feuillette les extensions ci-dessous — ou{" "}
+          <a
+            href="/ajouter/manuel"
+            className="text-accent underline-offset-2 hover:underline"
+          >
+            ajoute une carte hors catalogue
+          </a>
+          .
         </p>
         <SearchClient series={series} lang={lang} />
       </main>

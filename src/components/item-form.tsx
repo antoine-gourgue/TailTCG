@@ -57,19 +57,30 @@ function Section({
   );
 }
 
+export type ManualCardFields = {
+  card_name: string;
+  set_name: string;
+  local_id: string;
+};
+
 export function ItemForm({
   mode,
   itemId,
   card,
+  cardFields,
   defaults,
   sources: initialSources,
 }: {
   mode: "create" | "edit";
   itemId?: string;
   card?: CardMeta;
+  /** Carte absente de TCGdex : nom/set/numéro saisis à la main */
+  cardFields?: ManualCardFields;
   defaults: ItemDefaults;
   sources: SourceOption[];
 }) {
+  const stepNo = (n: number) =>
+    String(n + (cardFields ? 1 : 0)).padStart(2, "0");
   const action = mode === "create" ? createItem : updateItem;
   const [state, formAction, pending] = useActionState<ItemFormState, FormData>(
     action,
@@ -130,8 +141,58 @@ export function ItemForm({
         <input type="hidden" name="item_id" value={itemId} />
       )}
 
+      {/* 0 — Carte manuelle : identité saisie à la main */}
+      {cardFields && (
+        <Section step="01" title="La carte" hint="hors catalogue TCGdex">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="col-span-2">
+              <label htmlFor="card_name" className="label-xs mb-1.5 block">
+                Nom de la carte
+              </label>
+              <input
+                id="card_name"
+                type="text"
+                name="card_name"
+                placeholder="Pikachu"
+                defaultValue={cardFields.card_name}
+                required
+                className="field"
+              />
+            </div>
+            <div>
+              <label htmlFor="set_name" className="label-xs mb-1.5 block">
+                Set / série
+              </label>
+              <input
+                id="set_name"
+                type="text"
+                name="set_name"
+                placeholder="Promo S-P"
+                defaultValue={cardFields.set_name}
+                required
+                className="field"
+              />
+            </div>
+            <div>
+              <label htmlFor="local_id" className="label-xs mb-1.5 block">
+                Numéro
+              </label>
+              <input
+                id="local_id"
+                type="text"
+                name="local_id"
+                placeholder="208/S-P"
+                defaultValue={cardFields.local_id}
+                required
+                className="field num"
+              />
+            </div>
+          </div>
+        </Section>
+      )}
+
       {/* 1 — État */}
-      <Section step="01" title="État de la carte">
+      <Section step={stepNo(1)} title="État de la carte">
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
           {CONDITIONS.map((c) => (
             <label
@@ -162,7 +223,7 @@ export function ItemForm({
       </Section>
 
       {/* 2 — La carte */}
-      <Section step="02" title="Exemplaire">
+      <Section step={stepNo(2)} title="Exemplaire">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div>
             <label htmlFor="card_type" className="label-xs mb-1.5 block">
@@ -247,7 +308,7 @@ export function ItemForm({
       </Section>
 
       {/* 3 — Achat et valeur */}
-      <Section step="03" title="Achat & valeur">
+      <Section step={stepNo(3)} title="Achat & valeur">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           <div>
             <label htmlFor="purchase_price" className="label-xs mb-1.5 block">
@@ -306,7 +367,7 @@ export function ItemForm({
       </Section>
 
       {/* 4 — Source */}
-      <Section step="04" title="Source d'achat" hint="optionnel">
+      <Section step={stepNo(4)} title="Source d'achat" hint="optionnel">
         <input type="hidden" name="source_id" value={sourceId} />
         <div className="mb-3 flex gap-2">
           {(
@@ -428,7 +489,7 @@ export function ItemForm({
       </Section>
 
       {/* 5 — Notes */}
-      <Section step="05" title="Notes" hint="optionnel">
+      <Section step={stepNo(5)} title="Notes" hint="optionnel">
         <textarea
           id="notes"
           name="notes"
