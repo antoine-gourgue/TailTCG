@@ -87,37 +87,39 @@ function AnnotatedFace({
   );
 }
 
-export function GradingReportButton({ data }: { data: GradingReportData }) {
-  const [open, setOpen] = useState(false);
-
+// Modale contrôlée : réutilisée par le bouton (fiche) et le boîtier (vitrine)
+export function GradingReportModal({
+  data,
+  open,
+  onClose,
+}: {
+  data: GradingReportData;
+  open: boolean;
+  onClose: () => void;
+}) {
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") onClose();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open, onClose]);
+
+  if (!open) return null;
 
   return (
-    <>
-      <button type="button" onClick={() => setOpen(true)} className="btn btn-ghost">
-        <FileText size={15} aria-hidden />
-        Rapport
-      </button>
-
-      {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center"
-          onClick={() => setOpen(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Rapport de pré-gradation"
-        >
-          <div
-            className="panel rise-in flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden !p-0"
-            onClick={(e) => e.stopPropagation()}
-          >
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Rapport de pré-gradation"
+    >
+      <div
+        className="panel rise-in flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden !p-0"
+        onClick={(e) => e.stopPropagation()}
+      >
             {/* En-tête */}
             <div className="flex items-center gap-3 border-b border-edge px-5 py-3.5">
               <Logo variant="mark" size={22} />
@@ -137,7 +139,7 @@ export function GradingReportButton({ data }: { data: GradingReportData }) {
               </div>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={onClose}
                 aria-label="Fermer"
                 className="ml-1 flex h-7 w-7 items-center justify-center rounded-lg text-muted transition hover:bg-raised hover:text-foreground"
               >
@@ -230,9 +232,21 @@ export function GradingReportButton({ data }: { data: GradingReportData }) {
                   : ""}
               </p>
             </div>
-          </div>
-        </div>
-      )}
+      </div>
+    </div>
+  );
+}
+
+// Bouton « Rapport » (fiche carte)
+export function GradingReportButton({ data }: { data: GradingReportData }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="btn btn-ghost">
+        <FileText size={15} aria-hidden />
+        Rapport
+      </button>
+      <GradingReportModal data={data} open={open} onClose={() => setOpen(false)} />
     </>
   );
 }
