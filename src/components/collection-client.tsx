@@ -2,10 +2,26 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { LayoutGrid, List, ArrowUp, ArrowDown } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  LayoutGrid,
+  List,
+  ArrowUp,
+  ArrowDown,
+  ListChecks,
+  Check,
+  NotebookTabs,
+  X,
+} from "lucide-react";
 import { formatEur } from "@/lib/domain";
+import {
+  addItemsToBinder,
+  createBinderAndAdd,
+  removeItemsFromBinder,
+} from "@/app/classeurs/actions";
 import { CardImage } from "@/components/card-image";
 import { Logo } from "@/components/logo";
+import { Toast } from "@/components/toast";
 
 export type CollectionItem = {
   id: string;
@@ -79,12 +95,17 @@ function Stat({
   );
 }
 
+export type BinderRef = { id: string; name: string };
+
 export function CollectionClient({
   items,
   sources,
   initialSource = "",
   initialSet = "",
   readOnly = false,
+  binders,
+  binderContext,
+  initialSelect = false,
 }: {
   items: CollectionItem[];
   sources: SourceRef[];
@@ -92,8 +113,24 @@ export function CollectionClient({
   initialSet?: string;
   /** Vitrine publique : pas de liens vers les fiches */
   readOnly?: boolean;
+  /** Classeurs disponibles : active le mode sélection multiple */
+  binders?: BinderRef[];
+  /** Rendu dans un classeur : la sélection permet aussi d'en retirer */
+  binderContext?: BinderRef;
+  initialSelect?: boolean;
 }) {
+  const router = useRouter();
   const [view, setView] = useState<"grid" | "table">("grid");
+  const canSelect = !readOnly && binders != null;
+  const [selecting, setSelecting] = useState(canSelect && initialSelect);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [addOpen, setAddOpen] = useState(false);
+  const [newBinderName, setNewBinderName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState<{
+    message: string;
+    tone?: "success" | "error";
+  } | null>(null);
   const [q, setQ] = useState("");
   const [fSold, setFSold] = useState<"active" | "sold" | "all">("active");
   const [fSet, setFSet] = useState(initialSet);
@@ -182,6 +219,88 @@ export function CollectionClient({
     };
   }, [filtered]);
 
+  function exitSelect() {
+    setSelecting(false);
+    setSelected(new Set());
+    setAddOpen(false);
+    setNewBinderName("");
+  }
+
+  function toggleSelecting() {
+    if (selecting) {
+      exitSelect();
+    } else {
+      setSelecting(true);
+      setView("grid");
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function addToBinder(binder: BinderRef) {
+    const ids = [...selected];
+    setBusy(true);
+    const { error } = await addItemsToBinder(binder.id, ids);
+    setBusy(false);
+    setToast(
+      error
+        ? { message: "Ajout impossible", tone: "error" }
+        : {
+            message: `${ids.length} carte${ids.length > 1 ? "s" : ""} ajoutée${
+              ids.length > 1 ? "s" : ""
+            } à « ${binder.name} »`,
+          }
+    );
+    exitSelect();
+    router.refresh();
+  }
+
+  async function createAndAdd() {
+    const name = newBinderName.trim();
+    if (!name) return;
+    const ids = [...selected];
+    setBusy(true);
+    const { error } = await createBinderAndAdd(name, ids);
+    setBusy(false);
+    setToast(
+      error
+        ? { message: "Création impossible", tone: "error" }
+        : {
+            message: `Classeur « ${name} » créé avec ${ids.length} carte${
+              ids.length > 1 ? "s" : ""
+            }`,
+          }
+    );
+    exitSelect();
+    router.refresh();
+  }
+
+  async function removeFromBinder() {
+    if (!binderContext) return;
+    const ids = [...selected];
+    setBusy(true);
+    const { error } = await removeItemsFromBinder(binderContext.id, ids);
+    setBusy(false);
+    setToast(
+      error
+        ? { message: "Retrait impossible", tone: "error" }
+        : {
+            message: `${ids.length} carte${ids.length > 1 ? "s" : ""} retirée${
+              ids.length > 1 ? "s" : ""
+            } du classeur`,
+          }
+    );
+    exitSelect();
+    router.refresh();
+  }
+
   if (items.length === 0) {
     return (
       <div className="panel rise-in flex flex-col items-center gap-3 p-12 text-center">
@@ -220,7 +339,21 @@ export function CollectionClient({
             }
           />
         </div>
-        <div className="flex items-center sm:ml-auto">
+        <div className="flex items-center gap-2 sm:ml-auto">
+          {canSelect && (
+            <button
+              type="button"
+              onClick={toggleSelecting}
+              aria-pressed={selecting}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] transition ${
+                selecting
+                  ? "border-accent/50 bg-accent-soft font-medium text-accent-strong"
+                  : "border-edge text-muted hover:text-foreground"
+              }`}
+            >
+              <ListChecks size={13} aria-hidden /> Sélectionner
+            </button>
+          )}
           <div className="flex overflow-hidden rounded-lg border border-edge">
             <button
               type="button"
@@ -360,14 +493,31 @@ export function CollectionClient({
       ) : view === "grid" ? (
         <ul className="rise-in grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {filtered.map((item) => {
+            const sel = selecting && selected.has(item.id);
             const tileContent = (
               <>
-                <div className="card-tile aspect-[63/88]">
+                <div
+                  className={`card-tile aspect-[63/88] ${
+                    sel ? "outline outline-2 outline-offset-2 outline-accent" : ""
+                  }`}
+                >
                   <CardImage
                     base={item.image_url || null}
                     alt={item.card_name}
                     fallback={item.photo_fallback ?? null}
                   />
+                  {selecting && (
+                    <span
+                      className={`absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border transition ${
+                        sel
+                          ? "border-transparent bg-accent text-accent-ink"
+                          : "border-white/50 bg-black/40 text-transparent"
+                      }`}
+                      aria-hidden
+                    >
+                      <Check size={13} />
+                    </span>
+                  )}
                   <span className="tile-badge num left-1.5 top-1.5">
                     {item.condition}
                   </span>
@@ -407,7 +557,16 @@ export function CollectionClient({
             );
             return (
               <li key={item.id}>
-                {readOnly ? (
+                {selecting ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleSelected(item.id)}
+                    aria-pressed={sel}
+                    className="group block w-full text-left"
+                  >
+                    {tileContent}
+                  </button>
+                ) : readOnly ? (
                   <div className="group block">{tileContent}</div>
                 ) : (
                   <Link href={`/carte/${item.id}`} className="group block">
@@ -478,6 +637,137 @@ export function CollectionClient({
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Barre d'action flottante du mode sélection */}
+      {selecting && (
+        <div className="fixed bottom-5 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-2xl border border-edge bg-raised px-3 py-2 shadow-xl">
+          <span className="px-1 text-sm text-muted">
+            <span className="num font-semibold text-foreground">
+              {selected.size}
+            </span>{" "}
+            sélectionnée{selected.size > 1 ? "s" : ""}
+          </span>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set(filtered.map((i) => i.id)))}
+            className="btn btn-ghost !px-2.5 !py-1.5 text-[13px]"
+          >
+            Tout
+          </button>
+          <button
+            type="button"
+            disabled={selected.size === 0 || busy}
+            onClick={() => setAddOpen(true)}
+            className="btn btn-primary !py-1.5 text-[13px] disabled:opacity-50"
+          >
+            <NotebookTabs size={14} aria-hidden />
+            Ajouter à un classeur
+          </button>
+          {binderContext && (
+            <button
+              type="button"
+              disabled={selected.size === 0 || busy}
+              onClick={removeFromBinder}
+              className="btn btn-ghost !py-1.5 text-[13px] !text-loss disabled:opacity-50"
+            >
+              {busy ? "Retrait…" : "Retirer du classeur"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={exitSelect}
+            aria-label="Quitter la sélection"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:bg-surface hover:text-foreground"
+          >
+            <X size={15} aria-hidden />
+          </button>
+        </div>
+      )}
+
+      {/* Choix du classeur de destination */}
+      {addOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center"
+          onClick={() => !busy && setAddOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Ajouter à un classeur"
+        >
+          <div
+            className="panel rise-in relative w-full max-w-sm p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setAddOpen(false)}
+              aria-label="Fermer"
+              className="absolute -right-3 -top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-edge bg-raised text-muted shadow-lg transition hover:text-foreground"
+            >
+              <X size={15} aria-hidden />
+            </button>
+            <p className="display mb-1 text-base font-semibold">
+              Ajouter à un classeur
+            </p>
+            <p className="mb-4 text-sm text-muted">
+              {selected.size} carte{selected.size > 1 ? "s" : ""} sélectionnée
+              {selected.size > 1 ? "s" : ""}.
+            </p>
+
+            {(binders ?? []).length > 0 && (
+              <div className="mb-4 flex max-h-56 flex-col gap-1 overflow-y-auto">
+                {(binders ?? []).map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => addToBinder(b)}
+                    className="flex items-center gap-2.5 rounded-xl border border-edge px-3 py-2 text-left text-sm text-muted transition hover:border-edge-strong hover:text-foreground disabled:opacity-50"
+                  >
+                    <NotebookTabs size={14} aria-hidden />
+                    {b.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newBinderName}
+                onChange={(e) => setNewBinderName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") createAndAdd();
+                }}
+                maxLength={60}
+                placeholder={
+                  (binders ?? []).length === 0
+                    ? binderContext
+                      ? "Nom du nouveau classeur…"
+                      : "Nom du premier classeur…"
+                    : "Ou crée un nouveau classeur…"
+                }
+                className="field flex-1 text-[13px]"
+              />
+              <button
+                type="button"
+                disabled={busy || !newBinderName.trim()}
+                onClick={createAndAdd}
+                className="btn btn-primary text-[13px] disabled:opacity-50"
+              >
+                {busy ? "…" : "Créer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          tone={toast.tone}
+          onDone={() => setToast(null)}
+        />
       )}
     </div>
   );

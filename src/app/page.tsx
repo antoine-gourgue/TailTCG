@@ -16,9 +16,13 @@ import {
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string; set?: string }>;
+  searchParams: Promise<{ source?: string; set?: string; select?: string }>;
 }) {
-  const { source: initialSource, set: initialSet } = await searchParams;
+  const {
+    source: initialSource,
+    set: initialSet,
+    select,
+  } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -28,15 +32,17 @@ export default async function Home({
     redirect("/login");
   }
 
-  const [{ data: items }, { data: sources }] = await Promise.all([
-    supabase
-      .from("collection_value")
-      .select(
-        "id, tcgdex_id, card_name, set_name, set_id, local_id, image_url, card_type, language, condition, quantity, purchase_price, purchase_date, manual_price, source_id, graded, grade, created_at, current_price, gain, sold_price, sold_at"
-      )
-      .order("created_at", { ascending: false }),
-    supabase.from("sources").select("id, name").order("name"),
-  ]);
+  const [{ data: items }, { data: sources }, { data: binders }] =
+    await Promise.all([
+      supabase
+        .from("collection_value")
+        .select(
+          "id, tcgdex_id, card_name, set_name, set_id, local_id, image_url, card_type, language, condition, quantity, purchase_price, purchase_date, manual_price, source_id, graded, grade, created_at, current_price, gain, sold_price, sold_at"
+        )
+        .order("created_at", { ascending: false }),
+      supabase.from("sources").select("id, name").order("name"),
+      supabase.from("binders").select("id, name").order("name"),
+    ]);
 
   // Photos perso en secours de vignette (cartes sans scan officiel)
   const photoFallbacks = new Map<string, string>();
@@ -133,6 +139,8 @@ export default async function Home({
           sources={(sources ?? []) as SourceRef[]}
           initialSource={initialSource ?? ""}
           initialSet={initialSet ?? ""}
+          binders={binders ?? []}
+          initialSelect={select != null}
         />
       </main>
       </AppShell>

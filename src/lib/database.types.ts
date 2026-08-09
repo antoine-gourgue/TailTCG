@@ -39,6 +39,70 @@ export type Database = {
   }
   public: {
     Tables: {
+      binder_items: {
+        Row: {
+          added_at: string | null
+          binder_id: string
+          item_id: string
+          owner_id: string
+        }
+        Insert: {
+          added_at?: string | null
+          binder_id: string
+          item_id: string
+          owner_id?: string
+        }
+        Update: {
+          added_at?: string | null
+          binder_id?: string
+          item_id?: string
+          owner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "binder_items_binder_id_fkey"
+            columns: ["binder_id"]
+            isOneToOne: false
+            referencedRelation: "binders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "binder_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "collection_value"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "binder_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      binders: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          owner_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          owner_id?: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          owner_id?: string
+        }
+        Relationships: []
+      }
       custom_cards: {
         Row: {
           created_at: string | null

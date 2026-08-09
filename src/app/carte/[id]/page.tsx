@@ -15,6 +15,7 @@ import { ValueHistoryChart } from "@/components/value-history-chart";
 import { ValueHistoryManager } from "@/components/value-history-manager";
 import { ValueUpdateButton } from "@/components/quick-value-edit";
 import { SellButton } from "@/components/sell-button";
+import { BinderPicker } from "@/components/binder-picker";
 import { ConfirmAction } from "@/components/confirm-action";
 import { cancelSale } from "@/app/items/actions";
 import type { SourceOption } from "@/app/items/actions";
@@ -56,21 +57,29 @@ export default async function CartePage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: item }, { data: sources }, { data: photoRows }, { data: siblings }] =
-    await Promise.all([
-      supabase.from("collection_value").select("*").eq("id", id).single(),
-      supabase.from("sources").select("id, name, kind, city, url").order("name"),
-      supabase
-        .from("item_photos")
-        .select("id, path, label, position")
-        .eq("item_id", id)
-        .order("position"),
-      // Même ordre que la grille (ajout récent d'abord) pour feuilleter
-      supabase
-        .from("items")
-        .select("id")
-        .order("created_at", { ascending: false }),
-    ]);
+  const [
+    { data: item },
+    { data: sources },
+    { data: photoRows },
+    { data: siblings },
+    { data: binders },
+    { data: memberships },
+  ] = await Promise.all([
+    supabase.from("collection_value").select("*").eq("id", id).single(),
+    supabase.from("sources").select("id, name, kind, city, url").order("name"),
+    supabase
+      .from("item_photos")
+      .select("id, path, label, position")
+      .eq("item_id", id)
+      .order("position"),
+    // Même ordre que la grille (ajout récent d'abord) pour feuilleter
+    supabase
+      .from("items")
+      .select("id")
+      .order("created_at", { ascending: false }),
+    supabase.from("binders").select("id, name").order("name"),
+    supabase.from("binder_items").select("binder_id").eq("item_id", id),
+  ]);
 
   if (!item) notFound();
 
@@ -202,6 +211,13 @@ export default async function CartePage({
                   </Link>{" "}
                   <span className="num text-faint">· {item.local_id}</span>
                 </p>
+                {!editing && (
+                  <BinderPicker
+                    itemId={item.id ?? id}
+                    binders={binders ?? []}
+                    memberIds={(memberships ?? []).map((m) => m.binder_id)}
+                  />
+                )}
               </div>
               {editing ? (
                 <Link href={`/carte/${id}`} className="btn btn-ghost">

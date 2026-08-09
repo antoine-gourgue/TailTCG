@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { NotebookTabs } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages } from "@/lib/images";
@@ -65,20 +66,26 @@ export default async function SharedCollectionPage({
     );
   }
 
-  const [{ data: items }, { data: sources }] = await Promise.all([
-    admin
-      .from("collection_value")
-      .select(
-        "id, tcgdex_id, card_name, set_name, set_id, local_id, image_url, card_type, language, condition, quantity, purchase_price, purchase_date, manual_price, source_id, graded, grade, created_at, current_price, gain, sold_price, sold_at"
-      )
-      .eq("owner_id", settings.owner_id)
-      .order("created_at", { ascending: false }),
-    admin
-      .from("sources")
-      .select("id, name")
-      .eq("owner_id", settings.owner_id)
-      .order("name"),
-  ]);
+  const [{ data: items }, { data: sources }, { data: binders }] =
+    await Promise.all([
+      admin
+        .from("collection_value")
+        .select(
+          "id, tcgdex_id, card_name, set_name, set_id, local_id, image_url, card_type, language, condition, quantity, purchase_price, purchase_date, manual_price, source_id, graded, grade, created_at, current_price, gain, sold_price, sold_at"
+        )
+        .eq("owner_id", settings.owner_id)
+        .order("created_at", { ascending: false }),
+      admin
+        .from("sources")
+        .select("id, name")
+        .eq("owner_id", settings.owner_id)
+        .order("name"),
+      admin
+        .from("binders")
+        .select("id, name, binder_items(item_id)")
+        .eq("owner_id", settings.owner_id)
+        .order("name"),
+    ]);
 
   const signedItems = await signStorageImages((items ?? []) as CollectionItem[]);
 
@@ -106,6 +113,23 @@ export default async function SharedCollectionPage({
           </Link>
         )}
       </div>
+
+      {(binders ?? []).length > 0 && (
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+          <span className="label-xs mr-1">Classeurs</span>
+          {(binders ?? []).map((b) => (
+            <Link
+              key={b.id}
+              href={`/v/${token}/c/${b.id}`}
+              className="inline-flex items-center gap-1.5 rounded-full border border-edge bg-raised px-3 py-1.5 text-[13px] text-muted transition hover:border-edge-strong hover:text-foreground"
+            >
+              <NotebookTabs size={13} aria-hidden />
+              {b.name}
+              <span className="num text-faint">{b.binder_items.length}</span>
+            </Link>
+          ))}
+        </div>
+      )}
 
       <CollectionClient
         items={signedItems}

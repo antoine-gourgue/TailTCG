@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import {
   LayoutGrid,
+  NotebookTabs,
   SearchIcon,
   Star,
   MapPin,
@@ -36,6 +37,7 @@ function getSidebar(): "open" | "rail" {
 
 const NAV = [
   { href: "/", label: "Collection", Icon: LayoutGrid },
+  { href: "/classeurs", label: "Classeurs", Icon: NotebookTabs },
   { href: "/recherche", label: "Ajouter", Icon: SearchIcon },
   { href: "/wishlist", label: "Recherchées", Icon: Star },
   { href: "/boutiques", label: "Boutiques", Icon: MapPin },
