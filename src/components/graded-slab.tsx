@@ -40,10 +40,16 @@ export function GradedSlab({
             {setName} <span className="num">· {localId}</span>
           </p>
           <p
-            className="num mt-0.5 text-[9px] tracking-wide text-black/50"
-            title="Centrage · Coins · Bords · Surface"
+            className="num mt-0.5 text-[9px] leading-tight tracking-wide text-black/50"
+            title="Centrage · Coins"
           >
-            CEN {centering} · COI {corners} · BOR {edges} · SUR {surface}
+            CEN {centering} · COI {corners}
+          </p>
+          <p
+            className="num text-[9px] leading-tight tracking-wide text-black/50"
+            title="Bords · Surface"
+          >
+            BOR {edges} · SUR {surface}
           </p>
         </div>
         <div className="shrink-0 border-l border-black/15 pl-2.5 text-center">
