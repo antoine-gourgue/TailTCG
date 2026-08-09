@@ -8,6 +8,7 @@ import { binderColorHex } from "@/lib/binder-colors";
 import { Logo } from "@/components/logo";
 import { BinderCover } from "@/components/binder-cover";
 import { CardImage } from "@/components/card-image";
+import { GradedSlab } from "@/components/graded-slab";
 import {
   CollectionClient,
   type CollectionItem,
@@ -119,7 +120,7 @@ export default async function SharedCollectionPage({
 
   const { data: shareGradings } = await admin
     .from("item_gradings")
-    .select("item_id, rectified_path")
+    .select("item_id, rectified_path, grade, centering, corners, edges, surface, created_at")
     .eq("owner_id", settings.owner_id)
     .order("created_at", { ascending: false });
 
@@ -145,6 +146,18 @@ export default async function SharedCollectionPage({
 
   // Tuiles de classeurs : mêmes couvertures stylées que côté propriétaire
   const itemById = new Map(signedItems.map((i) => [i.id, i]));
+
+  // Boîtiers des cartes pré-gradées (dernière évaluation par exemplaire)
+  const latestGrading = new Map<string, NonNullable<typeof shareGradings>[number]>();
+  for (const g of shareGradings ?? []) {
+    if (!latestGrading.has(g.item_id)) latestGrading.set(g.item_id, g);
+  }
+  const slabs = [...latestGrading.values()]
+    .map((g) => ({ g, item: itemById.get(g.item_id) }))
+    .filter(
+      (s): s is { g: (typeof s)["g"]; item: NonNullable<(typeof s)["item"]> } =>
+        s.item != null
+    );
   const binderTiles = (binders ?? []).map((b) => {
     let count = 0;
     let value = 0;
@@ -221,6 +234,29 @@ export default async function SharedCollectionPage({
                 </div>
               ))}
           </div>
+        </section>
+      )}
+
+      {slabs.length > 0 && (
+        <section className="mb-8">
+          <h2 className="display mb-3 text-lg font-semibold">Pré-gradées</h2>
+          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {slabs.map(({ g, item }) => (
+              <li key={g.item_id}>
+                <GradedSlab
+                  name={item.card_name}
+                  setName={item.set_name}
+                  localId={item.local_id}
+                  imageUrl={item.image_url || null}
+                  grade={g.grade ?? 0}
+                  centering={g.centering ?? 0}
+                  corners={g.corners ?? 0}
+                  edges={g.edges ?? 0}
+                  surface={g.surface ?? 0}
+                />
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
