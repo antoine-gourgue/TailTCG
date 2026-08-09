@@ -459,9 +459,152 @@ a:hover .card-tile,
   animation: rise-in 0.35s ease both;
 }
 
+/* ————— Motion design des maquettes (landing) ————— */
+/* Les animations démarrent quand le wrapper Reveal pose [data-shown] */
+
+.mk-pop,
+.mk-stamp,
+.mk-fade {
+  opacity: 0;
+}
+
+[data-shown] .mk-pop {
+  animation: mk-pop 0.55s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes mk-pop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+[data-shown] .mk-stamp {
+  animation: mk-stamp 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.35) both;
+}
+
+@keyframes mk-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(1.9) rotate(-10deg);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+[data-shown] .mk-fade {
+  animation: mk-fade 0.9s ease both;
+}
+
+@keyframes mk-fade {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Courbe qui se dessine (le path doit porter pathLength=1) */
+.mk-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+[data-shown] .mk-draw {
+  animation: mk-draw 1.6s ease 0.5s both;
+}
+
+@keyframes mk-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Pulsation douce (badges d'action) */
+.mk-pulse {
+  animation: mk-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes mk-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.07);
+  }
+}
+
+/* Reflet qui balaie le boîtier */
+.mk-sweep {
+  position: relative;
+  overflow: hidden;
+}
+
+.mk-sweep::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  bottom: -40%;
+  left: -60%;
+  width: 45%;
+  transform: rotate(12deg);
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 255, 255, 0.13),
+    transparent
+  );
+  animation: mk-sweep 3.4s ease-in-out infinite;
+}
+
+@keyframes mk-sweep {
+  0%,
+  50% {
+    left: -60%;
+  }
+  100% {
+    left: 140%;
+  }
+}
+
+/* Flottement doux des cartes du héros (landing) */
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.float-y {
+  animation: float-y 5.5s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .mk-pop,
+  .mk-stamp,
+  .mk-fade {
+    animation: none;
+    opacity: 1;
+  }
+  .mk-draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .mk-pulse,
+  .mk-sweep::after {
+    animation: none;
+  }
   .card-tile,
   .rise-in,
+  .float-y,
   .btn,
   .app-main,
   .app-sidebar,
