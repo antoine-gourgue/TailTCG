@@ -61,5 +61,10 @@ export default async function Image({
     }
   }
 
-  return renderCollectionOg({ title, subtitle, cardUrls });
+  return renderCollectionOg({
+    title,
+    subtitle,
+    cardUrls,
+    cta: "Voir la collection",
+  });
 }

@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description:
-    "Suis tes cartes Pokémon, leur état et leur valeur. Pré-grade-les toi-même sur tes photos (centrage mesuré au barème PSA), range-les en classeurs stylés et partage ta vitrine d'un lien. Gratuit, sans pub.",
+    "Suis tes cartes Pokémon, leur état et leur valeur. Pré-grade-les sur tes photos, range-les en classeurs et partage ta vitrine. Gratuit, sans pub.",
   keywords: [
     "collection cartes Pokémon",
     "classeur Pokémon",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     siteName: "TailTCG",
     title: "TailTCG — Ta collection Pokémon, enfin à sa hauteur",
     description:
-      "Suivi de collection, valorisation, pré-gradation sur tes photos, classeurs stylés et vitrine partageable. Gratuit, fait par un collectionneur.",
+      "Suivi, valeur, pré-gradation, classeurs et vitrine partageable. Gratuit, fait par un collectionneur.",
   },
   twitter: {
     card: "summary_large_image",

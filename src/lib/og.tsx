@@ -1,20 +1,53 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { ImageResponse } from "next/og";
 
 export const OG_SIZE = { width: 1200, height: 630 };
+
+/* Police du site + logo, chargés une fois par instance */
+let assetsPromise: Promise<{
+  regular: Buffer;
+  bold: Buffer;
+  logo: string;
+}> | null = null;
+
+function loadAssets() {
+  assetsPromise ??= (async () => {
+    const [regular, bold, logoPng] = await Promise.all([
+      readFile(
+        path.join(process.cwd(), "src/lib/og-fonts/instrument-sans-400.woff")
+      ),
+      readFile(
+        path.join(process.cwd(), "src/lib/og-fonts/instrument-sans-700.woff")
+      ),
+      readFile(path.join(process.cwd(), "src/app/apple-icon.png")),
+    ]);
+    return {
+      regular,
+      bold,
+      logo: `data:image/png;base64,${logoPng.toString("base64")}`,
+    };
+  })();
+  return assetsPromise;
+}
 
 /**
  * Image OG des pages de vitrine : marque, titre, stats et jusqu'à
  * trois cartes en éventail. Satori : display flex partout, styles inline.
  */
-export function renderCollectionOg({
+export async function renderCollectionOg({
   title,
   subtitle,
   cardUrls,
+  cta,
 }: {
   title: string;
   subtitle: string;
   cardUrls: string[];
+  /** Bouton d'appel à l'action affiché sous le sous-titre */
+  cta?: string;
 }) {
+  const { regular, bold, logo } = await loadAssets();
   const cards = cardUrls.slice(0, 3);
   const mid = (cards.length - 1) / 2;
   return new ImageResponse(
@@ -41,21 +74,32 @@ export function renderCollectionOg({
           <div
             style={{
               display: "flex",
-              fontSize: 36,
-              fontWeight: 700,
-              letterSpacing: 4,
+              alignItems: "center",
+              gap: 18,
             }}
           >
-            <span>TAIL</span>
-            <span style={{ color: "#e4572e" }}>TCG</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logo} width={64} height={64} alt="" />
+            <div
+              style={{
+                display: "flex",
+                fontSize: 38,
+                fontWeight: 700,
+                letterSpacing: -0.5,
+              }}
+            >
+              <span>Tail</span>
+              <span style={{ color: "#e4572e" }}>TCG</span>
+            </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             <div
               style={{
                 display: "flex",
-                fontSize: 60,
-                fontWeight: 800,
-                lineHeight: 1.1,
+                fontSize: 58,
+                fontWeight: 700,
+                lineHeight: 1.08,
+                letterSpacing: -1.5,
                 maxWidth: 640,
               }}
             >
@@ -64,6 +108,25 @@ export function renderCollectionOg({
             <div style={{ display: "flex", fontSize: 30, color: "#bab0a4" }}>
               {subtitle}
             </div>
+            {cta && (
+              <div style={{ display: "flex", marginTop: 6 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    background: "#e4572e",
+                    color: "#fff7f2",
+                    fontSize: 26,
+                    fontWeight: 700,
+                    padding: "14px 30px",
+                    borderRadius: 999,
+                    boxShadow: "0 12px 30px rgba(228,87,46,0.35)",
+                  }}
+                >
+                  {cta}
+                </div>
+              </div>
+            )}
           </div>
           <div style={{ display: "flex", fontSize: 24, color: "#847a6e" }}>
             tailtcg.vercel.app
@@ -102,7 +165,18 @@ export function renderCollectionOg({
         )}
       </div>
     ),
-    OG_SIZE
+    {
+      ...OG_SIZE,
+      fonts: [
+        {
+          name: "Instrument Sans",
+          data: regular,
+          weight: 400,
+          style: "normal",
+        },
+        { name: "Instrument Sans", data: bold, weight: 700, style: "normal" },
+      ],
+    }
   );
 }
 
