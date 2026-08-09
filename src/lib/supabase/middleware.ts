@@ -3,7 +3,15 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // /api/cron est protégé par CRON_SECRET dans la route ; /v est la vitrine
 // publique (jeton secret vérifié dans la page)
-const PUBLIC_PATHS = ["/login", "/auth", "/api/cron", "/v/"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/auth",
+  "/api/cron",
+  "/v/",
+  // Métadonnées récupérées par des robots non connectés
+  "/opengraph-image",
+  "/manifest.webmanifest",
+];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
