@@ -209,9 +209,17 @@ export function SetCardsGrid({
           aria-label={selected.name}
         >
           <div
-            className="panel rise-in w-full max-w-xs p-5"
+            className="panel rise-in relative w-full max-w-xs p-5"
             onClick={(e) => e.stopPropagation()}
           >
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              aria-label="Fermer"
+              className="absolute -right-3 -top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-edge bg-raised text-muted shadow-lg transition hover:text-foreground"
+            >
+              <X size={15} aria-hidden />
+            </button>
             <div className="card-tile relative aspect-[63/88]">
               <CardImage base={selected.image} alt={selected.name} quality="high" />
               <button
@@ -242,32 +250,22 @@ export function SetCardsGrid({
               </button>
             </div>
 
-            <div className="mt-4 flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="display truncate text-lg font-semibold leading-tight">
-                  {selected.name}
+            <div className="mt-4 min-w-0">
+              <p className="display truncate text-lg font-semibold leading-tight">
+                {selected.name}
+              </p>
+              <p className="mt-0.5 text-sm text-muted">
+                {setName}{" "}
+                <span className="num text-faint">
+                  · {selected.localId}
+                  {officialCount ? ` / ${officialCount}` : ""}
+                </span>
+              </p>
+              {selected.rarity && (
+                <p className="mt-1.5 inline-block rounded-md bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong">
+                  {selected.rarity}
                 </p>
-                <p className="mt-0.5 text-sm text-muted">
-                  {setName}{" "}
-                  <span className="num text-faint">
-                    · {selected.localId}
-                    {officialCount ? ` / ${officialCount}` : ""}
-                  </span>
-                </p>
-                {selected.rarity && (
-                  <p className="mt-1.5 inline-block rounded-md bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong">
-                    {selected.rarity}
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelected(null)}
-                aria-label="Fermer"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-raised hover:text-foreground"
-              >
-                <X size={15} aria-hidden />
-              </button>
+              )}
             </div>
 
             <Link
