@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages } from "@/lib/images";
 import { Logo } from "@/components/logo";
@@ -33,6 +34,12 @@ export default async function SharedCollectionPage({
     .maybeSingle();
   if (!settings) notFound();
 
+  // Visiteur déjà connecté : pas de CTA d'inscription
+  const supabase = await createClient();
+  const {
+    data: { user: visitor },
+  } = await supabase.auth.getUser();
+
   const [{ data: items }, { data: sources }] = await Promise.all([
     admin
       .from("collection_value")
@@ -64,9 +71,15 @@ export default async function SharedCollectionPage({
             </p>
           </div>
         </div>
-        <Link href="/login" className="btn btn-ghost">
-          Créer ma collection →
-        </Link>
+        {visitor ? (
+          <Link href="/" className="btn btn-ghost">
+            Ma collection →
+          </Link>
+        ) : (
+          <Link href="/login" className="btn btn-ghost">
+            Créer ma collection →
+          </Link>
+        )}
       </div>
 
       <CollectionClient
