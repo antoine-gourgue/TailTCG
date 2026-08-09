@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   LayoutGrid,
   NotebookTabs,
@@ -15,8 +15,10 @@ import {
   Moon,
   LogOut,
   ChevronLeft,
+  Plus,
 } from "lucide-react";
 import { signOut } from "@/app/actions";
+import { formatEur } from "@/lib/domain";
 import { Logo } from "@/components/logo";
 import { ImageGate } from "@/components/image-gate";
 import { ThemeToggle, useTheme } from "@/components/theme-toggle";
@@ -45,6 +47,15 @@ const NAV = [
   { href: "/parametres", label: "Paramètres", Icon: Settings },
 ];
 
+/* Onglets du bas sur mobile — Ajouter au centre, en avant */
+const MOBILE_TABS = [
+  { href: "/", label: "Collection", Icon: LayoutGrid },
+  { href: "/classeurs", label: "Classeurs", Icon: NotebookTabs },
+  { href: "/recherche", label: "Ajouter", Icon: Plus, primary: true },
+  { href: "/wishlist", label: "Recherchées", Icon: Star },
+  { href: "/stats", label: "Stats", Icon: BarChart3 },
+];
+
 function isActive(href: string, pathname: string) {
   if (href === "/") return pathname === "/" || pathname.startsWith("/carte");
   if (href === "/recherche")
@@ -56,9 +67,37 @@ function isActive(href: string, pathname: string) {
   return pathname.startsWith(href);
 }
 
+/* Widget de la sidebar : chargé une fois puis gardé en mémoire de module,
+ * rafraîchi en arrière-plan à chaque montage */
+type ShellData = { email: string; count: number; value: number | null };
+let shellCache: ShellData | null = null;
+
+function useShellData(): ShellData | null {
+  const [data, setData] = useState<ShellData | null>(shellCache);
+
+  useEffect(() => {
+    let on = true;
+    fetch("/api/shell")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: ShellData | null) => {
+        if (on && j) {
+          shellCache = j;
+          setData(j);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      on = false;
+    };
+  }, []);
+
+  return data;
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { theme, toggle: toggleTheme } = useTheme();
+  const shell = useShellData();
   const sidebar = useSyncExternalStore(
     subscribeSidebar,
     getSidebar,
@@ -79,11 +118,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const rail = sidebar === "rail";
+  const initial = (shell?.email?.[0] ?? "?").toUpperCase();
 
   return (
     <>
-      {/* ——— Sidebar (desktop) ——— */}
-      <aside className="app-sidebar fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-edge bg-surface md:flex">
+      {/* ——— Sidebar flottante (desktop) ——— */}
+      <aside className="app-sidebar fixed bottom-3 left-3 top-3 z-40 hidden flex-col overflow-hidden rounded-2xl border border-edge bg-surface shadow-xl md:flex">
         <div
           className={`flex items-center ${
             rail ? "h-auto flex-col gap-2 py-4" : "h-16 justify-between pl-5 pr-3"
@@ -119,8 +159,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 title={rail ? item.label : undefined}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
-                  rail ? "justify-center" : ""
+                className={`flex items-center rounded-xl px-3 py-2.5 text-sm transition ${
+                  rail ? "justify-center gap-0" : "gap-3"
                 } ${
                   active
                     ? "bg-accent-soft font-semibold text-accent-strong"
@@ -134,13 +174,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
+        {/* Widget : la valeur du classeur, toujours sous la main */}
+        {!rail && shell && shell.count > 0 && (
+          <div className="mx-3 mb-2 rounded-xl border border-edge bg-raised/60 px-3.5 py-2.5">
+            <p className="label-xs">Ma collection</p>
+            <p className="display num mt-0.5 text-lg font-bold leading-tight">
+              {shell.value != null ? formatEur(shell.value) : "—"}
+            </p>
+            <p className="mt-0.5 text-xs text-muted">
+              {shell.count} carte{shell.count > 1 ? "s" : ""}
+            </p>
+          </div>
+        )}
+
         <div className="flex flex-col gap-1 border-t border-edge px-3 py-3">
           <button
             type="button"
             onClick={toggleTheme}
             title={rail ? (theme === "dark" ? "Thème clair" : "Thème sombre") : undefined}
-            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted transition hover:bg-raised hover:text-foreground ${
-              rail ? "justify-center" : ""
+            className={`flex items-center rounded-xl px-3 py-2.5 text-sm text-muted transition hover:bg-raised hover:text-foreground ${
+              rail ? "justify-center gap-0" : "gap-3"
             }`}
           >
             <span className="shrink-0">
@@ -154,46 +207,69 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {theme === "dark" ? "Thème clair" : "Thème sombre"}
             </span>
           </button>
-          <form action={signOut}>
-            <button
-              type="submit"
-              title={rail ? "Déconnexion" : undefined}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted transition hover:bg-raised hover:text-foreground ${
-                rail ? "justify-center" : ""
-              }`}
+
+          {/* Compte : avatar, email, déconnexion */}
+          <div
+            className={`flex items-center gap-2.5 rounded-xl px-2 py-2 ${
+              rail ? "flex-col px-0" : ""
+            }`}
+          >
+            <span
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent-strong"
+              aria-hidden
             >
-              <span className="shrink-0">
-                <LogOut size={16} strokeWidth={1.9} aria-hidden />
+              {initial}
+            </span>
+            {!rail && (
+              <span
+                className="min-w-0 flex-1 truncate text-xs text-muted"
+                title={shell?.email}
+              >
+                {shell?.email ?? "…"}
               </span>
-              <span className="nav-label">Déconnexion</span>
-            </button>
-          </form>
+            )}
+            <form action={signOut}>
+              <button
+                type="submit"
+                title="Déconnexion"
+                aria-label="Déconnexion"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-faint transition hover:bg-raised hover:text-loss"
+              >
+                <LogOut size={14} strokeWidth={1.9} aria-hidden />
+              </button>
+            </form>
+          </div>
         </div>
       </aside>
 
-      {/* ——— Barre haute (mobile) ——— */}
+      {/* ——— Barre haute (mobile) : logo + accès secondaires ——— */}
       <header className="sticky top-0 z-40 border-b border-edge bg-surface/90 backdrop-blur-md md:hidden">
-        <div className="flex h-13 items-center gap-2 px-3 py-2">
-          <Logo variant="mark" size={26} />
-          <nav className="scrollbar-none flex flex-1 items-center gap-0.5 overflow-x-auto text-sm">
-            {NAV.map((item) => {
-              const active = isActive(item.href, pathname);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 transition ${
-                    active
-                      ? "bg-accent-soft font-semibold text-accent-strong"
-                      : "text-muted"
-                  }`}
-                >
-                  <item.Icon size={14} aria-hidden />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
+        <div className="flex h-13 items-center gap-1.5 px-3 py-2">
+          <Link href="/" className="mr-auto flex items-center">
+            <Logo variant="lockup" size={26} />
+          </Link>
+          <Link
+            href="/boutiques"
+            aria-label="Boutiques"
+            className={`flex h-8 w-8 items-center justify-center rounded-lg border border-edge ${
+              isActive("/boutiques", pathname)
+                ? "text-accent-strong"
+                : "text-muted"
+            }`}
+          >
+            <MapPin size={14} aria-hidden />
+          </Link>
+          <Link
+            href="/parametres"
+            aria-label="Paramètres"
+            className={`flex h-8 w-8 items-center justify-center rounded-lg border border-edge ${
+              isActive("/parametres", pathname)
+                ? "text-accent-strong"
+                : "text-muted"
+            }`}
+          >
+            <Settings size={14} aria-hidden />
+          </Link>
           <ThemeToggle />
           <form action={signOut}>
             <button
@@ -206,6 +282,44 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </form>
         </div>
       </header>
+
+      {/* ——— Barre d'onglets (mobile) ——— */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-edge bg-surface/95 backdrop-blur-md md:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="grid grid-cols-5">
+          {MOBILE_TABS.map((tab) => {
+            const active = isActive(tab.href, pathname);
+            if (tab.primary) {
+              return (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  aria-label={tab.label}
+                  className="flex flex-col items-center justify-end pb-1.5"
+                >
+                  <span className="flex h-11 w-11 -translate-y-3.5 items-center justify-center rounded-full border-4 border-surface bg-accent text-accent-ink shadow-lg">
+                    <tab.Icon size={20} strokeWidth={2.2} aria-hidden />
+                  </span>
+                </Link>
+              );
+            }
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                className={`flex flex-col items-center gap-1 pb-2 pt-2.5 text-[10px] font-medium transition ${
+                  active ? "text-accent-strong" : "text-muted"
+                }`}
+              >
+                <tab.Icon size={18} strokeWidth={active ? 2.1 : 1.8} aria-hidden />
+                {tab.label}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
 
       {/* ——— Contenu ——— */}
       <ImageGate />

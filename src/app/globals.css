@@ -99,16 +99,20 @@ body {
 
 .app-main {
   min-height: 100vh;
+  /* Place pour la barre d'onglets mobile */
+  padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
 }
 
 @media (min-width: 768px) {
   .app-main {
-    padding-left: 15rem;
+    /* Sidebar flottante : 0.75rem de marge + 15rem de large + respiration */
+    padding-left: 16.5rem;
+    padding-bottom: 0;
     transition: padding-left 0.25s cubic-bezier(0.3, 0.7, 0.3, 1);
   }
 
   :root[data-sidebar="rail"] .app-main {
-    padding-left: 4.5rem;
+    padding-left: 6rem;
   }
 
   .app-sidebar {
