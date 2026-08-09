@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { signOut } from "@/app/actions";
 import { Logo } from "@/components/logo";
+import { ImageGate } from "@/components/image-gate";
 import { ThemeToggle, useTheme } from "@/components/theme-toggle";
 
 /* État de la sidebar : vit sur <html data-sidebar>, comme le thème */
@@ -205,6 +206,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* ——— Contenu ——— */}
+      <ImageGate />
       <div className="app-main">{children}</div>
     </>
   );
