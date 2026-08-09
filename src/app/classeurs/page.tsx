@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { NotebookTabs } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { binderColorHex } from "@/lib/binder-colors";
-import { signStorageImages } from "@/lib/images";
+import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
 import { BindersGrid } from "@/components/binders-grid";
 import { NewBinderButton } from "@/components/new-binder-button";
@@ -34,11 +34,16 @@ export default async function ClasseursPage() {
       .from("collection_value")
       .select("id, image_url, quantity, current_price"),
   ]);
+  const { data: gradings } = await supabase
+    .from("item_gradings")
+    .select("item_id, rectified_path")
+    .order("created_at", { ascending: false });
 
   const signedItems = await signStorageImages(
     (items ?? []) as { id: string; image_url: string; quantity: number; current_price: number | null }[]
   );
-  const itemById = new Map(signedItems.map((i) => [i.id, i]));
+  const rectifiedItems = await applyRectifiedImages(gradings, signedItems);
+  const itemById = new Map(rectifiedItems.map((i) => [i.id, i]));
 
   const enriched = (binders ?? []).map((b) => {
     const memberIds = (links ?? [])

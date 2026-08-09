@@ -11,6 +11,7 @@ import {
   BarChart3,
   Settings,
   History,
+  Award,
   RectangleVertical,
   CornerDownLeft,
 } from "lucide-react";
@@ -28,6 +29,7 @@ const PAGES = [
   { href: "/classeurs", label: "Classeurs", Icon: NotebookTabs },
   { href: "/recherche", label: "Ajouter une carte", Icon: SearchIcon },
   { href: "/wishlist", label: "Recherchées", Icon: Star },
+  { href: "/pregrades", label: "Pré-gradées", Icon: Award },
   { href: "/boutiques", label: "Boutiques", Icon: MapPin },
   { href: "/stats", label: "Stats", Icon: BarChart3 },
   { href: "/journal", label: "Journal", Icon: History },

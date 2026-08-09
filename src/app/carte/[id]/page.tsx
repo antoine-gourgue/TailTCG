@@ -16,6 +16,8 @@ import { ValueHistoryManager } from "@/components/value-history-manager";
 import { ValueUpdateButton } from "@/components/quick-value-edit";
 import { SellButton } from "@/components/sell-button";
 import { BinderPicker } from "@/components/binder-picker";
+import { PregradeButton } from "@/components/pregrade-wizard";
+import { GRADE_LABELS } from "@/lib/grading";
 import { ConfirmAction } from "@/components/confirm-action";
 import { cancelSale } from "@/app/items/actions";
 import type { SourceOption } from "@/app/items/actions";
@@ -99,11 +101,31 @@ export default async function CartePage({
     { image_url: item.image_url },
   ]);
 
-  const { data: valueHistory } = await supabase
-    .from("item_value_history")
-    .select("id, recorded_at, value")
-    .eq("item_id", id)
-    .order("recorded_at");
+  const [{ data: valueHistory }, { data: lastGrading }] = await Promise.all([
+    supabase
+      .from("item_value_history")
+      .select("id, recorded_at, value")
+      .eq("item_id", id)
+      .order("recorded_at"),
+    supabase
+      .from("item_gradings")
+      .select("grade, centering, corners, edges, surface, created_at, rectified_path")
+      .eq("item_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  // Visuel redressé de la pré-gradation : c'est TA carte, elle prime
+  // sur le scan officiel dans l'encart principal
+  let rectifiedUrl: string | null = null;
+  if (lastGrading?.rectified_path) {
+    const admin = createAdminClient();
+    const { data: signedRect } = await admin.storage
+      .from("card-photos")
+      .createSignedUrl(lastGrading.rectified_path, 3600);
+    rectifiedUrl = signedRect?.signedUrl ?? null;
+  }
 
   // URLs signées 1 h, générées côté serveur (bucket privé)
   let photos: GalleryPhoto[] = [];
@@ -180,7 +202,7 @@ export default async function CartePage({
           <aside className="w-full max-w-96 shrink-0 lg:sticky lg:top-8 lg:self-start">
             <div className="card-tile aspect-[63/88]">
               <CardImage
-                base={displayImage || null}
+                base={rectifiedUrl ?? (displayImage || null)}
                 alt={item.card_name ?? ""}
                 quality="high"
                 fallback={photos[0]?.url ?? null}
@@ -242,6 +264,7 @@ export default async function CartePage({
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
+                  <PregradeButton itemId={item.id ?? id} photos={photos} />
                   <ValueUpdateButton
                     itemId={item.id ?? id}
                     current={item.current_price}
@@ -415,6 +438,25 @@ export default async function CartePage({
                         "Non"
                       )}
                     </Field>
+                    {lastGrading && (
+                      <Field label="Pré-grade">
+                        <span className="inline-flex items-baseline gap-1.5">
+                          <span className="num rounded-md bg-accent-soft px-1.5 py-0.5 text-[13px] font-bold text-accent-strong">
+                            {lastGrading.grade}
+                          </span>
+                          <span className="text-muted">
+                            {GRADE_LABELS[lastGrading.grade ?? 0] ?? ""}
+                          </span>
+                          <span
+                            className="num text-xs text-faint"
+                            title="Centrage · Coins · Bords · Surface"
+                          >
+                            {lastGrading.centering}/{lastGrading.corners}/
+                            {lastGrading.edges}/{lastGrading.surface}
+                          </span>
+                        </span>
+                      </Field>
+                    )}
                     <Field label="Date d'achat">{purchaseDate ?? "—"}</Field>
                     <Field label="Source">
                       {source ? (

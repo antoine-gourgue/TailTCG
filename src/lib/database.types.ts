@@ -148,6 +148,66 @@ export type Database = {
         }
         Relationships: []
       }
+      item_gradings: {
+        Row: {
+          centering: number
+          corners: number
+          created_at: string | null
+          details: Json | null
+          edges: number
+          grade: number
+          id: string
+          item_id: string
+          owner_id: string
+          ratios: Json | null
+          rectified_path: string | null
+          surface: number
+        }
+        Insert: {
+          centering: number
+          corners: number
+          created_at?: string | null
+          details?: Json | null
+          edges: number
+          grade: number
+          id?: string
+          item_id: string
+          owner_id?: string
+          ratios?: Json | null
+          rectified_path?: string | null
+          surface: number
+        }
+        Update: {
+          centering?: number
+          corners?: number
+          created_at?: string | null
+          details?: Json | null
+          edges?: number
+          grade?: number
+          id?: string
+          item_id?: string
+          owner_id?: string
+          ratios?: Json | null
+          rectified_path?: string | null
+          surface?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_gradings_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "collection_value"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_gradings_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       item_photos: {
         Row: {
           created_at: string | null

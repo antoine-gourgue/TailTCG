@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { signStorageImages } from "@/lib/images";
+import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { formatEur } from "@/lib/domain";
 import { binderColorHex } from "@/lib/binder-colors";
 import { Logo } from "@/components/logo";
@@ -115,7 +115,16 @@ export default async function SharedCollectionPage({
         .order("created_at"),
     ]);
 
-  const signedItems = await signStorageImages((items ?? []) as CollectionItem[]);
+  const { data: shareGradings } = await admin
+    .from("item_gradings")
+    .select("item_id, rectified_path")
+    .eq("owner_id", settings.owner_id)
+    .order("created_at", { ascending: false });
+
+  const signedItems = await applyRectifiedImages(
+    shareGradings,
+    await signStorageImages((items ?? []) as CollectionItem[])
+  );
 
   // Tuiles de classeurs : mêmes couvertures stylées que côté propriétaire
   const itemById = new Map(signedItems.map((i) => [i.id, i]));

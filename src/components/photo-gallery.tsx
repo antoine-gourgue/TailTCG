@@ -56,7 +56,25 @@ export function PhotoGallery({
       );
       const batches: FormData[] = [];
       for (const file of Array.from(fileList).slice(0, 10)) {
-        const compressed = await imageCompression(file, {
+        // Photos iPhone (.heic) : les navigateurs ne les décodent pas,
+        // conversion en JPEG dans le navigateur avant compression
+        let source = file;
+        const isHeic =
+          /\.hei[cf]$/i.test(file.name) ||
+          file.type === "image/heic" ||
+          file.type === "image/heif";
+        if (isHeic) {
+          const { heicTo } = await import("heic-to/next");
+          const blob = await heicTo({
+            blob: file,
+            type: "image/jpeg",
+            quality: 0.9,
+          });
+          source = new File([blob], file.name.replace(/\.hei[cf]$/i, ".jpg"), {
+            type: "image/jpeg",
+          });
+        }
+        const compressed = await imageCompression(source, {
           maxWidthOrHeight: 1600,
           initialQuality: 0.8,
           fileType: "image/webp",
@@ -157,7 +175,7 @@ export function PhotoGallery({
           <input
             ref={inputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,.heic,.heif"
             multiple
             className="sr-only"
             onChange={(e) => handleFiles(e.target.files)}

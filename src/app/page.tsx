@@ -3,7 +3,7 @@ import { BellRing } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { daysAgoISO } from "@/lib/domain";
-import { signStorageImages } from "@/lib/images";
+import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
 import { ShareButton } from "@/components/share-button";
 import { UndoDeleteToast } from "@/components/undo-delete-toast";
@@ -39,7 +39,7 @@ export default async function Home({
     return <Landing />;
   }
 
-  const [{ data: items }, { data: sources }, { data: binders }] =
+  const [{ data: items }, { data: sources }, { data: binders }, { data: gradings }] =
     await Promise.all([
       supabase
         .from("collection_value")
@@ -49,6 +49,10 @@ export default async function Home({
         .order("created_at", { ascending: false }),
       supabase.from("sources").select("id, name").order("name"),
       supabase.from("binders").select("id, name").order("name"),
+      supabase
+        .from("item_gradings")
+        .select("item_id, rectified_path")
+        .order("created_at", { ascending: false }),
     ]);
 
   // Photos perso en secours de vignette (cartes sans scan officiel)
@@ -140,9 +144,12 @@ export default async function Home({
           </div>
         )}
         <CollectionClient
-          items={(await signStorageImages((items ?? []) as CollectionItem[])).map(
-            (i) => ({ ...i, photo_fallback: photoFallbacks.get(i.id) ?? null })
-          )}
+          items={(
+            await applyRectifiedImages(
+              gradings,
+              await signStorageImages((items ?? []) as CollectionItem[])
+            )
+          ).map((i) => ({ ...i, photo_fallback: photoFallbacks.get(i.id) ?? null }))}
           sources={(sources ?? []) as SourceRef[]}
           initialSource={initialSource ?? ""}
           initialSet={initialSet ?? ""}

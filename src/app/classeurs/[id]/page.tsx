@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Trash2, ListChecks } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { signStorageImages } from "@/lib/images";
+import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmAction } from "@/components/confirm-action";
 import { RenameBinderButton } from "@/components/rename-binder-button";
@@ -92,11 +92,19 @@ export default async function ClasseurPage({
     }
   }
 
+  const { data: gradings } = await supabase
+    .from("item_gradings")
+    .select("item_id, rectified_path")
+    .order("created_at", { ascending: false });
+
   const positionByItem = new Map(
     (links ?? []).map((l) => [l.item_id, l.position])
   );
   const signedItems = (
-    await signStorageImages((items ?? []) as CollectionItem[])
+    await applyRectifiedImages(
+      gradings,
+      await signStorageImages((items ?? []) as CollectionItem[])
+    )
   ).map((i) => ({
     ...i,
     photo_fallback: photoFallbacks.get(i.id) ?? null,

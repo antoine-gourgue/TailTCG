@@ -6,6 +6,8 @@ import {
   TrendingUp,
   MapPin,
   Star,
+  Award,
+  Ruler,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 
@@ -71,6 +73,30 @@ export function Landing() {
         <p className="mt-3 text-xs text-faint">
           Gratuit · catalogue TCGdex FR &amp; JA · aucune carte bancaire
         </p>
+      </section>
+
+      {/* Pré-gradation, la fonctionnalité signature */}
+      <section className="panel mb-4 flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:p-8">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent-strong">
+          <Award size={22} strokeWidth={1.8} aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="display text-lg font-bold">
+            Pré-grade tes cartes toi-même, gratuitement
+          </p>
+          <p className="mt-1.5 text-sm leading-relaxed text-muted">
+            Photographie ta carte, pose 4 poignées sur ses coins : l&apos;app la
+            redresse dans un calque au format exact, <strong>mesure</strong> le
+            centrage au barème PSA (recto et verso), zoome sur chaque coin, et
+            calcule une note plafonnée par le pire critère — comme les vrais
+            gradeurs. Ta carte finit dans un boîtier avec son étiquette, avant
+            de décider si elle mérite une vraie gradation.
+          </p>
+        </div>
+        <span className="hidden items-center gap-1.5 rounded-full border border-edge px-3 py-1.5 text-xs text-muted sm:flex">
+          <Ruler size={13} aria-hidden />
+          Centrage mesuré, pas estimé
+        </span>
       </section>
 
       {/* Fonctionnalités */}

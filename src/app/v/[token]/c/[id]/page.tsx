@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { signStorageImages } from "@/lib/images";
+import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { Logo } from "@/components/logo";
 import {
   CollectionClient,
@@ -79,8 +79,17 @@ export default async function SharedBinderPage({
           .order("created_at", { ascending: false })
       : { data: [] };
 
+  const { data: shareGradings } = await admin
+    .from("item_gradings")
+    .select("item_id, rectified_path")
+    .eq("owner_id", settings.owner_id)
+    .order("created_at", { ascending: false });
+
   const signedItems = (
-    await signStorageImages((items ?? []) as CollectionItem[])
+    await applyRectifiedImages(
+      shareGradings,
+      await signStorageImages((items ?? []) as CollectionItem[])
+    )
   ).map((i) => ({ ...i, position: positionByItem.get(i.id) ?? null }));
 
   return (

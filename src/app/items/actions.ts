@@ -317,6 +317,50 @@ export async function purgeItem(formData: FormData): Promise<void> {
   revalidatePath("/parametres");
 }
 
+/** Enregistre une pré-gradation (atelier guidé de la fiche carte).
+ * FormData pour transporter le visuel redressé (calque carte). */
+export async function saveGrading(formData: FormData) {
+  const itemId = str(formData, "item_id");
+  if (!itemId) return { error: "Carte manquante" };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Non connecté" };
+
+  const num = (k: string) => Number.parseInt(str(formData, k), 10);
+
+  // Visuel redressé : bucket privé, comme les photos perso
+  let rectified_path: string | null = null;
+  const file = formData.get("rectified");
+  if (file instanceof File && file.size > 0) {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createAdminClient();
+    const path = `${user.id}/gradings/${itemId}-${Date.now()}.jpg`;
+    const { error: upError } = await admin.storage
+      .from("card-photos")
+      .upload(path, file, { contentType: "image/jpeg" });
+    if (!upError) rectified_path = path;
+  }
+
+  const { error } = await supabase.from("item_gradings").insert({
+    item_id: itemId,
+    centering: num("centering"),
+    corners: num("corners"),
+    edges: num("edges"),
+    surface: num("surface"),
+    grade: num("grade"),
+    ratios: JSON.parse(str(formData, "ratios") || "null"),
+    details: JSON.parse(str(formData, "details") || "null"),
+    rectified_path,
+  });
+
+  revalidatePath(`/carte/${itemId}`);
+  revalidatePath("/pregrades");
+  return { error: error?.message ?? null };
+}
+
 export type SourceOption = {
   id: string;
   name: string;
