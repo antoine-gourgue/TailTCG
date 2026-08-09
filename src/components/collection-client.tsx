@@ -30,6 +30,7 @@ export type CollectionItem = {
   gain: number | null;
   sold_price: number | null;
   sold_at: string | null;
+  photo_fallback?: string | null;
 };
 
 /** minuscules sans accents, pour la recherche texte */
@@ -359,7 +360,11 @@ export function CollectionClient({
             <li key={item.id}>
               <Link href={`/carte/${item.id}`} className="group block">
                 <div className="card-tile aspect-[63/88]">
-                  <CardImage base={item.image_url || null} alt={item.card_name} />
+                  <CardImage
+                    base={item.image_url || null}
+                    alt={item.card_name}
+                    fallback={item.photo_fallback ?? null}
+                  />
                   <span className="tile-badge num left-1.5 top-1.5">
                     {item.condition}
                   </span>

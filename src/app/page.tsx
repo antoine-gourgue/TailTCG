@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BellRing } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { daysAgoISO } from "@/lib/domain";
 import { signStorageImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
@@ -35,6 +36,31 @@ export default async function Home({
       .order("created_at", { ascending: false }),
     supabase.from("sources").select("id, name").order("name"),
   ]);
+
+  // Photos perso en secours de vignette (cartes sans scan officiel)
+  const photoFallbacks = new Map<string, string>();
+  {
+    const { data: allPhotos } = await supabase
+      .from("item_photos")
+      .select("item_id, path, position")
+      .order("position");
+    const firstByItem = new Map<string, string>();
+    for (const p of allPhotos ?? []) {
+      if (!firstByItem.has(p.item_id)) firstByItem.set(p.item_id, p.path);
+    }
+    if (firstByItem.size > 0) {
+      const admin = createAdminClient();
+      const paths = [...firstByItem.values()];
+      const { data: signed } = await admin.storage
+        .from("card-photos")
+        .createSignedUrls(paths, 3600);
+      const urlByPath = new Map(paths.map((p, i) => [p, signed?.[i]?.signedUrl]));
+      for (const [itemId, path] of firstByItem) {
+        const url = urlByPath.get(path);
+        if (url) photoFallbacks.set(itemId, url);
+      }
+    }
+  }
 
   // Rappel de réévaluation : cartes dont la valeur date de plus de N semaines
   const { data: settings } = await supabase
@@ -97,7 +123,9 @@ export default async function Home({
           </div>
         )}
         <CollectionClient
-          items={await signStorageImages((items ?? []) as CollectionItem[])}
+          items={(await signStorageImages((items ?? []) as CollectionItem[])).map(
+            (i) => ({ ...i, photo_fallback: photoFallbacks.get(i.id) ?? null })
+          )}
           sources={(sources ?? []) as SourceRef[]}
           initialSource={initialSource ?? ""}
           initialSet={initialSet ?? ""}

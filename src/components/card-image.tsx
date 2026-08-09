@@ -24,6 +24,7 @@ export function CardImage({
   quality = "low",
   className = "h-full w-full object-cover",
   direct = false,
+  fallback = null,
 }: {
   base: string | null;
   alt: string;
@@ -31,6 +32,8 @@ export function CardImage({
   className?: string;
   /** base est déjà une URL finale (photo perso signée…), pas une base TCGdex */
   direct?: boolean;
+  /** URL de secours (photo perso) si aucun scan n'existe */
+  fallback?: string | null;
 }) {
   const isDirect =
     direct || (base?.startsWith("http") && !base.includes("assets.tcgdex.net"));
@@ -38,7 +41,7 @@ export function CardImage({
     ? isDirect
       ? base
       : `${base}/${quality === "low" ? "low.webp" : "high.png"}`
-    : null;
+    : fallback;
   const [src, setSrc] = useState(initial);
 
   if (!src) {
@@ -57,7 +60,14 @@ export function CardImage({
       alt={alt}
       loading="lazy"
       className={className}
-      onError={() => setSrc(isDirect ? null : nextLangSrc(src))}
+      onError={() => {
+        if (src === fallback) {
+          setSrc(null);
+          return;
+        }
+        const next = isDirect ? null : nextLangSrc(src);
+        setSrc(next ?? fallback);
+      }}
     />
   );
 }

@@ -174,6 +174,7 @@ export default async function CartePage({
                 base={displayImage || null}
                 alt={item.card_name ?? ""}
                 quality="high"
+                fallback={photos[0]?.url ?? null}
               />
             </div>
           </aside>
