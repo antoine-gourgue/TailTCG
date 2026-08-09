@@ -127,6 +127,23 @@ export async function getCard(
   if (!card.image) {
     card.image = (await findImageInOtherLangs(id)) ?? undefined;
   }
+  if (!card.image && card.set?.id) {
+    // Dernier recours : l'URL d'asset par convention (série via le set)
+    try {
+      const setRes = await fetch(
+        `${langBase(lang)}/sets/${encodeURIComponent(card.set.id)}`,
+        { next: { revalidate: DAY_SECONDS } }
+      );
+      if (setRes.ok) {
+        const set: TcgdexSetDetail = await setRes.json();
+        if (set.serie?.id) {
+          card.image = guessAssetBase(set.serie.id, card.set.id, card.localId);
+        }
+      }
+    } catch {
+      // placeholder côté client
+    }
+  }
   return card;
 }
 
@@ -200,6 +217,19 @@ export type TcgdexSetDetail = {
   cards: TcgdexCardBrief[];
 };
 
+/**
+ * L'API omet parfois des images pourtant présentes sur le CDN (ex. promos
+ * MEP) : on construit l'URL par convention assets/{lang}/{série}/{set}/{n°},
+ * le repli client (cascade de langues → placeholder) tranche les vrais 404.
+ */
+function guessAssetBase(
+  serieId: string,
+  setId: string,
+  localId: string
+): string {
+  return `https://assets.tcgdex.net/en/${serieId.toLowerCase()}/${setId.toLowerCase()}/${localId}`;
+}
+
 export async function getSet(
   id: string,
   lang: CatalogLang
@@ -208,7 +238,16 @@ export async function getSet(
     next: { revalidate: DAY_SECONDS },
   });
   if (!res.ok) return null;
-  return res.json();
+  const set: TcgdexSetDetail = await res.json();
+
+  if (set.serie?.id) {
+    for (const card of set.cards ?? []) {
+      if (!card.image) {
+        card.image = guessAssetBase(set.serie.id, set.id, card.localId);
+      }
+    }
+  }
+  return set;
 }
 
 /** L'API ne fournit pas d'URL Cardmarket : lien de recherche pré-rempli, éditable */
