@@ -45,18 +45,21 @@ export type Database = {
           binder_id: string
           item_id: string
           owner_id: string
+          position: number | null
         }
         Insert: {
           added_at?: string | null
           binder_id: string
           item_id: string
           owner_id?: string
+          position?: number | null
         }
         Update: {
           added_at?: string | null
           binder_id?: string
           item_id?: string
           owner_id?: string
+          position?: number | null
         }
         Relationships: [
           {
@@ -90,6 +93,7 @@ export type Database = {
           id: string
           name: string
           owner_id: string
+          position: number | null
           style: string | null
         }
         Insert: {
@@ -99,6 +103,7 @@ export type Database = {
           id?: string
           name: string
           owner_id?: string
+          position?: number | null
           style?: string | null
         }
         Update: {
@@ -108,6 +113,7 @@ export type Database = {
           id?: string
           name?: string
           owner_id?: string
+          position?: number | null
           style?: string | null
         }
         Relationships: []
@@ -380,18 +386,21 @@ export type Database = {
       }
       user_settings: {
         Row: {
+          display_name: string | null
           owner_id: string
           revalue_weeks: number | null
           share_token: string | null
           updated_at: string | null
         }
         Insert: {
+          display_name?: string | null
           owner_id?: string
           revalue_weeks?: number | null
           share_token?: string | null
           updated_at?: string | null
         }
         Update: {
+          display_name?: string | null
           owner_id?: string
           revalue_weeks?: number | null
           share_token?: string | null

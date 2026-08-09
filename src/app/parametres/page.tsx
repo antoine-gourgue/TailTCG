@@ -11,6 +11,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app-shell";
 import { SetPasswordForm } from "@/components/set-password-form";
+import { DisplayNameForm } from "@/components/display-name-form";
 import { RevalueForm } from "@/components/revalue-form";
 import { SharePanel } from "@/components/share-panel";
 import { signOutEverywhere } from "./actions";
@@ -28,7 +29,7 @@ export default async function ParametresPage() {
 
   const { data: settings } = await supabase
     .from("user_settings")
-    .select("revalue_weeks, share_token")
+    .select("revalue_weeks, share_token, display_name")
     .eq("owner_id", user.id)
     .maybeSingle();
 
@@ -51,6 +52,13 @@ export default async function ParametresPage() {
           {/* Compte */}
           <section className="panel p-5">
             <h2 className="display mb-4 text-base font-semibold">Compte</h2>
+            <div className="mb-5">
+              <p className="label-xs mb-1.5">Pseudo public</p>
+              <DisplayNameForm initialName={settings?.display_name ?? null} />
+              <p className="mt-1.5 text-xs text-faint">
+                Affiché sur ta collection partagée : « La collection de … ».
+              </p>
+            </div>
             <dl className="mb-5 grid grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
               <div>
                 <dt className="label-xs mb-1">Email</dt>

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { NotebookTabs } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages } from "@/lib/images";
+import { formatEur } from "@/lib/domain";
+import { binderColorHex } from "@/lib/binder-colors";
 import { Logo } from "@/components/logo";
+import { BinderCover } from "@/components/binder-cover";
 import {
   CollectionClient,
   type CollectionItem,
@@ -30,7 +32,7 @@ export default async function SharedCollectionPage({
   const admin = createAdminClient();
   const { data: settings } = await admin
     .from("user_settings")
-    .select("owner_id")
+    .select("owner_id, display_name")
     .eq("share_token", token)
     .maybeSingle();
 
@@ -82,12 +84,46 @@ export default async function SharedCollectionPage({
         .order("name"),
       admin
         .from("binders")
-        .select("id, name, binder_items(item_id)")
+        .select(
+          "id, name, color, style, cover_item_ids, created_at, binder_items(item_id)"
+        )
         .eq("owner_id", settings.owner_id)
-        .order("name"),
+        .order("position", { nullsFirst: false })
+        .order("created_at"),
     ]);
 
   const signedItems = await signStorageImages((items ?? []) as CollectionItem[]);
+
+  // Tuiles de classeurs : mêmes couvertures stylées que côté propriétaire
+  const itemById = new Map(signedItems.map((i) => [i.id, i]));
+  const binderTiles = (binders ?? []).map((b) => {
+    let count = 0;
+    let value = 0;
+    let hasValue = false;
+    const covers: { image_url: string }[] = [];
+    for (const link of b.binder_items) {
+      const item = itemById.get(link.item_id);
+      if (!item) continue;
+      count += item.quantity;
+      if (item.current_price != null) {
+        value += item.current_price * item.quantity;
+        hasValue = true;
+      }
+      if (covers.length < 4 && item.image_url) covers.push(item);
+    }
+    const chosen = (b.cover_item_ids ?? [])
+      .map((id) => itemById.get(id))
+      .filter((i): i is NonNullable<typeof i> => i != null && !!i.image_url);
+    return {
+      id: b.id,
+      name: b.name,
+      style: b.style,
+      colorHex: binderColorHex(b.color),
+      count,
+      value: hasValue ? value : null,
+      covers: chosen.length > 0 ? chosen : covers,
+    };
+  });
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8">
@@ -96,7 +132,9 @@ export default async function SharedCollectionPage({
           <Logo variant="mark" size={36} />
           <div>
             <h1 className="display text-2xl font-bold tracking-tight">
-              Collection partagée
+              {settings.display_name
+                ? `La collection de ${settings.display_name}`
+                : "Collection partagée"}
             </h1>
             <p className="text-sm text-muted">
               Vitrine en lecture seule, propulsée par TailTCG.
@@ -114,21 +152,40 @@ export default async function SharedCollectionPage({
         )}
       </div>
 
-      {(binders ?? []).length > 0 && (
-        <div className="mb-6 flex flex-wrap items-center gap-2">
-          <span className="label-xs mr-1">Classeurs</span>
-          {(binders ?? []).map((b) => (
-            <Link
-              key={b.id}
-              href={`/v/${token}/c/${b.id}`}
-              className="inline-flex items-center gap-1.5 rounded-full border border-edge bg-raised px-3 py-1.5 text-[13px] text-muted transition hover:border-edge-strong hover:text-foreground"
-            >
-              <NotebookTabs size={13} aria-hidden />
-              {b.name}
-              <span className="num text-faint">{b.binder_items.length}</span>
-            </Link>
-          ))}
-        </div>
+      {binderTiles.length > 0 && (
+        <section className="mb-8">
+          <h2 className="display mb-3 text-lg font-semibold">Classeurs</h2>
+          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {binderTiles.map((b) => (
+              <li key={b.id}>
+                <Link
+                  href={`/v/${token}/c/${b.id}`}
+                  className="panel group block overflow-hidden p-3 transition hover:border-edge-strong"
+                >
+                  <BinderCover
+                    style={b.style}
+                    covers={b.covers}
+                    name={b.name}
+                    colorHex={b.colorHex}
+                  />
+                  <p className="mt-2.5 truncate text-sm font-semibold group-hover:text-accent-strong">
+                    {b.name}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted">
+                    <span className="num">{b.count}</span> carte
+                    {b.count > 1 ? "s" : ""}
+                    {b.value != null && (
+                      <>
+                        {" "}
+                        · <span className="num">{formatEur(b.value)}</span>
+                      </>
+                    )}
+                  </p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <CollectionClient

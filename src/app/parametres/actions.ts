@@ -41,6 +41,37 @@ export async function updateShare(
   return { token: share_token };
 }
 
+export type NameState = { ok: boolean; message: string; name?: string } | null;
+
+// Pseudo public — obligatoire : la coquille bloque tant qu'il est vide
+export async function setDisplayName(
+  _prev: NameState,
+  formData: FormData
+): Promise<NameState> {
+  const name = String(formData.get("display_name") ?? "").trim();
+  if (name.length < 2 || name.length > 30) {
+    return { ok: false, message: "Entre 2 et 30 caractères." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Non connecté." };
+
+  const { error } = await supabase.from("user_settings").upsert(
+    {
+      owner_id: user.id,
+      display_name: name,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "owner_id" }
+  );
+  if (error) return { ok: false, message: `Impossible : ${error.message}` };
+
+  return { ok: true, message: "Pseudo enregistré.", name };
+}
+
 export type RevalueState = { ok: boolean; message: string } | null;
 
 // Fréquence du rappel d'actualisation des valeurs estimées (null = jamais)

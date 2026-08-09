@@ -11,9 +11,14 @@ export async function GET() {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }
 
-  const { data: items } = await supabase
-    .from("collection_value")
-    .select("quantity, current_price, sold_at");
+  const [{ data: items }, { data: settings }] = await Promise.all([
+    supabase.from("collection_value").select("quantity, current_price, sold_at"),
+    supabase
+      .from("user_settings")
+      .select("display_name")
+      .eq("owner_id", user.id)
+      .maybeSingle(),
+  ]);
 
   let count = 0;
   let value = 0;
@@ -32,5 +37,6 @@ export async function GET() {
     email: user.email ?? "",
     count,
     value: hasValue ? value : null,
+    displayName: settings?.display_name ?? null,
   });
 }

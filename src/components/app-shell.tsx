@@ -19,9 +19,16 @@ import {
 } from "lucide-react";
 import { signOut } from "@/app/actions";
 import { formatEur } from "@/lib/domain";
+import {
+  getShellCache,
+  setShellCache,
+  type ShellData,
+} from "@/lib/shell-store";
 import { Logo } from "@/components/logo";
 import { ImageGate } from "@/components/image-gate";
 import { ThemeToggle, useTheme } from "@/components/theme-toggle";
+import { DisplayNameGate } from "@/components/display-name-gate";
+import { CommandPalette, OPEN_PALETTE_EVENT } from "@/components/command-palette";
 
 /* État de la sidebar : vit sur <html data-sidebar>, comme le thème */
 let sidebarListeners: Array<() => void> = [];
@@ -69,11 +76,8 @@ function isActive(href: string, pathname: string) {
 
 /* Widget de la sidebar : chargé une fois puis gardé en mémoire de module,
  * rafraîchi en arrière-plan à chaque montage */
-type ShellData = { email: string; count: number; value: number | null };
-let shellCache: ShellData | null = null;
-
 function useShellData(): ShellData | null {
-  const [data, setData] = useState<ShellData | null>(shellCache);
+  const [data, setData] = useState<ShellData | null>(getShellCache());
 
   useEffect(() => {
     let on = true;
@@ -81,7 +85,7 @@ function useShellData(): ShellData | null {
       .then((r) => (r.ok ? r.json() : null))
       .then((j: ShellData | null) => {
         if (on && j) {
-          shellCache = j;
+          setShellCache(j);
           setData(j);
         }
       })
@@ -92,6 +96,10 @@ function useShellData(): ShellData | null {
   }, []);
 
   return data;
+}
+
+function openPalette() {
+  window.dispatchEvent(new CustomEvent(OPEN_PALETTE_EVENT));
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -136,19 +144,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Logo variant="lockup" size={30} />
             )}
           </Link>
-          <button
-            type="button"
-            onClick={toggleSidebar}
-            title={rail ? "Déplier" : "Replier"}
-            aria-label={rail ? "Déplier la navigation" : "Replier la navigation"}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-faint transition hover:bg-raised hover:text-foreground"
-          >
-            <ChevronLeft
-              size={14}
-              className={`transition-transform ${rail ? "rotate-180" : ""}`}
-              aria-hidden
-            />
-          </button>
+          <div className={`flex items-center ${rail ? "flex-col gap-1" : "gap-0.5"}`}>
+            <button
+              type="button"
+              onClick={openPalette}
+              title="Recherche rapide (⌘K)"
+              aria-label="Recherche rapide"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-faint transition hover:bg-raised hover:text-foreground"
+            >
+              <SearchIcon size={14} aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              title={rail ? "Déplier" : "Replier"}
+              aria-label={rail ? "Déplier la navigation" : "Replier la navigation"}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-faint transition hover:bg-raised hover:text-foreground"
+            >
+              <ChevronLeft
+                size={14}
+                className={`transition-transform ${rail ? "rotate-180" : ""}`}
+                aria-hidden
+              />
+            </button>
+          </div>
         </div>
 
         <nav className="flex flex-1 flex-col gap-1 px-3 pt-1">
@@ -248,6 +267,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/" className="mr-auto flex items-center">
             <Logo variant="lockup" size={26} />
           </Link>
+          <button
+            type="button"
+            onClick={openPalette}
+            aria-label="Recherche rapide"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-edge text-muted"
+          >
+            <SearchIcon size={14} aria-hidden />
+          </button>
           <Link
             href="/boutiques"
             aria-label="Boutiques"
@@ -323,6 +350,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* ——— Contenu ——— */}
       <ImageGate />
+      <CommandPalette />
+      {shell && !shell.displayName && <DisplayNameGate />}
       <div className="app-main">{children}</div>
     </>
   );

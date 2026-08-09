@@ -1,12 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { NotebookTabs } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { formatEur } from "@/lib/domain";
 import { binderColorHex } from "@/lib/binder-colors";
 import { signStorageImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
-import { BinderCover } from "@/components/binder-cover";
+import { BindersGrid } from "@/components/binders-grid";
 import { NewBinderButton } from "@/components/new-binder-button";
 
 export const metadata = {
@@ -26,6 +24,7 @@ export default async function ClasseursPage() {
     supabase
       .from("binders")
       .select("id, name, created_at, color, cover_item_ids, style")
+      .order("position", { nullsFirst: false })
       .order("created_at"),
     supabase
       .from("binder_items")
@@ -64,7 +63,10 @@ export default async function ClasseursPage() {
       .map((id) => itemById.get(id))
       .filter((i): i is NonNullable<typeof i> => i != null && !!i.image_url);
     return {
-      ...b,
+      id: b.id,
+      name: b.name,
+      style: b.style,
+      colorHex: binderColorHex(b.color),
       count,
       value: hasValue ? value : null,
       covers: chosen.length > 0 ? chosen : covers,
@@ -90,36 +92,10 @@ export default async function ClasseursPage() {
             </p>
           </div>
         ) : (
-          <ul className="rise-in grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {enriched.map((b) => (
-              <li key={b.id}>
-                <Link
-                  href={`/classeurs/${b.id}`}
-                  className="panel group block overflow-hidden p-4 transition hover:border-edge-strong"
-                >
-                  <BinderCover
-                    style={b.style}
-                    covers={b.covers}
-                    name={b.name}
-                    colorHex={binderColorHex(b.color)}
-                  />
-                  <p className="mt-3 truncate text-base font-semibold group-hover:text-accent-strong">
-                    {b.name}
-                  </p>
-                  <p className="mt-0.5 text-sm text-muted">
-                    <span className="num">{b.count}</span> carte
-                    {b.count > 1 ? "s" : ""}
-                    {b.value != null && (
-                      <>
-                        {" "}
-                        · <span className="num">{formatEur(b.value)}</span>
-                      </>
-                    )}
-                  </p>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <BindersGrid
+            key={enriched.map((b) => b.id).join("|")}
+            binders={enriched}
+          />
         )}
       </main>
     </AppShell>

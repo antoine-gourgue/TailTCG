@@ -94,6 +94,36 @@ export async function removeItemsFromBinder(binderId: string, itemIds: string[])
   return { error: error?.message ?? null };
 }
 
+/** Ordre manuel des classeurs (glisser-déposer sur la page Classeurs) */
+export async function reorderBinders(binderIds: string[]) {
+  if (binderIds.length === 0) return { error: null };
+  const supabase = await createClient();
+  const results = await Promise.all(
+    binderIds.map((id, i) =>
+      supabase.from("binders").update({ position: i }).eq("id", id)
+    )
+  );
+  revalidatePath("/classeurs");
+  return { error: results.find((r) => r.error)?.error?.message ?? null };
+}
+
+/** Ordre manuel des cartes dans un classeur */
+export async function reorderBinderItems(binderId: string, itemIds: string[]) {
+  if (!binderId || itemIds.length === 0) return { error: null };
+  const supabase = await createClient();
+  const results = await Promise.all(
+    itemIds.map((itemId, i) =>
+      supabase
+        .from("binder_items")
+        .update({ position: i })
+        .eq("binder_id", binderId)
+        .eq("item_id", itemId)
+    )
+  );
+  revalidatePath(`/classeurs/${binderId}`);
+  return { error: results.find((r) => r.error)?.error?.message ?? null };
+}
+
 /** Apparence du classeur : couleur de tranche + cartes de couverture */
 export async function updateBinderStyle(
   binderId: string,

@@ -43,7 +43,7 @@ export default async function ClasseurPage({
     await Promise.all([
       supabase
         .from("binder_items")
-        .select("item_id")
+        .select("item_id, position")
         .eq("binder_id", id),
       supabase.from("sources").select("id, name").order("name"),
       supabase.from("binders").select("id, name").order("name"),
@@ -92,9 +92,16 @@ export default async function ClasseurPage({
     }
   }
 
+  const positionByItem = new Map(
+    (links ?? []).map((l) => [l.item_id, l.position])
+  );
   const signedItems = (
     await signStorageImages((items ?? []) as CollectionItem[])
-  ).map((i) => ({ ...i, photo_fallback: photoFallbacks.get(i.id) ?? null }));
+  ).map((i) => ({
+    ...i,
+    photo_fallback: photoFallbacks.get(i.id) ?? null,
+    position: positionByItem.get(i.id) ?? null,
+  }));
 
   return (
     <AppShell>
@@ -156,6 +163,7 @@ export default async function ClasseurPage({
             sources={(sources ?? []) as SourceRef[]}
             binders={(allBinders ?? []).filter((b) => b.id !== binder.id)}
             binderContext={{ id: binder.id, name: binder.name }}
+            orderable
           />
         )}
       </main>

@@ -26,7 +26,7 @@ function StyleBinder({
   colorHex: string | null;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-l-lg rounded-r-xl border border-edge bg-surface">
+    <div className="relative aspect-[63/88] overflow-hidden rounded-l-lg rounded-r-xl border border-edge bg-surface">
       <div
         className="absolute inset-y-0 left-0 flex w-7 flex-col items-center justify-evenly border-r border-edge bg-raised py-3"
         style={colorHex ? { backgroundColor: colorHex } : undefined}
@@ -39,8 +39,8 @@ function StyleBinder({
           />
         ))}
       </div>
-      <div className="ml-7 p-2.5">
-        <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-raised/40 p-2 ring-1 ring-edge/60">
+      <div className="ml-7 flex h-full items-center p-2.5">
+        <div className="grid w-full grid-cols-2 gap-1.5 rounded-lg bg-raised/40 p-2 ring-1 ring-edge/60">
           {[0, 1, 2, 3].map((i) =>
             covers[i] ? (
               <div key={i} className="card-tile relative aspect-[63/88]">
@@ -72,18 +72,20 @@ function StyleMosaic({
 }) {
   return (
     <div
-      className="grid grid-cols-2 gap-1.5 rounded-xl p-2"
+      className="flex aspect-[63/88] items-center rounded-xl p-2"
       style={{ backgroundColor: tint(colorHex, "1f") }}
     >
-      {[0, 1, 2, 3].map((i) =>
-        covers[i] ? (
-          <div key={i} className="card-tile aspect-[63/88]">
-            <CardImage base={covers[i].image_url || null} alt={name} />
-          </div>
-        ) : (
-          <EmptyPocket key={i} />
-        )
-      )}
+      <div className="grid w-full grid-cols-2 gap-1.5">
+        {[0, 1, 2, 3].map((i) =>
+          covers[i] ? (
+            <div key={i} className="card-tile aspect-[63/88]">
+              <CardImage base={covers[i].image_url || null} alt={name} />
+            </div>
+          ) : (
+            <EmptyPocket key={i} />
+          )
+        )}
+      </div>
     </div>
   );
 }

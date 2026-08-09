@@ -41,9 +41,12 @@ export default async function SharedBinderPage({
 
   const { data: links } = await admin
     .from("binder_items")
-    .select("item_id")
+    .select("item_id, position")
     .eq("binder_id", binder.id);
   const memberIds = (links ?? []).map((l) => l.item_id);
+  const positionByItem = new Map(
+    (links ?? []).map((l) => [l.item_id, l.position])
+  );
 
   const { data: items } =
     memberIds.length > 0
@@ -56,7 +59,9 @@ export default async function SharedBinderPage({
           .order("created_at", { ascending: false })
       : { data: [] };
 
-  const signedItems = await signStorageImages((items ?? []) as CollectionItem[]);
+  const signedItems = (
+    await signStorageImages((items ?? []) as CollectionItem[])
+  ).map((i) => ({ ...i, position: positionByItem.get(i.id) ?? null }));
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8">
@@ -80,7 +85,12 @@ export default async function SharedBinderPage({
       {signedItems.length === 0 ? (
         <p className="text-sm text-muted">Ce classeur est vide.</p>
       ) : (
-        <CollectionClient items={signedItems} sources={[]} readOnly />
+        <CollectionClient
+          items={signedItems}
+          sources={[]}
+          readOnly
+          binderContext={{ id: binder.id, name: binder.name }}
+        />
       )}
     </main>
   );

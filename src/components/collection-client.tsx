@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   LayoutGrid,
@@ -18,6 +18,7 @@ import {
   addItemsToBinder,
   createBinderAndAdd,
   removeItemsFromBinder,
+  reorderBinderItems,
 } from "@/app/classeurs/actions";
 import { CardImage } from "@/components/card-image";
 import { Logo } from "@/components/logo";
@@ -47,6 +48,8 @@ export type CollectionItem = {
   sold_price: number | null;
   sold_at: string | null;
   photo_fallback?: string | null;
+  /** Ordre manuel dans un classeur */
+  position?: number | null;
 };
 
 /** minuscules sans accents, pour la recherche texte */
@@ -59,7 +62,7 @@ function normalize(s: string): string {
 
 export type SourceRef = { id: string; name: string };
 
-type SortKey = "name" | "paid" | "price" | "gain" | "date";
+type SortKey = "name" | "paid" | "price" | "gain" | "date" | "custom";
 
 function GainText({ value }: { value: number | null }) {
   if (value == null) return <span className="num text-faint">—</span>;
@@ -106,6 +109,7 @@ export function CollectionClient({
   binders,
   binderContext,
   initialSelect = false,
+  orderable = false,
 }: {
   items: CollectionItem[];
   sources: SourceRef[];
@@ -118,6 +122,8 @@ export function CollectionClient({
   /** Rendu dans un classeur : la sélection permet aussi d'en retirer */
   binderContext?: BinderRef;
   initialSelect?: boolean;
+  /** Autorise le glisser-déposer en tri « ordre du classeur » */
+  orderable?: boolean;
 }) {
   const router = useRouter();
   const [view, setView] = useState<"grid" | "table">("grid");
@@ -139,8 +145,15 @@ export function CollectionClient({
   const [fLanguage, setFLanguage] = useState("");
   const [fSource, setFSource] = useState(initialSource);
   const [fGraded, setFGraded] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("date");
+  const [sortKey, setSortKey] = useState<SortKey>(
+    binderContext ? "custom" : "date"
+  );
   const [sortAsc, setSortAsc] = useState(false);
+  /** Ordre local pendant/après un glisser-déposer, avant refresh serveur */
+  const [manualIds, setManualIds] = useState<string[] | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const dragFrom = useRef<number | null>(null);
+  const orderRef = useRef<string[] | null>(null);
 
   const sourceName = useMemo(
     () => new Map(sources.map((s) => [s.id, s.name])),
@@ -185,7 +198,8 @@ export function CollectionClient({
         (!fGraded || (fGraded === "oui" ? i.graded : !i.graded))
     );
 
-    const dir = sortAsc ? 1 : -1;
+    // L'ordre manuel du classeur est toujours croissant, la flèche ne s'applique pas
+    const dir = sortKey === "custom" ? 1 : sortAsc ? 1 : -1;
     const cmp: Record<SortKey, (a: CollectionItem, b: CollectionItem) => number> = {
       name: (a, b) => a.card_name.localeCompare(b.card_name, "fr"),
       paid: (a, b) => (a.purchase_price ?? -1) - (b.purchase_price ?? -1),
@@ -194,9 +208,17 @@ export function CollectionClient({
         (a.gain ?? Number.NEGATIVE_INFINITY) - (b.gain ?? Number.NEGATIVE_INFINITY),
       date: (a, b) =>
         (a.purchase_date ?? a.created_at).localeCompare(b.purchase_date ?? b.created_at),
+      custom: (a, b) => {
+        if (manualIds) return manualIds.indexOf(a.id) - manualIds.indexOf(b.id);
+        return (
+          (a.position ?? Number.MAX_SAFE_INTEGER) -
+            (b.position ?? Number.MAX_SAFE_INTEGER) ||
+          b.created_at.localeCompare(a.created_at)
+        );
+      },
     };
     return [...list].sort((a, b) => dir * cmp[sortKey](a, b));
-  }, [items, q, fSold, fSet, fCondition, fType, fLanguage, fSource, fGraded, sortKey, sortAsc]);
+  }, [items, q, fSold, fSet, fCondition, fType, fLanguage, fSource, fGraded, sortKey, sortAsc, manualIds]);
 
   const summary = useMemo(() => {
     let count = 0;
@@ -279,6 +301,47 @@ export function CollectionClient({
           }
     );
     exitSelect();
+    router.refresh();
+  }
+
+  const canReorder =
+    orderable &&
+    binderContext != null &&
+    !readOnly &&
+    sortKey === "custom" &&
+    view === "grid" &&
+    !selecting;
+
+  function startDrag(index: number, id: string, order: string[]) {
+    dragFrom.current = index;
+    orderRef.current = order;
+    setDraggingId(id);
+  }
+
+  function moveCard(target: number) {
+    const from = dragFrom.current;
+    if (from == null || from === target || !orderRef.current) return;
+    const next = [...orderRef.current];
+    const [moved] = next.splice(from, 1);
+    next.splice(target, 0, moved);
+    orderRef.current = next;
+    setManualIds(next);
+    dragFrom.current = target;
+  }
+
+  async function persistOrder() {
+    setDraggingId(null);
+    dragFrom.current = null;
+    if (!binderContext || !orderRef.current) return;
+    const { error } = await reorderBinderItems(
+      binderContext.id,
+      orderRef.current
+    );
+    setToast(
+      error
+        ? { message: "Ordre non enregistré", tone: "error" }
+        : { message: "Ordre enregistré" }
+    );
     router.refresh();
   }
 
@@ -469,9 +532,16 @@ export function CollectionClient({
 
         <select
           value={sortKey}
-          onChange={(e) => setSortKey(e.target.value as SortKey)}
+          onChange={(e) => {
+            setSortKey(e.target.value as SortKey);
+            setManualIds(null);
+            orderRef.current = null;
+          }}
           className={selectCls}
         >
+          {binderContext && (
+            <option value="custom">Tri : ordre du classeur</option>
+          )}
           <option value="date">Tri : date d&apos;achat</option>
           <option value="name">Tri : nom</option>
           <option value="paid">Tri : prix payé</option>
@@ -481,7 +551,8 @@ export function CollectionClient({
         <button
           type="button"
           onClick={() => setSortAsc((v) => !v)}
-          className="btn btn-ghost !px-2.5 !py-1.5"
+          disabled={sortKey === "custom"}
+          className="btn btn-ghost !px-2.5 !py-1.5 disabled:opacity-40"
           title={sortAsc ? "Croissant" : "Décroissant"}
         >
           {sortAsc ? <ArrowUp size={14} aria-hidden /> : <ArrowDown size={14} aria-hidden />}
@@ -492,7 +563,7 @@ export function CollectionClient({
         <p className="text-sm text-muted">Aucune carte ne correspond aux filtres.</p>
       ) : view === "grid" ? (
         <ul className="rise-in grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {filtered.map((item) => {
+          {filtered.map((item, idx) => {
             const sel = selecting && selected.has(item.id);
             const tileContent = (
               <>
@@ -556,7 +627,24 @@ export function CollectionClient({
               </>
             );
             return (
-              <li key={item.id}>
+              <li
+                key={item.id}
+                draggable={canReorder}
+                onDragStart={
+                  canReorder
+                    ? (e) => {
+                        startDrag(idx, item.id, filtered.map((i) => i.id));
+                        e.dataTransfer.effectAllowed = "move";
+                      }
+                    : undefined
+                }
+                onDragOver={canReorder ? (e) => e.preventDefault() : undefined}
+                onDragEnter={canReorder ? () => moveCard(idx) : undefined}
+                onDragEnd={canReorder ? persistOrder : undefined}
+                className={`transition-opacity ${
+                  draggingId === item.id ? "opacity-40" : ""
+                }`}
+              >
                 {selecting ? (
                   <button
                     type="button"
@@ -569,7 +657,14 @@ export function CollectionClient({
                 ) : readOnly ? (
                   <div className="group block">{tileContent}</div>
                 ) : (
-                  <Link href={`/carte/${item.id}`} className="group block">
+                  <Link
+                    href={`/carte/${item.id}`}
+                    draggable={false}
+                    title={canReorder ? "Glisser pour réordonner" : undefined}
+                    className={`group block ${
+                      canReorder ? "cursor-grab active:cursor-grabbing" : ""
+                    }`}
+                  >
                     {tileContent}
                   </Link>
                 )}
