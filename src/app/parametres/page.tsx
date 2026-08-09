@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app-shell";
 import { SetPasswordForm } from "@/components/set-password-form";
 import { RevalueForm } from "@/components/revalue-form";
+import { SharePanel } from "@/components/share-panel";
 import { signOutEverywhere } from "./actions";
 
 export const metadata = {
@@ -27,7 +28,7 @@ export default async function ParametresPage() {
 
   const { data: settings } = await supabase
     .from("user_settings")
-    .select("revalue_weeks")
+    .select("revalue_weeks, share_token")
     .eq("owner_id", user.id)
     .maybeSingle();
 
@@ -85,6 +86,19 @@ export default async function ParametresPage() {
               secours.
             </p>
             <SetPasswordForm />
+          </section>
+
+          {/* Partage public */}
+          <section className="panel p-5">
+            <h2 className="display mb-1 text-base font-semibold">
+              Partager ma collection
+            </h2>
+            <p className="mb-4 text-sm text-muted">
+              Un lien secret en lecture seule : toute ta collection (cartes,
+              états, prix et valeurs) visible sans compte. Ne le donne
+              qu&apos;à des personnes de confiance — révocable à tout moment.
+            </p>
+            <SharePanel initialToken={settings?.share_token ?? null} />
           </section>
 
           {/* Rappel de réévaluation */}

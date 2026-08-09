@@ -309,16 +309,19 @@ export type Database = {
         Row: {
           owner_id: string
           revalue_weeks: number | null
+          share_token: string | null
           updated_at: string | null
         }
         Insert: {
           owner_id?: string
           revalue_weeks?: number | null
+          share_token?: string | null
           updated_at?: string | null
         }
         Update: {
           owner_id?: string
           revalue_weeks?: number | null
+          share_token?: string | null
           updated_at?: string | null
         }
         Relationships: []

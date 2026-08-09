@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -11,6 +12,34 @@ export async function signOutEverywhere() {
 }
 
 export type PasswordState = { ok: boolean; message: string } | null;
+
+export type ShareState = { token: string | null } | null;
+
+// Active / regénère / coupe le lien public de la collection
+export async function updateShare(
+  _prev: ShareState,
+  formData: FormData
+): Promise<ShareState> {
+  const mode = String(formData.get("mode") ?? "");
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const share_token = mode === "disable" ? null : randomUUID();
+  const { error } = await supabase.from("user_settings").upsert(
+    {
+      owner_id: user.id,
+      share_token,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "owner_id" }
+  );
+  if (error) return null;
+
+  return { token: share_token };
+}
 
 export type RevalueState = { ok: boolean; message: string } | null;
 

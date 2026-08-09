@@ -84,11 +84,14 @@ export function CollectionClient({
   sources,
   initialSource = "",
   initialSet = "",
+  readOnly = false,
 }: {
   items: CollectionItem[];
   sources: SourceRef[];
   initialSource?: string;
   initialSet?: string;
+  /** Vitrine publique : pas de liens vers les fiches */
+  readOnly?: boolean;
 }) {
   const [view, setView] = useState<"grid" | "table">("grid");
   const [q, setQ] = useState("");
@@ -356,9 +359,9 @@ export function CollectionClient({
         <p className="text-sm text-muted">Aucune carte ne correspond aux filtres.</p>
       ) : view === "grid" ? (
         <ul className="rise-in grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {filtered.map((item) => (
-            <li key={item.id}>
-              <Link href={`/carte/${item.id}`} className="group block">
+          {filtered.map((item) => {
+            const tileContent = (
+              <>
                 <div className="card-tile aspect-[63/88]">
                   <CardImage
                     base={item.image_url || null}
@@ -400,9 +403,20 @@ export function CollectionClient({
                     </span>
                   </p>
                 </div>
-              </Link>
-            </li>
-          ))}
+              </>
+            );
+            return (
+              <li key={item.id}>
+                {readOnly ? (
+                  <div className="group block">{tileContent}</div>
+                ) : (
+                  <Link href={`/carte/${item.id}`} className="group block">
+                    {tileContent}
+                  </Link>
+                )}
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <div className="panel rise-in overflow-x-auto">
@@ -428,9 +442,16 @@ export function CollectionClient({
                   className="border-b border-edge/50 transition last:border-0 hover:bg-raised"
                 >
                   <td className="px-4 py-2.5">
-                    <Link href={`/carte/${item.id}`} className="font-medium hover:text-accent-strong">
-                      {item.card_name}
-                    </Link>
+                    {readOnly ? (
+                      <span className="font-medium">{item.card_name}</span>
+                    ) : (
+                      <Link
+                        href={`/carte/${item.id}`}
+                        className="font-medium hover:text-accent-strong"
+                      >
+                        {item.card_name}
+                      </Link>
+                    )}
                     {item.graded && (
                       <span className="ml-2 rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-ink">
                         {item.grade ?? "Gradée"}

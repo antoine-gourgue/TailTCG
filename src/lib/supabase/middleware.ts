@@ -1,8 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// /api/cron est protégé par CRON_SECRET dans la route, pas par la session
-const PUBLIC_PATHS = ["/login", "/auth", "/api/cron"];
+// /api/cron est protégé par CRON_SECRET dans la route ; /v est la vitrine
+// publique (jeton secret vérifié dans la page)
+const PUBLIC_PATHS = ["/login", "/auth", "/api/cron", "/v/"];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
