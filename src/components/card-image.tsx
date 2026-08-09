@@ -1,20 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ImageOff } from "lucide-react";
 
 // Image de carte TCGdex avec secours : si l'asset est en 404, on tente le
-// même chemin dans les autres langues, sinon placeholder.
+// même chemin dans TOUTES les autres langues, sinon placeholder.
 const LANG_CASCADE = ["fr", "en", "de", "es", "it", "ja"];
 
-function nextLangSrc(src: string): string | null {
-  const match = src.match(/assets\.tcgdex\.net\/([a-z-]+)\//);
-  if (!match) return null;
-  const idx = LANG_CASCADE.indexOf(match[1]);
-  if (idx === -1 || idx + 1 >= LANG_CASCADE.length) return null;
+/** Langue présente dans une URL d'asset TCGdex, ou null */
+function langOf(src: string): string | null {
+  return src.match(/assets\.tcgdex\.net\/([a-z-]+)\//)?.[1] ?? null;
+}
+
+/** Prochaine langue non encore tentée (parcourt toute la liste) */
+function nextLangSrc(src: string, tried: Set<string>): string | null {
+  const cur = langOf(src);
+  if (!cur) return null;
+  const next = LANG_CASCADE.find((l) => l !== cur && !tried.has(l));
+  if (!next) return null;
   return src.replace(
-    `assets.tcgdex.net/${match[1]}/`,
-    `assets.tcgdex.net/${LANG_CASCADE[idx + 1]}/`
+    `assets.tcgdex.net/${cur}/`,
+    `assets.tcgdex.net/${next}/`
   );
 }
 
@@ -43,6 +49,10 @@ export function CardImage({
       : `${base}/${quality === "low" ? "low.webp" : "high.png"}`
     : fallback;
   const [src, setSrc] = useState(initial);
+  // Langues déjà tentées pour cette carte (évite les boucles)
+  const tried = useRef<Set<string>>(
+    new Set(initial && !isDirect ? [langOf(initial)].filter(Boolean) as string[] : [])
+  );
 
   if (!src) {
     return (
@@ -65,7 +75,11 @@ export function CardImage({
           setSrc(null);
           return;
         }
-        const next = isDirect ? null : nextLangSrc(src);
+        const next = isDirect ? null : nextLangSrc(src, tried.current);
+        if (next) {
+          const l = langOf(next);
+          if (l) tried.current.add(l);
+        }
         setSrc(next ?? fallback);
       }}
     />
