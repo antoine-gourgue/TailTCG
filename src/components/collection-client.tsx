@@ -736,7 +736,7 @@ export function CollectionClient({
 
       {/* Barre d'action flottante du mode sélection */}
       {selecting && (
-        <div className="fixed bottom-5 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-2xl border border-edge bg-raised px-3 py-2 shadow-xl">
+        <div className="fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-[45] flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-edge bg-raised px-3 py-2 shadow-xl md:inset-x-auto md:bottom-5 md:left-1/2 md:max-w-[calc(100vw-2rem)] md:-translate-x-1/2">
           <span className="px-1 text-sm text-muted">
             <span className="num font-semibold text-foreground">
               {selected.size}
