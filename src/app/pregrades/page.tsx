@@ -43,7 +43,8 @@ export default async function PregradesPage() {
       set_name: string;
       local_id: string;
       image_url: string;
-    }[]
+    }[],
+    user.id
   );
   const itemById = new Map(signedItems.map((i) => [i.id, i]));
 

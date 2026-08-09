@@ -3,11 +3,16 @@ import { redirect } from "next/navigation";
 import { type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+// N'accepte qu'un chemin interne (évite les redirections ouvertes)
+function safeNext(raw: string | null): string {
+  return raw && /^\/(?!\/|\\)/.test(raw) ? raw : "/";
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/";
+  const next = safeNext(searchParams.get("next"));
 
   if (token_hash && type) {
     const supabase = await createClient();

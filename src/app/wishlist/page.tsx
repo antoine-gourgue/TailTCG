@@ -23,7 +23,7 @@ export default async function WishlistPage() {
     .select("id, tcgdex_id, card_name, set_name, local_id, image_url")
     .order("created_at", { ascending: false });
 
-  const wishes = await signStorageImages(rows ?? []);
+  const wishes = await signStorageImages(rows ?? [], user.id);
 
   return (
     <AppShell>

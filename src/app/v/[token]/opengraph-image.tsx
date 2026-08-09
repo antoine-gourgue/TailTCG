@@ -25,7 +25,7 @@ export default async function Image({
     const admin = createAdminClient();
     const { data: settings } = await admin
       .from("user_settings")
-      .select("owner_id, display_name")
+      .select("owner_id, display_name, share_show_values")
       .eq("share_token", token)
       .maybeSingle();
 
@@ -50,8 +50,10 @@ export default async function Image({
           hasValue = true;
         }
       }
+      // Le montant total n'apparaît dans l'aperçu que si le partage des
+      // valeurs est activé (audit — fuite financière dans l'aperçu du lien)
       subtitle = `${count} carte${count > 1 ? "s" : ""}${
-        hasValue ? ` · ${formatEur(value)}` : ""
+        settings.share_show_values && hasValue ? ` · ${formatEur(value)}` : ""
       }`;
       cardUrls = (items ?? [])
         .filter((i) => i.sold_at == null)

@@ -103,7 +103,8 @@ export default async function ClasseurPage({
   const signedItems = (
     await applyRectifiedImages(
       gradings,
-      await signStorageImages((items ?? []) as CollectionItem[])
+      await signStorageImages((items ?? []) as CollectionItem[], user.id),
+      user.id
     )
   ).map((i) => ({
     ...i,

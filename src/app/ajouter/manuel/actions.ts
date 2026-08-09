@@ -48,7 +48,8 @@ export async function createCustomCard(
     .from("card-photos")
     .upload(image_path, photo, { contentType: photo.type });
   if (upError) {
-    return { message: `Upload impossible : ${upError.message}` };
+    console.error("createCustomCard upload:", upError.message);
+    return { message: "Upload de l'image impossible, réessaie." };
   }
 
   const { data: created, error: dbError } = await supabase
@@ -58,8 +59,9 @@ export async function createCustomCard(
     .single();
 
   if (dbError || !created) {
+    console.error("createCustomCard insert:", dbError?.message);
     await admin.storage.from("card-photos").remove([image_path]);
-    return { message: `Création impossible : ${dbError?.message}` };
+    return { message: "Création impossible, réessaie." };
   }
 
   redirect(`/ajouter?card=custom:${created.id}`);

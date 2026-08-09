@@ -20,6 +20,8 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
+      // Session en cookie httpOnly (audit)
+      cookieOptions: { httpOnly: true, secure: true, sameSite: "lax" },
       cookies: {
         getAll() {
           return request.cookies.getAll();

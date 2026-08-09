@@ -17,21 +17,32 @@ export async function generateMetadata({
 }: {
   params: Promise<{ token: string; id: string }>;
 }) {
-  const { id } = await params;
+  const { token, id } = await params;
   let title = "Classeur partagé — TailTCG";
-  if (UUID_RE.test(id)) {
+  // Le nom n'est révélé que si le classeur appartient bien au jeton (audit)
+  if (UUID_RE.test(token) && UUID_RE.test(id)) {
     const admin = createAdminClient();
-    const { data: binder } = await admin
-      .from("binders")
-      .select("name")
-      .eq("id", id)
+    const { data: settings } = await admin
+      .from("user_settings")
+      .select("owner_id")
+      .eq("share_token", token)
       .maybeSingle();
-    if (binder?.name) title = `${binder.name} — TailTCG`;
+    if (settings) {
+      const { data: binder } = await admin
+        .from("binders")
+        .select("name, owner_id")
+        .eq("id", id)
+        .maybeSingle();
+      if (binder && binder.owner_id === settings.owner_id) {
+        title = `${binder.name} — TailTCG`;
+      }
+    }
   }
   return {
     title,
     description: "Un classeur partagé en lecture seule, propulsé par TailTCG.",
     twitter: { card: "summary_large_image" as const },
+    robots: { index: false, follow: false, nocache: true },
   };
 }
 
@@ -47,7 +58,7 @@ export default async function SharedBinderPage({
   const admin = createAdminClient();
   const { data: settings } = await admin
     .from("user_settings")
-    .select("owner_id")
+    .select("owner_id, share_show_values")
     .eq("share_token", token)
     .maybeSingle();
   if (!settings) notFound();
@@ -75,6 +86,9 @@ export default async function SharedBinderPage({
           .select(
             "id, tcgdex_id, card_name, set_name, set_id, local_id, image_url, card_type, language, condition, quantity, purchase_price, purchase_date, manual_price, source_id, graded, grade, created_at, current_price, gain, sold_price, sold_at"
           )
+          // Sécurité : ne renvoyer que les items du propriétaire de la
+          // vitrine, même si un item_id étranger s'était glissé dans le classeur
+          .eq("owner_id", settings.owner_id)
           .in("id", memberIds)
           .order("created_at", { ascending: false })
       : { data: [] };
@@ -85,12 +99,29 @@ export default async function SharedBinderPage({
     .eq("owner_id", settings.owner_id)
     .order("created_at", { ascending: false });
 
-  const signedItems = (
+  const showValues = settings.share_show_values;
+  const signedRaw = (
     await applyRectifiedImages(
       shareGradings,
-      await signStorageImages((items ?? []) as CollectionItem[])
+      await signStorageImages(
+        (items ?? []) as CollectionItem[],
+        settings.owner_id
+      ),
+      settings.owner_id
     )
   ).map((i) => ({ ...i, position: positionByItem.get(i.id) ?? null }));
+  const signedItems = showValues
+    ? signedRaw
+    : signedRaw.map((i) => ({
+        ...i,
+        purchase_price: null,
+        purchase_date: null,
+        manual_price: null,
+        current_price: null,
+        gain: null,
+        sold_price: null,
+        source_id: null,
+      }));
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8">
@@ -118,6 +149,7 @@ export default async function SharedBinderPage({
           items={signedItems}
           sources={[]}
           readOnly
+          hideValues={!showValues}
           binderContext={{ id: binder.id, name: binder.name }}
         />
       )}

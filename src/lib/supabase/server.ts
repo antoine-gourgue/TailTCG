@@ -9,6 +9,9 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
+      // Session en cookie httpOnly : inaccessible à document.cookie, donc
+      // au vol par un éventuel XSS (audit)
+      cookieOptions: { httpOnly: true, secure: true, sameSite: "lax" },
       cookies: {
         getAll() {
           return cookieStore.getAll();

@@ -110,6 +110,7 @@ export function CollectionClient({
   binderContext,
   initialSelect = false,
   orderable = false,
+  hideValues = false,
 }: {
   items: CollectionItem[];
   sources: SourceRef[];
@@ -124,6 +125,8 @@ export function CollectionClient({
   initialSelect?: boolean;
   /** Autorise le glisser-déposer en tri « ordre du classeur » */
   orderable?: boolean;
+  /** Vitrine sans les valeurs : masque prix, plus-values et sources */
+  hideValues?: boolean;
 }) {
   const router = useRouter();
   const [view, setView] = useState<"grid" | "table">("grid");
@@ -388,19 +391,27 @@ export function CollectionClient({
       <div className="panel rise-in mb-5 flex flex-col gap-4 px-5 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-10 sm:px-6">
         <div className="grid grid-cols-2 gap-4 sm:contents">
           <Stat label="Cartes" value={summary.count} />
-          <Stat label="Investi" value={formatEur(summary.invested)} />
-          <Stat label="Valeur estimée" value={formatEur(summary.value)} />
-          <Stat
-            label="Plus-value"
-            value={
-              summary.gain == null
-                ? "—"
-                : `${summary.gain > 0 ? "+" : ""}${formatEur(summary.gain)}`
-            }
-            tone={
-              summary.gain == null ? undefined : summary.gain >= 0 ? "up" : "down"
-            }
-          />
+          {!hideValues && (
+            <>
+              <Stat label="Investi" value={formatEur(summary.invested)} />
+              <Stat label="Valeur estimée" value={formatEur(summary.value)} />
+              <Stat
+                label="Plus-value"
+                value={
+                  summary.gain == null
+                    ? "—"
+                    : `${summary.gain > 0 ? "+" : ""}${formatEur(summary.gain)}`
+                }
+                tone={
+                  summary.gain == null
+                    ? undefined
+                    : summary.gain >= 0
+                      ? "up"
+                      : "down"
+                }
+              />
+            </>
+          )}
         </div>
         <div className="flex items-center gap-2 sm:ml-auto">
           {canSelect && (
@@ -615,14 +626,16 @@ export function CollectionClient({
                   <p className="mt-0.5 truncate text-xs text-muted">
                     {item.set_name} <span className="num text-faint">· {item.local_id}</span>
                   </p>
-                  <p className="mt-1 flex items-baseline gap-1.5 text-xs">
-                    <span className="num text-faint">{formatEur(item.purchase_price)}</span>
-                    <span className="text-faint">→</span>
-                    <span className="num font-medium">{formatEur(item.current_price)}</span>
-                    <span className="ml-auto">
-                      <GainText value={item.gain} />
-                    </span>
-                  </p>
+                  {!hideValues && (
+                    <p className="mt-1 flex items-baseline gap-1.5 text-xs">
+                      <span className="num text-faint">{formatEur(item.purchase_price)}</span>
+                      <span className="text-faint">→</span>
+                      <span className="num font-medium">{formatEur(item.current_price)}</span>
+                      <span className="ml-auto">
+                        <GainText value={item.gain} />
+                      </span>
+                    </p>
+                  )}
                 </div>
               </>
             );
@@ -683,10 +696,14 @@ export function CollectionClient({
                 <th className="label-xs px-4 py-3">État</th>
                 <th className="label-xs px-4 py-3">Type</th>
                 <th className="label-xs px-4 py-3">Qté</th>
-                <th className="label-xs px-4 py-3 text-right">Payé</th>
-                <th className="label-xs px-4 py-3 text-right">Estimé</th>
-                <th className="label-xs px-4 py-3 text-right">+/-</th>
-                <th className="label-xs px-4 py-3">Source</th>
+                {!hideValues && (
+                  <>
+                    <th className="label-xs px-4 py-3 text-right">Payé</th>
+                    <th className="label-xs px-4 py-3 text-right">Estimé</th>
+                    <th className="label-xs px-4 py-3 text-right">+/-</th>
+                    <th className="label-xs px-4 py-3">Source</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -717,16 +734,20 @@ export function CollectionClient({
                   <td className="num px-4 py-2.5">{item.condition}</td>
                   <td className="px-4 py-2.5 text-muted">{item.card_type ?? "—"}</td>
                   <td className="num px-4 py-2.5">{item.quantity}</td>
-                  <td className="num px-4 py-2.5 text-right">{formatEur(item.purchase_price)}</td>
-                  <td className="num px-4 py-2.5 text-right font-medium">
-                    {formatEur(item.current_price)}
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
-                    <GainText value={item.gain} />
-                  </td>
-                  <td className="px-4 py-2.5 text-muted">
-                    {item.source_id ? sourceName.get(item.source_id) ?? "—" : "—"}
-                  </td>
+                  {!hideValues && (
+                    <>
+                      <td className="num px-4 py-2.5 text-right">{formatEur(item.purchase_price)}</td>
+                      <td className="num px-4 py-2.5 text-right font-medium">
+                        {formatEur(item.current_price)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <GainText value={item.gain} />
+                      </td>
+                      <td className="px-4 py-2.5 text-muted">
+                        {item.source_id ? sourceName.get(item.source_id) ?? "—" : "—"}
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>

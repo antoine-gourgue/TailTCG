@@ -40,6 +40,8 @@ export async function generateMetadata({
     title,
     description: "Vitrine en lecture seule, propulsée par TailTCG.",
     twitter: { card: "summary_large_image" as const },
+    // Lien secret : jamais indexé (audit)
+    robots: { index: false, follow: false, nocache: true },
   };
 }
 
@@ -55,7 +57,7 @@ export default async function SharedCollectionPage({
   const admin = createAdminClient();
   const { data: settings } = await admin
     .from("user_settings")
-    .select("owner_id, display_name")
+    .select("owner_id, display_name, share_show_values")
     .eq("share_token", token)
     .maybeSingle();
 
@@ -121,10 +123,25 @@ export default async function SharedCollectionPage({
     .eq("owner_id", settings.owner_id)
     .order("created_at", { ascending: false });
 
-  const signedItems = await applyRectifiedImages(
+  const showValues = settings.share_show_values;
+  const signedRaw = await applyRectifiedImages(
     shareGradings,
-    await signStorageImages((items ?? []) as CollectionItem[])
+    await signStorageImages((items ?? []) as CollectionItem[], settings.owner_id),
+    settings.owner_id
   );
+  // Option de partage : masquer la dimension financière (défaut)
+  const signedItems: CollectionItem[] = showValues
+    ? signedRaw
+    : signedRaw.map((i) => ({
+        ...i,
+        purchase_price: null,
+        purchase_date: null,
+        manual_price: null,
+        current_price: null,
+        gain: null,
+        sold_price: null,
+        source_id: null,
+      }));
 
   // Tuiles de classeurs : mêmes couvertures stylées que côté propriétaire
   const itemById = new Map(signedItems.map((i) => [i.id, i]));
@@ -245,8 +262,9 @@ export default async function SharedCollectionPage({
 
       <CollectionClient
         items={signedItems}
-        sources={(sources ?? []) as SourceRef[]}
+        sources={showValues ? ((sources ?? []) as SourceRef[]) : []}
         readOnly
+        hideValues={!showValues}
       />
     </main>
   );

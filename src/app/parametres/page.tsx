@@ -33,7 +33,7 @@ export default async function ParametresPage() {
   const [{ data: settings }, { data: trashed }] = await Promise.all([
     supabase
       .from("user_settings")
-      .select("revalue_weeks, share_token, display_name")
+      .select("revalue_weeks, share_token, display_name, share_show_values")
       .eq("owner_id", user.id)
       .maybeSingle(),
     supabase
@@ -116,7 +116,10 @@ export default async function ParametresPage() {
               états, prix et valeurs) visible sans compte. Ne le donne
               qu&apos;à des personnes de confiance — révocable à tout moment.
             </p>
-            <SharePanel initialToken={settings?.share_token ?? null} />
+            <SharePanel
+              initialToken={settings?.share_token ?? null}
+              initialShowValues={settings?.share_show_values ?? false}
+            />
           </section>
 
           {/* Rappel de réévaluation */}

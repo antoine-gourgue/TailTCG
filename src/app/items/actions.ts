@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -88,6 +89,18 @@ export async function createItem(
   }
 
   const supabase = await createClient();
+
+  // Un visuel « storage: » ne peut référencer qu'une carte perso de
+  // l'appelant (audit — sinon signature d'un fichier d'un autre compte)
+  if (image_url.startsWith("storage:")) {
+    const { data: own } = await supabase
+      .from("custom_cards")
+      .select("id")
+      .eq("image_path", image_url.slice("storage:".length))
+      .maybeSingle();
+    if (!own) return { message: "Visuel invalide." };
+  }
+
   const { data: created, error: dbError } = await supabase
     .from("items")
     .insert({
@@ -103,7 +116,8 @@ export async function createItem(
     .single();
 
   if (dbError || !created) {
-    return { message: `Enregistrement impossible : ${dbError?.message}` };
+    console.error("createItem:", dbError?.message);
+    return { message: "Enregistrement impossible, réessaie." };
   }
 
   if (fields.manual_price != null) {
@@ -161,7 +175,10 @@ export async function updateItem(
     .update({ ...fields, ...metaFields })
     .eq("id", id);
 
-  if (dbError) return { message: `Mise à jour impossible : ${dbError.message}` };
+  if (dbError) {
+    console.error("updateItem:", dbError.message);
+    return { message: "Mise à jour impossible, réessaie." };
+  }
 
   if (fields.manual_price != null) {
     await recordValue(supabase, id, fields.manual_price);
@@ -193,7 +210,10 @@ export async function updateItemValue(
     .from("items")
     .update({ manual_price: value })
     .eq("id", id);
-  if (error) return { ok: false, message: `Impossible : ${error.message}` };
+  if (error) {
+    console.error("updateItemValue:", error.message);
+    return { ok: false, message: "Impossible, réessaie." };
+  }
 
   await recordValue(supabase, id, value);
 
@@ -225,7 +245,10 @@ export async function markItemSold(
     .from("items")
     .update({ sold_price, sold_at })
     .eq("id", id);
-  if (error) return { ok: false, message: `Impossible : ${error.message}` };
+  if (error) {
+    console.error("markItemSold:", error.message);
+    return { ok: false, message: "Impossible, réessaie." };
+  }
 
   revalidatePath("/");
   revalidatePath(`/carte/${id}`);
@@ -329,15 +352,27 @@ export async function saveGrading(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Non connecté" };
 
+  // L'exemplaire doit appartenir à l'appelant avant tout upload (audit)
+  const { data: owned } = await supabase
+    .from("items")
+    .select("id")
+    .eq("id", itemId)
+    .maybeSingle();
+  if (!owned) return { error: "Exemplaire introuvable" };
+
   const num = (k: string) => Number.parseInt(str(formData, k), 10);
 
-  // Visuel redressé : bucket privé, comme les photos perso
+  // Visuel redressé : bucket privé, comme les photos perso.
+  // Chemin en UUID aléatoire (pas d'itemId brut), taille et type validés.
   let rectified_path: string | null = null;
   const file = formData.get("rectified");
   if (file instanceof File && file.size > 0) {
+    if (file.size > 5_000_000 || !file.type.startsWith("image/")) {
+      return { error: "Visuel invalide (image de 5 Mo max)." };
+    }
     const { createAdminClient } = await import("@/lib/supabase/admin");
     const admin = createAdminClient();
-    const path = `${user.id}/gradings/${itemId}-${Date.now()}.jpg`;
+    const path = `${user.id}/gradings/${randomUUID()}.jpg`;
     const { error: upError } = await admin.storage
       .from("card-photos")
       .upload(path, file, { contentType: "image/jpeg" });

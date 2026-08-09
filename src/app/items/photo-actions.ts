@@ -64,7 +64,8 @@ export async function uploadItemPhotos(
       .from(BUCKET)
       .upload(path, file, { contentType: file.type });
     if (uploadError) {
-      return { ok: false, message: `Upload impossible : ${uploadError.message}` };
+      console.error("uploadItemPhotos upload:", uploadError.message);
+      return { ok: false, message: "Upload impossible, réessaie." };
     }
 
     const { error: dbError } = await supabase.from("item_photos").insert({
@@ -74,8 +75,9 @@ export async function uploadItemPhotos(
       position: (count ?? 0) + index,
     });
     if (dbError) {
+      console.error("uploadItemPhotos insert:", dbError.message);
       await admin.storage.from(BUCKET).remove([path]);
-      return { ok: false, message: `Enregistrement impossible : ${dbError.message}` };
+      return { ok: false, message: "Enregistrement impossible, réessaie." };
     }
     uploaded++;
   }

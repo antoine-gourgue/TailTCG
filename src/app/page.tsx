@@ -83,7 +83,7 @@ export default async function Home({
   // Rappel de réévaluation : cartes dont la valeur date de plus de N semaines
   const { data: settings } = await supabase
     .from("user_settings")
-    .select("revalue_weeks, share_token")
+    .select("revalue_weeks, share_token, share_show_values")
     .eq("owner_id", user.id)
     .maybeSingle();
 
@@ -114,7 +114,10 @@ export default async function Home({
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="display text-3xl font-bold tracking-tight">Collection</h1>
           <div className="flex flex-wrap gap-2">
-            <ShareButton initialToken={settings?.share_token ?? null} />
+            <ShareButton
+              initialToken={settings?.share_token ?? null}
+              initialShowValues={settings?.share_show_values ?? false}
+            />
             <Link href="/recherche" className="btn btn-primary">
               + Ajouter une carte
             </Link>
@@ -147,7 +150,8 @@ export default async function Home({
           items={(
             await applyRectifiedImages(
               gradings,
-              await signStorageImages((items ?? []) as CollectionItem[])
+              await signStorageImages((items ?? []) as CollectionItem[], user.id),
+              user.id
             )
           ).map((i) => ({ ...i, photo_fallback: photoFallbacks.get(i.id) ?? null }))}
           sources={(sources ?? []) as SourceRef[]}

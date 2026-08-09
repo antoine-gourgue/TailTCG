@@ -97,9 +97,10 @@ export default async function CartePage({
     item.tcgdex_id && !isCustom ? await getCard(item.tcgdex_id) : null;
 
   // Visuel des cartes hors catalogue : photo signée depuis le bucket privé
-  const [{ image_url: displayImage }] = await signStorageImages([
-    { image_url: item.image_url },
-  ]);
+  const [{ image_url: displayImage }] = await signStorageImages(
+    [{ image_url: item.image_url }],
+    user.id
+  );
 
   const [{ data: valueHistory }, { data: lastGrading }] = await Promise.all([
     supabase

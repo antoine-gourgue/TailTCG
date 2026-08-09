@@ -41,6 +41,29 @@ export async function updateShare(
   return { token: share_token };
 }
 
+// Active / désactive l'affichage des valeurs financières dans la vitrine
+export async function setShareShowValues(show: boolean) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Non connecté" };
+
+  const { error } = await supabase.from("user_settings").upsert(
+    {
+      owner_id: user.id,
+      share_show_values: show,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "owner_id" }
+  );
+  if (error) {
+    console.error("setShareShowValues:", error.message);
+    return { error: "Impossible, réessaie." };
+  }
+  return { error: null };
+}
+
 export type NameState = { ok: boolean; message: string; name?: string } | null;
 
 // Pseudo public — obligatoire : la coquille bloque tant qu'il est vide
@@ -67,7 +90,10 @@ export async function setDisplayName(
     },
     { onConflict: "owner_id" }
   );
-  if (error) return { ok: false, message: `Impossible : ${error.message}` };
+  if (error) {
+    console.error("setDisplayName:", error.message);
+    return { ok: false, message: "Impossible, réessaie." };
+  }
 
   return { ok: true, message: "Pseudo enregistré.", name };
 }
@@ -99,7 +125,10 @@ export async function setRevalueWeeks(
     },
     { onConflict: "owner_id" }
   );
-  if (error) return { ok: false, message: `Impossible : ${error.message}` };
+  if (error) {
+    console.error("setRevalueWeeks:", error.message);
+    return { ok: false, message: "Impossible, réessaie." };
+  }
 
   return {
     ok: true,

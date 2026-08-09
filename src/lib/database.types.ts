@@ -452,6 +452,7 @@ export type Database = {
           display_name: string | null
           owner_id: string
           revalue_weeks: number | null
+          share_show_values: boolean
           share_token: string | null
           updated_at: string | null
         }
@@ -459,6 +460,7 @@ export type Database = {
           display_name?: string | null
           owner_id?: string
           revalue_weeks?: number | null
+          share_show_values?: boolean
           share_token?: string | null
           updated_at?: string | null
         }
@@ -466,6 +468,7 @@ export type Database = {
           display_name?: string | null
           owner_id?: string
           revalue_weeks?: number | null
+          share_show_values?: boolean
           share_token?: string | null
           updated_at?: string | null
         }

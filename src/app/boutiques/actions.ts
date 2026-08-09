@@ -43,7 +43,10 @@ export async function createSourceForm(
     lng: coords?.lng ?? null,
   });
 
-  if (error) return { ok: false, message: `Création impossible : ${error.message}` };
+  if (error) {
+    console.error("createSource:", error.message);
+    return { ok: false, message: "Création impossible, réessaie." };
+  }
 
   revalidatePath("/boutiques");
   const geoNote =
@@ -91,7 +94,10 @@ export async function updateSourceForm(
     })
     .eq("id", id);
 
-  if (error) return { ok: false, message: `Mise à jour impossible : ${error.message}` };
+  if (error) {
+    console.error("updateSource:", error.message);
+    return { ok: false, message: "Mise à jour impossible, réessaie." };
+  }
 
   revalidatePath("/boutiques");
   return { ok: true, message: "Modifications enregistrées." };

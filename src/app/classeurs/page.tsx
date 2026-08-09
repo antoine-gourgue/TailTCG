@@ -40,9 +40,10 @@ export default async function ClasseursPage() {
     .order("created_at", { ascending: false });
 
   const signedItems = await signStorageImages(
-    (items ?? []) as { id: string; image_url: string; quantity: number; current_price: number | null }[]
+    (items ?? []) as { id: string; image_url: string; quantity: number; current_price: number | null }[],
+    user.id
   );
-  const rectifiedItems = await applyRectifiedImages(gradings, signedItems);
+  const rectifiedItems = await applyRectifiedImages(gradings, signedItems, user.id);
   const itemById = new Map(rectifiedItems.map((i) => [i.id, i]));
 
   const enriched = (binders ?? []).map((b) => {

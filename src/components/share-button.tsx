@@ -5,7 +5,13 @@ import { Share2, X } from "lucide-react";
 import { SharePanel } from "@/components/share-panel";
 
 // Bouton Partager de la page Collection : ouvre le panneau de partage
-export function ShareButton({ initialToken }: { initialToken: string | null }) {
+export function ShareButton({
+  initialToken,
+  initialShowValues = false,
+}: {
+  initialToken: string | null;
+  initialShowValues?: boolean;
+}) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -51,7 +57,10 @@ export function ShareButton({ initialToken }: { initialToken: string | null }) {
               Un lien secret en lecture seule — toute ta collection visible
               sans compte. Révocable à tout moment.
             </p>
-            <SharePanel initialToken={initialToken} />
+            <SharePanel
+              initialToken={initialToken}
+              initialShowValues={initialShowValues}
+            />
           </div>
         </div>
       )}
