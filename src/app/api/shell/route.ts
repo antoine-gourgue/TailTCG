@@ -33,10 +33,13 @@ export async function GET() {
     }
   }
 
+  const { isAdminEmail } = await import("@/lib/admin");
+
   return NextResponse.json({
     email: user.email ?? "",
     count,
     value: hasValue ? value : null,
     displayName: settings?.display_name ?? null,
+    isAdmin: isAdminEmail(user.email),
   });
 }

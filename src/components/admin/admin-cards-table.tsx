@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Trash2, Undo2, X, SearchIcon, Eye } from "lucide-react";
 import { formatEur } from "@/lib/domain";
@@ -113,9 +113,8 @@ export function AdminCardsTable({
                     ? (i.manual_price - i.purchase_price) * i.quantity
                     : null;
                 return (
-                  <>
+                  <Fragment key={i.id}>
                     <tr
-                      key={i.id}
                       className="cursor-pointer border-t border-edge/50 transition hover:bg-raised first:border-t-0"
                       onClick={() => setOpenId(open ? null : i.id)}
                     >
@@ -158,7 +157,7 @@ export function AdminCardsTable({
                       </td>
                     </tr>
                     {open && (
-                      <tr key={`${i.id}-d`} className="border-t border-edge/30 bg-raised/40">
+                      <tr className="border-t border-edge/30 bg-raised/40">
                         <td colSpan={3} className="px-4 py-3">
                           <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs sm:grid-cols-4">
                             <div><dt className="label-xs">État</dt><dd className="num">{i.condition}</dd></div>
@@ -225,7 +224,7 @@ export function AdminCardsTable({
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })
             )}

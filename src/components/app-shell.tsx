@@ -18,6 +18,7 @@ import {
   Plus,
   History,
   Award,
+  ShieldCheck,
 } from "lucide-react";
 import { signOut } from "@/app/actions";
 import { formatEur } from "@/lib/domain";
@@ -131,6 +132,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const rail = sidebar === "rail";
   const initial = (shell?.email?.[0] ?? "?").toUpperCase();
+  // Onglet Admin ajouté en fin de nav pour les administrateurs
+  const nav = shell?.isAdmin
+    ? [...NAV, { href: "/admin", label: "Admin", Icon: ShieldCheck }]
+    : NAV;
 
   return (
     <>
@@ -175,7 +180,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex flex-1 flex-col gap-1 px-3 pt-1">
-          {NAV.map((item) => {
+          {nav.map((item) => {
             const active = isActive(item.href, pathname);
             return (
               <Link

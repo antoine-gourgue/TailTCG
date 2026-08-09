@@ -5,6 +5,7 @@ export type ShellData = {
   count: number;
   value: number | null;
   displayName: string | null;
+  isAdmin: boolean;
 };
 
 let cache: ShellData | null = null;
