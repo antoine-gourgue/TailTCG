@@ -279,15 +279,42 @@ export async function deleteValuePoint(formData: FormData): Promise<void> {
   revalidatePath(`/carte/${point.item_id}`);
 }
 
+// Suppression douce : l'exemplaire part à la corbeille (Paramètres),
+// restaurable pendant 30 jours avant purge automatique par le cron
 export async function deleteItem(formData: FormData): Promise<void> {
   const id = str(formData, "item_id");
   if (!id) return;
 
   const supabase = await createClient();
-  await supabase.from("items").delete().eq("id", id);
+  await supabase
+    .from("items")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
 
   revalidatePath("/");
-  redirect("/");
+  redirect(`/?deleted=${id}`);
+}
+
+export async function restoreItem(formData: FormData): Promise<void> {
+  const id = str(formData, "item_id");
+  if (!id) return;
+
+  const supabase = await createClient();
+  await supabase.from("items").update({ deleted_at: null }).eq("id", id);
+
+  revalidatePath("/");
+  revalidatePath("/parametres");
+}
+
+/** Corbeille : suppression définitive (photos et historique compris) */
+export async function purgeItem(formData: FormData): Promise<void> {
+  const id = str(formData, "item_id");
+  if (!id) return;
+
+  const supabase = await createClient();
+  await supabase.from("items").delete().eq("id", id).not("deleted_at", "is", null);
+
+  revalidatePath("/parametres");
 }
 
 export type SourceOption = {

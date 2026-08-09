@@ -20,6 +20,16 @@ export async function GET(request: NextRequest) {
   }
 
   const admin = createAdminClient();
+
+  // Purge de la corbeille : suppression définitive après 30 jours
+  await admin
+    .from("items")
+    .delete()
+    .lt(
+      "deleted_at",
+      new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
+    );
+
   const { data: rows, error } = await admin.from("items").select("tcgdex_id");
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

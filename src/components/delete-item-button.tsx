@@ -10,7 +10,7 @@ export function DeleteItemButton({ itemId }: { itemId: string }) {
       action={deleteItem}
       fields={{ item_id: itemId }}
       title="Supprimer cet exemplaire ?"
-      message="La carte, ses photos et son historique disparaîtront de ta collection, sans retour possible."
+      message="Il part à la corbeille (Paramètres) : restaurable pendant 30 jours, puis supprimé définitivement avec ses photos et son historique."
       trigger={
         <>
           <Trash2 size={15} aria-hidden />

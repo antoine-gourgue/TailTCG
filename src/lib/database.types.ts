@@ -239,6 +239,7 @@ export type Database = {
           cardmarket_url: string | null
           condition: string
           created_at: string | null
+          deleted_at: string | null
           grade: string | null
           graded: boolean | null
           id: string
@@ -264,6 +265,7 @@ export type Database = {
           cardmarket_url?: string | null
           condition: string
           created_at?: string | null
+          deleted_at?: string | null
           grade?: string | null
           graded?: boolean | null
           id?: string
@@ -289,6 +291,7 @@ export type Database = {
           cardmarket_url?: string | null
           condition?: string
           created_at?: string | null
+          deleted_at?: string | null
           grade?: string | null
           graded?: boolean | null
           id?: string
@@ -454,6 +457,7 @@ export type Database = {
           condition: string | null
           created_at: string | null
           current_price: number | null
+          deleted_at: string | null
           gain: number | null
           grade: string | null
           graded: boolean | null

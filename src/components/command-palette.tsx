@@ -10,6 +10,7 @@ import {
   MapPin,
   BarChart3,
   Settings,
+  History,
   RectangleVertical,
   CornerDownLeft,
 } from "lucide-react";
@@ -29,6 +30,7 @@ const PAGES = [
   { href: "/wishlist", label: "Recherchées", Icon: Star },
   { href: "/boutiques", label: "Boutiques", Icon: MapPin },
   { href: "/stats", label: "Stats", Icon: BarChart3 },
+  { href: "/journal", label: "Journal", Icon: History },
   { href: "/parametres", label: "Paramètres", Icon: Settings },
 ];
 

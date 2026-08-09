@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { BellRing } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -7,6 +6,8 @@ import { daysAgoISO } from "@/lib/domain";
 import { signStorageImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
 import { ShareButton } from "@/components/share-button";
+import { UndoDeleteToast } from "@/components/undo-delete-toast";
+import { Landing } from "@/components/landing";
 import {
   CollectionClient,
   type CollectionItem,
@@ -16,12 +17,18 @@ import {
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string; set?: string; select?: string }>;
+  searchParams: Promise<{
+    source?: string;
+    set?: string;
+    select?: string;
+    deleted?: string;
+  }>;
 }) {
   const {
     source: initialSource,
     set: initialSet,
     select,
+    deleted,
   } = await searchParams;
   const supabase = await createClient();
   const {
@@ -29,7 +36,7 @@ export default async function Home({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    return <Landing />;
   }
 
   const [{ data: items }, { data: sources }, { data: binders }] =
@@ -142,6 +149,7 @@ export default async function Home({
           binders={binders ?? []}
           initialSelect={select != null}
         />
+        {deleted && <UndoDeleteToast itemId={deleted} />}
       </main>
       </AppShell>
     </>

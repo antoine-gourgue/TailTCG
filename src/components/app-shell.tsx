@@ -16,6 +16,7 @@ import {
   LogOut,
   ChevronLeft,
   Plus,
+  History,
 } from "lucide-react";
 import { signOut } from "@/app/actions";
 import { formatEur } from "@/lib/domain";
@@ -51,6 +52,7 @@ const NAV = [
   { href: "/wishlist", label: "Recherchées", Icon: Star },
   { href: "/boutiques", label: "Boutiques", Icon: MapPin },
   { href: "/stats", label: "Stats", Icon: BarChart3 },
+  { href: "/journal", label: "Journal", Icon: History },
   { href: "/parametres", label: "Paramètres", Icon: Settings },
 ];
 

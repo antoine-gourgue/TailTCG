@@ -7,7 +7,10 @@ import {
   SquarePlus,
   EllipsisVertical,
   Smartphone,
+  Trash2,
 } from "lucide-react";
+import { restoreItem, purgeItem } from "@/app/items/actions";
+import { ConfirmAction } from "@/components/confirm-action";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app-shell";
 import { SetPasswordForm } from "@/components/set-password-form";
@@ -27,11 +30,18 @@ export default async function ParametresPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: settings } = await supabase
-    .from("user_settings")
-    .select("revalue_weeks, share_token, display_name")
-    .eq("owner_id", user.id)
-    .maybeSingle();
+  const [{ data: settings }, { data: trashed }] = await Promise.all([
+    supabase
+      .from("user_settings")
+      .select("revalue_weeks, share_token, display_name")
+      .eq("owner_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("items")
+      .select("id, card_name, set_name, local_id, deleted_at")
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false }),
+  ]);
 
   const memberSince = user.created_at
     ? new Date(user.created_at).toLocaleDateString("fr-FR", {
@@ -121,6 +131,59 @@ export default async function ParametresPage() {
               la carte.
             </p>
             <RevalueForm current={settings?.revalue_weeks ?? null} />
+          </section>
+
+          {/* Corbeille */}
+          <section className="panel p-5">
+            <h2 className="display mb-1 flex items-center gap-2 text-base font-semibold">
+              <Trash2 size={16} aria-hidden />
+              Corbeille
+            </h2>
+            <p className="mb-4 text-sm text-muted">
+              Les exemplaires supprimés restent restaurables pendant 30 jours,
+              puis sont définitivement effacés.
+            </p>
+            {(trashed ?? []).length === 0 ? (
+              <p className="text-sm text-faint">La corbeille est vide.</p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {(trashed ?? []).map((t) => (
+                  <li
+                    key={t.id}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-edge px-3.5 py-2.5 text-sm"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="font-medium">{t.card_name}</span>{" "}
+                      <span className="text-muted">
+                        {t.set_name}{" "}
+                        <span className="num text-faint">· {t.local_id}</span>
+                      </span>
+                    </span>
+                    <span className="text-xs text-faint">
+                      supprimée le{" "}
+                      {t.deleted_at
+                        ? new Date(t.deleted_at).toLocaleDateString("fr-FR")
+                        : "—"}
+                    </span>
+                    <form action={restoreItem}>
+                      <input type="hidden" name="item_id" value={t.id} />
+                      <button type="submit" className="btn btn-ghost !py-1.5 text-[13px]">
+                        Restaurer
+                      </button>
+                    </form>
+                    <ConfirmAction
+                      action={purgeItem}
+                      fields={{ item_id: t.id }}
+                      title="Supprimer définitivement ?"
+                      message="Cette fois c'est sans retour : la carte, ses photos et son historique seront effacés."
+                      trigger={<Trash2 size={14} aria-hidden />}
+                      triggerClassName="btn btn-ghost !px-2.5 !py-1.5 !text-loss"
+                      triggerAriaLabel="Supprimer définitivement"
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           {/* Installer l'app */}

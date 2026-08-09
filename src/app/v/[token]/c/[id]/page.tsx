@@ -8,12 +8,32 @@ import {
   type CollectionItem,
 } from "@/components/collection-client";
 
-export const metadata = {
-  title: "Classeur partagé — TailTCG",
-};
-
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Titre dynamique : le nom du classeur apparaît dans l'aperçu du lien
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ token: string; id: string }>;
+}) {
+  const { id } = await params;
+  let title = "Classeur partagé — TailTCG";
+  if (UUID_RE.test(id)) {
+    const admin = createAdminClient();
+    const { data: binder } = await admin
+      .from("binders")
+      .select("name")
+      .eq("id", id)
+      .maybeSingle();
+    if (binder?.name) title = `${binder.name} — TailTCG`;
+  }
+  return {
+    title,
+    description: "Un classeur partagé en lecture seule, propulsé par TailTCG.",
+    twitter: { card: "summary_large_image" as const },
+  };
+}
 
 // Un classeur de la vitrine publique, en lecture seule
 export default async function SharedBinderPage({

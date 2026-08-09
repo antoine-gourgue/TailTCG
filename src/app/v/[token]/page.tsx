@@ -7,18 +7,41 @@ import { formatEur } from "@/lib/domain";
 import { binderColorHex } from "@/lib/binder-colors";
 import { Logo } from "@/components/logo";
 import { BinderCover } from "@/components/binder-cover";
+import { CardImage } from "@/components/card-image";
 import {
   CollectionClient,
   type CollectionItem,
   type SourceRef,
 } from "@/components/collection-client";
 
-export const metadata = {
-  title: "Collection partagée — TailTCG",
-};
-
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Titre dynamique : le pseudo apparaît dans l'aperçu du lien partagé
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}) {
+  const { token } = await params;
+  let title = "Collection partagée — TailTCG";
+  if (UUID_RE.test(token)) {
+    const admin = createAdminClient();
+    const { data: settings } = await admin
+      .from("user_settings")
+      .select("display_name")
+      .eq("share_token", token)
+      .maybeSingle();
+    if (settings?.display_name) {
+      title = `La collection de ${settings.display_name} — TailTCG`;
+    }
+  }
+  return {
+    title,
+    description: "Vitrine en lecture seule, propulsée par TailTCG.",
+    twitter: { card: "summary_large_image" as const },
+  };
+}
 
 // Vitrine publique en lecture seule, accessible par jeton secret
 export default async function SharedCollectionPage({
@@ -151,6 +174,29 @@ export default async function SharedCollectionPage({
           </Link>
         )}
       </div>
+
+      {signedItems.filter((i) => i.sold_at == null).length > 0 && (
+        <section className="mb-8">
+          <h2 className="display mb-3 text-lg font-semibold">
+            Dernières acquisitions
+          </h2>
+          <div className="scrollbar-none flex gap-3 overflow-x-auto pb-1">
+            {signedItems
+              .filter((i) => i.sold_at == null)
+              .slice(0, 8)
+              .map((i) => (
+                <div key={i.id} className="w-24 shrink-0 sm:w-28">
+                  <div className="card-tile aspect-[63/88]">
+                    <CardImage base={i.image_url || null} alt={i.card_name} />
+                  </div>
+                  <p className="mt-1.5 truncate text-xs text-muted">
+                    {i.card_name}
+                  </p>
+                </div>
+              ))}
+          </div>
+        </section>
+      )}
 
       {binderTiles.length > 0 && (
         <section className="mb-8">
