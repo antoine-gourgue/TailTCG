@@ -14,8 +14,31 @@ const mono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TailTCG",
-  description: "Ta collection de cartes Pokémon, organisée et valorisée.",
+  metadataBase: new URL("https://tailtcg.vercel.app"),
+  title: {
+    default: "TailTCG — Ta collection Pokémon, enfin à sa hauteur",
+    template: "%s",
+  },
+  description:
+    "Suis tes cartes Pokémon, leur état et leur valeur. Pré-grade-les toi-même sur tes photos (centrage mesuré au barème PSA), range-les en classeurs stylés et partage ta vitrine d'un lien. Gratuit, sans pub.",
+  keywords: [
+    "collection cartes Pokémon",
+    "classeur Pokémon",
+    "valeur cartes Pokémon",
+    "pré-gradation PSA",
+    "gestion collection TCG",
+  ],
+  openGraph: {
+    type: "website",
+    locale: "fr_FR",
+    siteName: "TailTCG",
+    title: "TailTCG — Ta collection Pokémon, enfin à sa hauteur",
+    description:
+      "Suivi de collection, valorisation, pré-gradation sur tes photos, classeurs stylés et vitrine partageable. Gratuit, fait par un collectionneur.",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
   appleWebApp: {
     capable: true,
     title: "TailTCG",
