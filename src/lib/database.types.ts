@@ -90,6 +90,7 @@ export type Database = {
           id: string
           name: string
           owner_id: string
+          style: string | null
         }
         Insert: {
           color?: string | null
@@ -98,6 +99,7 @@ export type Database = {
           id?: string
           name: string
           owner_id?: string
+          style?: string | null
         }
         Update: {
           color?: string | null
@@ -106,6 +108,7 @@ export type Database = {
           id?: string
           name?: string
           owner_id?: string
+          style?: string | null
         }
         Relationships: []
       }

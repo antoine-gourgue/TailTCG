@@ -2,8 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Palette, X, Ban } from "lucide-react";
+import {
+  Palette,
+  X,
+  Ban,
+  NotebookTabs,
+  LayoutGrid,
+  Sparkles,
+  Layers,
+  Tag,
+} from "lucide-react";
 import { BINDER_COLORS } from "@/lib/binder-colors";
+import { BINDER_STYLES, binderStyle, binderStyleCovers } from "@/lib/binder-styles";
 import { updateBinderStyle } from "@/app/classeurs/actions";
 import { CardImage } from "@/components/card-image";
 import { Toast } from "@/components/toast";
@@ -14,20 +24,31 @@ export type CoverCandidate = { id: string; card_name: string; image_url: string 
  * Personnalisation du classeur : couleur de tranche et choix des
  * 4 cartes affichées sur la couverture (l'ordre de sélection compte).
  */
+const STYLE_ICONS = {
+  binder: NotebookTabs,
+  mosaic: LayoutGrid,
+  showcase: Sparkles,
+  fan: Layers,
+  label: Tag,
+} as const;
+
 export function BinderStyleButton({
   binderId,
   color,
   coverIds,
   items,
+  styleCode,
 }: {
   binderId: string;
   color: string | null;
   coverIds: string[];
   items: CoverCandidate[];
+  styleCode: string | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selColor, setSelColor] = useState<string | null>(color);
+  const [selStyle, setSelStyle] = useState(binderStyle(styleCode));
   const [selIds, setSelIds] = useState<string[]>(coverIds);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{
@@ -44,23 +65,33 @@ export function BinderStyleButton({
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
+  const maxCovers = binderStyleCovers(selStyle);
+  const styleDef = BINDER_STYLES.find((s) => s.code === selStyle);
+
   function openModal() {
     setSelColor(color);
+    setSelStyle(binderStyle(styleCode));
     setSelIds(coverIds);
     setOpen(true);
+  }
+
+  function pickStyle(code: (typeof BINDER_STYLES)[number]["code"]) {
+    setSelStyle(code);
+    const max = binderStyleCovers(code);
+    setSelIds((prev) => prev.slice(0, max));
   }
 
   function toggleCard(id: string) {
     setSelIds((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
-      if (prev.length >= 4) return prev;
+      if (prev.length >= maxCovers) return prev;
       return [...prev, id];
     });
   }
 
   async function save() {
     setSaving(true);
-    const { error } = await updateBinderStyle(binderId, selColor, selIds);
+    const { error } = await updateBinderStyle(binderId, selColor, selIds, selStyle);
     setSaving(false);
     setOpen(false);
     setToast(
@@ -107,7 +138,35 @@ export function BinderStyleButton({
               Personnaliser le classeur
             </p>
 
-            <p className="label-xs mb-2">Couleur de la tranche</p>
+            <p className="label-xs mb-2">Style de couverture</p>
+            <div className="mb-1.5 grid grid-cols-5 gap-1.5">
+              {BINDER_STYLES.map((s) => {
+                const Icon = STYLE_ICONS[s.code];
+                const active = selStyle === s.code;
+                return (
+                  <button
+                    key={s.code}
+                    type="button"
+                    onClick={() => pickStyle(s.code)}
+                    aria-pressed={active}
+                    title={s.description}
+                    className={`flex flex-col items-center gap-1.5 rounded-xl border px-1 py-2.5 text-[11px] transition ${
+                      active
+                        ? "border-accent/50 bg-accent-soft font-semibold text-accent-strong"
+                        : "border-edge text-muted hover:border-edge-strong hover:text-foreground"
+                    }`}
+                  >
+                    <Icon size={16} strokeWidth={1.8} aria-hidden />
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mb-4 min-h-4 text-xs text-faint">
+              {styleDef?.description}
+            </p>
+
+            <p className="label-xs mb-2">Couleur</p>
             <div className="mb-5 flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -141,13 +200,20 @@ export function BinderStyleButton({
               ))}
             </div>
 
+            {maxCovers > 0 && (
+              <>
             <div className="mb-2 flex items-baseline justify-between">
-              <p className="label-xs">Cartes de couverture</p>
-              <span className="num text-xs text-faint">{selIds.length}/4</span>
+              <p className="label-xs">
+                Carte{maxCovers > 1 ? "s" : ""} de couverture
+              </p>
+              <span className="num text-xs text-faint">
+                {selIds.length}/{maxCovers}
+              </span>
             </div>
             <p className="mb-3 text-xs text-muted">
-              L&apos;ordre de sélection définit leur place. Aucune sélection =
-              les quatre premières cartes.
+              {maxCovers > 1
+                ? "L'ordre de sélection définit leur place. Aucune sélection = les premières cartes du classeur."
+                : "Aucune sélection = la première carte du classeur."}
             </p>
             <div className="mb-5 grid max-h-64 grid-cols-4 gap-2 overflow-y-auto pr-1">
               {items.map((it) => {
@@ -179,6 +245,8 @@ export function BinderStyleButton({
                 );
               })}
             </div>
+              </>
+            )}
 
             <div className="flex justify-end gap-2">
               <button

@@ -6,7 +6,7 @@ import { formatEur } from "@/lib/domain";
 import { binderColorHex } from "@/lib/binder-colors";
 import { signStorageImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
-import { CardImage } from "@/components/card-image";
+import { BinderCover } from "@/components/binder-cover";
 import { NewBinderButton } from "@/components/new-binder-button";
 
 export const metadata = {
@@ -14,57 +14,6 @@ export const metadata = {
 };
 
 type CoverItem = { image_url: string };
-
-// Couverture de classeur : tranche perforée discrète, page de
-// pochettes 2×2 légèrement en retrait
-function BinderCover({
-  covers,
-  name,
-  colorHex,
-}: {
-  covers: CoverItem[];
-  name: string;
-  colorHex: string | null;
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-l-lg rounded-r-xl border border-edge bg-surface transition-transform duration-300 group-hover:-translate-y-1">
-      {/* Tranche perforée, teintée si une couleur est choisie */}
-      <div
-        className="absolute inset-y-0 left-0 flex w-7 flex-col items-center justify-evenly border-r border-edge bg-raised py-3"
-        style={colorHex ? { backgroundColor: colorHex } : undefined}
-      >
-        {[0, 1, 2, 3, 4, 5].map((i) => (
-          <span
-            key={i}
-            className="h-1.5 w-1.5 rounded-full border border-edge-strong bg-surface"
-            aria-hidden
-          />
-        ))}
-      </div>
-      {/* Page de pochettes */}
-      <div className="ml-7 p-2.5">
-        <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-raised/40 p-2 ring-1 ring-edge/60">
-          {[0, 1, 2, 3].map((i) =>
-            covers[i] ? (
-              <div key={i} className="card-tile relative aspect-[63/88]">
-                <CardImage base={covers[i].image_url || null} alt={name} />
-                <span
-                  className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-transparent"
-                  aria-hidden
-                />
-              </div>
-            ) : (
-              <div
-                key={i}
-                className="aspect-[63/88] rounded-lg border border-dashed border-edge bg-raised/50"
-              />
-            )
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default async function ClasseursPage() {
   const supabase = await createClient();
@@ -76,7 +25,7 @@ export default async function ClasseursPage() {
   const [{ data: binders }, { data: links }, { data: items }] = await Promise.all([
     supabase
       .from("binders")
-      .select("id, name, created_at, color, cover_item_ids")
+      .select("id, name, created_at, color, cover_item_ids, style")
       .order("created_at"),
     supabase
       .from("binder_items")
@@ -149,6 +98,7 @@ export default async function ClasseursPage() {
                   className="panel group block overflow-hidden p-4 transition hover:border-edge-strong"
                 >
                   <BinderCover
+                    style={b.style}
                     covers={b.covers}
                     name={b.name}
                     colorHex={binderColorHex(b.color)}

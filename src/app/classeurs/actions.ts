@@ -98,12 +98,15 @@ export async function removeItemsFromBinder(binderId: string, itemIds: string[])
 export async function updateBinderStyle(
   binderId: string,
   color: string | null,
-  coverItemIds: string[]
+  coverItemIds: string[],
+  style: string
 ) {
   if (!binderId) return { error: "Classeur manquant" };
   const { BINDER_COLORS } = await import("@/lib/binder-colors");
+  const { binderStyle, binderStyleCovers } = await import("@/lib/binder-styles");
   const safeColor =
     color && BINDER_COLORS.some((c) => c.code === color) ? color : null;
+  const safeStyle = binderStyle(style);
 
   const supabase = await createClient();
   // Seules les cartes réellement dans le classeur peuvent servir de couverture
@@ -112,11 +115,17 @@ export async function updateBinderStyle(
     .select("item_id")
     .eq("binder_id", binderId);
   const memberIds = new Set((links ?? []).map((l) => l.item_id));
-  const covers = coverItemIds.filter((id) => memberIds.has(id)).slice(0, 4);
+  const covers = coverItemIds
+    .filter((id) => memberIds.has(id))
+    .slice(0, binderStyleCovers(safeStyle));
 
   const { error } = await supabase
     .from("binders")
-    .update({ color: safeColor, cover_item_ids: covers.length ? covers : null })
+    .update({
+      color: safeColor,
+      cover_item_ids: covers.length ? covers : null,
+      style: safeStyle,
+    })
     .eq("id", binderId);
 
   revalidatePath("/classeurs");

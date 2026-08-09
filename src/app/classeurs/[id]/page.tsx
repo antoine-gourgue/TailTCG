@@ -34,7 +34,7 @@ export default async function ClasseurPage({
 
   const { data: binder } = await supabase
     .from("binders")
-    .select("id, name, color, cover_item_ids")
+    .select("id, name, color, cover_item_ids, style")
     .eq("id", id)
     .maybeSingle();
   if (!binder) notFound();
@@ -117,6 +117,7 @@ export default async function ClasseurPage({
             <BinderStyleButton
               binderId={binder.id}
               color={binder.color}
+              styleCode={binder.style}
               coverIds={binder.cover_item_ids ?? []}
               items={signedItems.map((i) => ({
                 id: i.id,
