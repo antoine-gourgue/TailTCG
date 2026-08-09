@@ -11,6 +11,8 @@ export type TcgdexCardBrief = {
   name: string;
   /** URL de base SANS extension (ajouter /low.webp ou /high.png), absente si pas d'image */
   image?: string;
+  /** Enrichie carte par carte sur les pages de set (absente des briefs) */
+  rarity?: string;
 };
 
 export type TcgdexSetBrief = {
@@ -247,6 +249,29 @@ export async function getSet(
       }
     }
   }
+
+  // Rareté par carte (absente des briefs) : fiches détaillées par lots,
+  // chacune cachée 24 h — seul le premier affichage du set paie le coût
+  const cards = set.cards ?? [];
+  const CHUNK = 25;
+  for (let i = 0; i < cards.length; i += CHUNK) {
+    await Promise.all(
+      cards.slice(i, i + CHUNK).map(async (card) => {
+        try {
+          const r = await fetch(
+            `${langBase(lang)}/cards/${encodeURIComponent(card.id)}`,
+            { next: { revalidate: DAY_SECONDS } }
+          );
+          if (!r.ok) return;
+          const detail: { rarity?: string } = await r.json();
+          card.rarity = detail.rarity;
+        } catch {
+          // rareté inconnue : la carte reste visible dans tous les filtres
+        }
+      })
+    );
+  }
+
   return set;
 }
 

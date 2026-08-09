@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSet, type CatalogLang } from "@/lib/tcgdex";
 import { AppShell } from "@/components/app-shell";
-import { CardImage } from "@/components/card-image";
+import { SetCardsGrid } from "@/components/set-cards-grid";
 
 export const metadata = {
   title: "Extension — TailTCG",
@@ -80,29 +80,17 @@ export default async function ExtensionPage({
           </p>
         )}
 
-        <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {set.cards.map((card) => (
-            <li key={card.id}>
-              <Link
-                href={`/ajouter?card=${encodeURIComponent(card.id)}${langSuffix}`}
-                className="group block"
-              >
-                <div className="card-tile aspect-[63/88]">
-                  <CardImage base={card.image ?? null} alt={card.name} />
-                </div>
-                <div className="mt-2.5 px-0.5">
-                  <p className="truncate text-sm font-medium leading-tight group-hover:text-accent-strong">
-                    {card.name}
-                  </p>
-                  <p className="num mt-0.5 text-xs text-faint">
-                    {card.localId}
-                    {set.cardCount?.official ? ` / ${set.cardCount.official}` : ""}
-                  </p>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <SetCardsGrid
+          cards={set.cards.map((c) => ({
+            id: c.id,
+            localId: c.localId,
+            name: c.name,
+            image: c.image ?? null,
+            rarity: c.rarity ?? null,
+          }))}
+          officialCount={set.cardCount?.official ?? null}
+          langSuffix={langSuffix}
+        />
       </main>
     </AppShell>
   );
