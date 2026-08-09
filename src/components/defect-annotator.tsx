@@ -1,17 +1,19 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2, Undo2 } from "lucide-react";
 import {
   DEFECT_KINDS,
   defectMeta,
+  pointsToSvg,
   type Annotation,
   type DefectKind,
+  type Pt,
 } from "@/lib/grading-defects";
 
 /**
- * Entoure les défauts sur une carte redressée : glisser pour tracer un
- * rectangle, il prend le type sélectionné. Coordonnées normalisées 0..1.
+ * Dessin libre pour cerner les défauts sur une carte redressée : trace
+ * à main levée, le trait prend le type sélectionné. Points normalisés 0..1.
  */
 export function DefectAnnotator({
   url,
@@ -26,12 +28,12 @@ export function DefectAnnotator({
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [kind, setKind] = useState<DefectKind>("scratch");
-  const [draft, setDraft] = useState<Annotation | null>(null);
-  const start = useRef<{ x: number; y: number } | null>(null);
+  const [draft, setDraft] = useState<Pt[] | null>(null);
+  const drawing = useRef(false);
 
   const here = annotations.filter((a) => a.face === face);
 
-  function pos(e: React.PointerEvent) {
+  function pos(e: React.PointerEvent): Pt {
     const r = boxRef.current!.getBoundingClientRect();
     return {
       x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
@@ -41,30 +43,20 @@ export function DefectAnnotator({
 
   function onDown(e: React.PointerEvent) {
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    const p = pos(e);
-    start.current = p;
-    setDraft({ face, kind, x: p.x, y: p.y, w: 0, h: 0 });
+    drawing.current = true;
+    setDraft([pos(e)]);
   }
 
   function onMove(e: React.PointerEvent) {
-    if (!start.current) return;
-    const p = pos(e);
-    const s = start.current;
-    setDraft({
-      face,
-      kind,
-      x: Math.min(s.x, p.x),
-      y: Math.min(s.y, p.y),
-      w: Math.abs(p.x - s.x),
-      h: Math.abs(p.y - s.y),
-    });
+    if (!drawing.current) return;
+    setDraft((d) => (d ? [...d, pos(e)] : [pos(e)]));
   }
 
   function onUp() {
-    if (draft && draft.w > 0.02 && draft.h > 0.02) {
-      onChange([...annotations, draft]);
+    drawing.current = false;
+    if (draft && draft.length > 2) {
+      onChange([...annotations, { face, kind, points: draft }]);
     }
-    start.current = null;
     setDraft(null);
   }
 
@@ -78,6 +70,17 @@ export function DefectAnnotator({
       })
     );
   }
+
+  function undoLast() {
+    for (let i = annotations.length - 1; i >= 0; i--) {
+      if (annotations[i].face === face) {
+        onChange(annotations.filter((_, j) => j !== i));
+        return;
+      }
+    }
+  }
+
+  const draftColor = defectMeta(kind).color;
 
   return (
     <div>
@@ -112,27 +115,52 @@ export function DefectAnnotator({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={url} alt="Carte" className="max-h-[46vh] w-auto" draggable={false} />
-        {[...here, ...(draft ? [draft] : [])].map((a, i) => {
-          const m = defectMeta(a.kind);
-          return (
-            <span
+        <svg
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          className="pointer-events-none absolute inset-0 h-full w-full"
+        >
+          {here.map((a, i) => (
+            <polyline
               key={i}
-              className="pointer-events-none absolute rounded-md border-2"
-              style={{
-                left: `${a.x * 100}%`,
-                top: `${a.y * 100}%`,
-                width: `${a.w * 100}%`,
-                height: `${a.h * 100}%`,
-                borderColor: m.color,
-                boxShadow: `0 0 0 9999px ${m.color}0f inset`,
-              }}
+              points={pointsToSvg(a.points)}
+              fill="none"
+              stroke={defectMeta(a.kind).color}
+              strokeWidth={0.9}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
             />
-          );
-        })}
+          ))}
+          {draft && draft.length > 1 && (
+            <polyline
+              points={pointsToSvg(draft)}
+              fill="none"
+              stroke={draftColor}
+              strokeWidth={0.9}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+        </svg>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {here.length > 0 && (
+          <button
+            type="button"
+            onClick={undoLast}
+            className="btn btn-ghost !py-1.5 text-[13px]"
+          >
+            <Undo2 size={13} aria-hidden />
+            Annuler le dernier
+          </button>
+        )}
       </div>
 
       {here.length > 0 && (
-        <ul className="mt-3 flex flex-col gap-1.5">
+        <ul className="mt-2 flex flex-col gap-1.5">
           {here.map((a, i) => {
             const m = defectMeta(a.kind);
             return (
@@ -160,8 +188,8 @@ export function DefectAnnotator({
         </ul>
       )}
       <p className="mt-2 text-xs text-faint">
-        Glisse sur la carte pour entourer un défaut. Vide = aucun défaut
-        notable.
+        Dessine autour d&apos;un défaut pour l&apos;entourer. Vide = aucun
+        défaut notable.
       </p>
     </div>
   );

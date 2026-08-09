@@ -174,6 +174,7 @@ function PregradeWizard({
   const [guides, setGuides] = useState<Guides>(DEFAULT_GUIDES);
   const [guidesV, setGuidesV] = useState<Guides>(DEFAULT_GUIDES);
   const [corners, setCorners] = useState<(number | null)[]>([null, null, null, null]);
+  const [cornersV, setCornersV] = useState<(number | null)[]>([null, null, null, null]);
   const [edgeDefects, setEdgeDefects] = useState<Set<string>>(new Set());
   const [surfaceDefects, setSurfaceDefects] = useState<Set<string>>(new Set());
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -203,12 +204,19 @@ function PregradeWizard({
       ? Math.min(centeringNoteR, centeringNoteV)
       : centeringNoteR;
 
-  const cornerValues = corners.filter((c): c is number => c != null);
+  // Les 8 coins (4 recto + 4 verso si présent) comptent dans la note
+  const cornerValues = [
+    ...corners.filter((c): c is number => c != null),
+    ...(verso ? cornersV.filter((c): c is number => c != null) : []),
+  ];
+  const cornersComplete =
+    corners.every((c) => c != null) &&
+    (!verso || cornersV.every((c) => c != null));
   const cornersNote =
-    cornerValues.length === 4
+    cornersComplete && cornerValues.length > 0
       ? Math.round(
           (Math.min(...cornerValues) +
-            cornerValues.reduce((a, b) => a + b, 0) / 4) /
+            cornerValues.reduce((a, b) => a + b, 0) / cornerValues.length) /
             2
         )
       : null;
@@ -247,7 +255,7 @@ function PregradeWizard({
     "Verdict",
   ];
   const canNext =
-    step === 0 ? recto != null : step === 3 ? cornerValues.length === 4 : true;
+    step === 0 ? recto != null : step === 3 ? cornersComplete : true;
   const workingUrl = rectified ?? recto?.url ?? null;
   const workingUrlV = verso ? rectifiedV ?? verso.url : null;
 
@@ -303,6 +311,7 @@ function PregradeWizard({
       "details",
       JSON.stringify({
         corners,
+        cornersVerso: verso ? cornersV : null,
         edgeDefects: [...edgeDefects],
         surfaceDefects: [...surfaceDefects],
         annotations,
@@ -428,11 +437,26 @@ function PregradeWizard({
           {step === 3 && workingUrl && (
             <>
               <FaceTabs face={face} onFace={setFace} hasVerso={workingUrlV != null} />
-              <StepCorners
-                url={face === "v" && workingUrlV ? workingUrlV : workingUrl}
-                corners={corners}
-                onChange={setCorners}
-              />
+              {face === "v" && workingUrlV ? (
+                <StepCorners
+                  url={workingUrlV}
+                  corners={cornersV}
+                  onChange={setCornersV}
+                />
+              ) : (
+                <StepCorners
+                  url={workingUrl}
+                  corners={corners}
+                  onChange={setCorners}
+                />
+              )}
+              {workingUrlV != null && (
+                <p className="mt-3 text-center text-xs text-muted">
+                  {cornersComplete
+                    ? "Recto et verso évalués ✓"
+                    : "Évalue les 4 coins du recto et du verso pour continuer."}
+                </p>
+              )}
             </>
           )}
           {step === 4 && workingUrl && (

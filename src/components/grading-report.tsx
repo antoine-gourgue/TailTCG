@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { FileText, X } from "lucide-react";
 import { GRADE_LABELS } from "@/lib/grading";
-import { defectMeta, type Annotation } from "@/lib/grading-defects";
+import {
+  defectMeta,
+  pointsToSvg,
+  withPoints,
+  type Annotation,
+} from "@/lib/grading-defects";
 import { Logo } from "@/components/logo";
 
 export type GradingReportData = {
@@ -52,29 +57,31 @@ function AnnotatedFace({
   annotations: Annotation[];
   legend: string;
 }) {
-  const here = annotations.filter((a) => a.face === face);
+  const here = withPoints(annotations).filter((a) => a.face === face);
   return (
     <div>
       <p className="label-xs mb-1.5">{legend}</p>
       <div className="relative overflow-hidden rounded-xl border border-edge">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={url} alt={legend} className="w-full" />
-        {here.map((a, i) => {
-          const m = defectMeta(a.kind);
-          return (
-            <span
+        <svg
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          className="pointer-events-none absolute inset-0 h-full w-full"
+        >
+          {here.map((a, i) => (
+            <polyline
               key={i}
-              className="pointer-events-none absolute rounded-md border-2"
-              style={{
-                left: `${a.x * 100}%`,
-                top: `${a.y * 100}%`,
-                width: `${a.w * 100}%`,
-                height: `${a.h * 100}%`,
-                borderColor: m.color,
-              }}
+              points={pointsToSvg(a.points)}
+              fill="none"
+              stroke={defectMeta(a.kind).color}
+              strokeWidth={0.9}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
             />
-          );
-        })}
+          ))}
+        </svg>
       </div>
     </div>
   );
