@@ -14,6 +14,7 @@ export type BinderCard = {
   set_name: string;
   local_id: string;
   image_url: string;
+  photo_fallback?: string | null;
 };
 
 export function AdminBinderCards({
@@ -88,7 +89,7 @@ export function AdminBinderCards({
               </button>
               <Link href={`/admin/utilisateurs/${ownerId}/carte/${i.id}`} className="block">
                 <div className="card-tile aspect-[63/88]">
-                  <CardImage base={i.image_url || null} alt={i.card_name} />
+                  <CardImage base={i.image_url || null} alt={i.card_name} fallback={i.photo_fallback ?? null} />
                 </div>
                 <p className="mt-2 truncate text-sm font-medium">{i.card_name}</p>
                 <p className="truncate text-xs text-muted">
