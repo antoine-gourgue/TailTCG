@@ -8,8 +8,11 @@ import {
   EllipsisVertical,
   Smartphone,
   Trash2,
+  ShieldCheck,
 } from "lucide-react";
+import Link from "next/link";
 import { restoreItem, purgeItem } from "@/app/items/actions";
+import { isAdminEmail } from "@/lib/admin";
 import { ConfirmAction } from "@/components/confirm-action";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app-shell";
@@ -59,6 +62,21 @@ export default async function ParametresPage() {
         </h1>
 
         <div className="flex flex-col gap-4">
+          {isAdminEmail(user.email) && (
+            <Link
+              href="/admin"
+              className="panel flex items-center gap-3 p-5 transition hover:border-edge-strong"
+            >
+              <ShieldCheck size={18} className="text-accent-strong" aria-hidden />
+              <div className="flex-1">
+                <p className="display text-base font-semibold">Back-office</p>
+                <p className="text-sm text-muted">
+                  Vue d&apos;ensemble de tous les comptes et données.
+                </p>
+              </div>
+              <span className="text-muted">→</span>
+            </Link>
+          )}
           {/* Compte */}
           <section className="panel p-5">
             <h2 className="display mb-4 text-base font-semibold">Compte</h2>
