@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { daysAgoISO } from "@/lib/domain";
 import { signStorageImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
+import { ShareButton } from "@/components/share-button";
 import {
   CollectionClient,
   type CollectionItem,
@@ -65,7 +66,7 @@ export default async function Home({
   // Rappel de réévaluation : cartes dont la valeur date de plus de N semaines
   const { data: settings } = await supabase
     .from("user_settings")
-    .select("revalue_weeks")
+    .select("revalue_weeks, share_token")
     .eq("owner_id", user.id)
     .maybeSingle();
 
@@ -95,9 +96,12 @@ export default async function Home({
       <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="display text-3xl font-bold tracking-tight">Collection</h1>
-          <Link href="/recherche" className="btn btn-primary">
-            + Ajouter une carte
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <ShareButton initialToken={settings?.share_token ?? null} />
+            <Link href="/recherche" className="btn btn-primary">
+              + Ajouter une carte
+            </Link>
+          </div>
         </div>
 
         {staleItems.length > 0 && (
