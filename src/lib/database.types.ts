@@ -84,18 +84,24 @@ export type Database = {
       }
       binders: {
         Row: {
+          color: string | null
+          cover_item_ids: string[] | null
           created_at: string | null
           id: string
           name: string
           owner_id: string
         }
         Insert: {
+          color?: string | null
+          cover_item_ids?: string[] | null
           created_at?: string | null
           id?: string
           name: string
           owner_id?: string
         }
         Update: {
+          color?: string | null
+          cover_item_ids?: string[] | null
           created_at?: string | null
           id?: string
           name?: string

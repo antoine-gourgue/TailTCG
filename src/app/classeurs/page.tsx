@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { NotebookTabs } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatEur } from "@/lib/domain";
+import { binderColorHex } from "@/lib/binder-colors";
 import { signStorageImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
 import { CardImage } from "@/components/card-image";
@@ -14,33 +15,53 @@ export const metadata = {
 
 type CoverItem = { image_url: string };
 
-// Jusqu'à trois cartes en éventail sur la tuile
-function CoverFan({ covers, name }: { covers: CoverItem[]; name: string }) {
-  if (covers.length === 0) {
-    return (
-      <div className="flex h-40 items-center justify-center text-faint">
-        <NotebookTabs size={40} strokeWidth={1.2} aria-hidden />
-      </div>
-    );
-  }
-  const mid = (covers.length - 1) / 2;
+// Couverture de classeur : tranche perforée discrète, page de
+// pochettes 2×2 légèrement en retrait
+function BinderCover({
+  covers,
+  name,
+  colorHex,
+}: {
+  covers: CoverItem[];
+  name: string;
+  colorHex: string | null;
+}) {
   return (
-    <div className="relative h-40 overflow-hidden">
-      {covers.map((c, i) => (
-        <div
-          key={i}
-          className="card-tile absolute left-1/2 top-3 aspect-[63/88] w-24 transition-transform duration-300 group-hover:-translate-y-1"
-          style={{
-            transform: `translateX(-50%) translateX(${(i - mid) * 42}px) rotate(${
-              (i - mid) * 9
-            }deg)`,
-            transformOrigin: "bottom center",
-            zIndex: i === Math.floor(mid + 0.5) ? 3 : 1,
-          }}
-        >
-          <CardImage base={c.image_url || null} alt={name} />
+    <div className="relative overflow-hidden rounded-l-lg rounded-r-xl border border-edge bg-surface transition-transform duration-300 group-hover:-translate-y-1">
+      {/* Tranche perforée, teintée si une couleur est choisie */}
+      <div
+        className="absolute inset-y-0 left-0 flex w-7 flex-col items-center justify-evenly border-r border-edge bg-raised py-3"
+        style={colorHex ? { backgroundColor: colorHex } : undefined}
+      >
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <span
+            key={i}
+            className="h-1.5 w-1.5 rounded-full border border-edge-strong bg-surface"
+            aria-hidden
+          />
+        ))}
+      </div>
+      {/* Page de pochettes */}
+      <div className="ml-7 p-2.5">
+        <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-raised/40 p-2 ring-1 ring-edge/60">
+          {[0, 1, 2, 3].map((i) =>
+            covers[i] ? (
+              <div key={i} className="card-tile relative aspect-[63/88]">
+                <CardImage base={covers[i].image_url || null} alt={name} />
+                <span
+                  className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-transparent"
+                  aria-hidden
+                />
+              </div>
+            ) : (
+              <div
+                key={i}
+                className="aspect-[63/88] rounded-lg border border-dashed border-edge bg-raised/50"
+              />
+            )
+          )}
         </div>
-      ))}
+      </div>
     </div>
   );
 }
@@ -53,7 +74,10 @@ export default async function ClasseursPage() {
   if (!user) redirect("/login");
 
   const [{ data: binders }, { data: links }, { data: items }] = await Promise.all([
-    supabase.from("binders").select("id, name, created_at").order("created_at"),
+    supabase
+      .from("binders")
+      .select("id, name, created_at, color, cover_item_ids")
+      .order("created_at"),
     supabase
       .from("binder_items")
       .select("binder_id, item_id, added_at")
@@ -84,9 +108,18 @@ export default async function ClasseursPage() {
         value += item.current_price * item.quantity;
         hasValue = true;
       }
-      if (covers.length < 3 && item.image_url) covers.push(item);
+      if (covers.length < 4 && item.image_url) covers.push(item);
     }
-    return { ...b, count, value: hasValue ? value : null, covers };
+    // Couverture choisie par l'utilisateur, sinon les 4 premières
+    const chosen = (b.cover_item_ids ?? [])
+      .map((id) => itemById.get(id))
+      .filter((i): i is NonNullable<typeof i> => i != null && !!i.image_url);
+    return {
+      ...b,
+      count,
+      value: hasValue ? value : null,
+      covers: chosen.length > 0 ? chosen : covers,
+    };
   });
 
   return (
@@ -115,7 +148,11 @@ export default async function ClasseursPage() {
                   href={`/classeurs/${b.id}`}
                   className="panel group block overflow-hidden p-4 transition hover:border-edge-strong"
                 >
-                  <CoverFan covers={b.covers} name={b.name} />
+                  <BinderCover
+                    covers={b.covers}
+                    name={b.name}
+                    colorHex={binderColorHex(b.color)}
+                  />
                   <p className="mt-3 truncate text-base font-semibold group-hover:text-accent-strong">
                     {b.name}
                   </p>

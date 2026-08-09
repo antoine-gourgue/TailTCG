@@ -7,6 +7,8 @@ import { signStorageImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmAction } from "@/components/confirm-action";
 import { RenameBinderButton } from "@/components/rename-binder-button";
+import { BinderStyleButton } from "@/components/binder-style-button";
+import { BinderShareButton } from "@/components/binder-share-button";
 import { deleteBinder } from "@/app/classeurs/actions";
 import {
   CollectionClient,
@@ -32,12 +34,12 @@ export default async function ClasseurPage({
 
   const { data: binder } = await supabase
     .from("binders")
-    .select("id, name")
+    .select("id, name, color, cover_item_ids")
     .eq("id", id)
     .maybeSingle();
   if (!binder) notFound();
 
-  const [{ data: links }, { data: sources }, { data: allBinders }] =
+  const [{ data: links }, { data: sources }, { data: allBinders }, { data: settings }] =
     await Promise.all([
       supabase
         .from("binder_items")
@@ -45,6 +47,11 @@ export default async function ClasseurPage({
         .eq("binder_id", id),
       supabase.from("sources").select("id, name").order("name"),
       supabase.from("binders").select("id, name").order("name"),
+      supabase
+        .from("user_settings")
+        .select("share_token")
+        .eq("owner_id", user.id)
+        .maybeSingle(),
     ]);
 
   const memberIds = (links ?? []).map((l) => l.item_id);
@@ -103,6 +110,20 @@ export default async function ClasseurPage({
             {binder.name}
           </h1>
           <div className="flex flex-wrap items-center gap-2">
+            <BinderShareButton
+              binderId={binder.id}
+              shareToken={settings?.share_token ?? null}
+            />
+            <BinderStyleButton
+              binderId={binder.id}
+              color={binder.color}
+              coverIds={binder.cover_item_ids ?? []}
+              items={signedItems.map((i) => ({
+                id: i.id,
+                card_name: i.card_name,
+                image_url: i.photo_fallback && !i.image_url ? i.photo_fallback : i.image_url,
+              }))}
+            />
             <RenameBinderButton binderId={binder.id} currentName={binder.name} />
             <ConfirmAction
               action={deleteBinder}

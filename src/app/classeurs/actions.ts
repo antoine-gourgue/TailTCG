@@ -94,6 +94,36 @@ export async function removeItemsFromBinder(binderId: string, itemIds: string[])
   return { error: error?.message ?? null };
 }
 
+/** Apparence du classeur : couleur de tranche + cartes de couverture */
+export async function updateBinderStyle(
+  binderId: string,
+  color: string | null,
+  coverItemIds: string[]
+) {
+  if (!binderId) return { error: "Classeur manquant" };
+  const { BINDER_COLORS } = await import("@/lib/binder-colors");
+  const safeColor =
+    color && BINDER_COLORS.some((c) => c.code === color) ? color : null;
+
+  const supabase = await createClient();
+  // Seules les cartes réellement dans le classeur peuvent servir de couverture
+  const { data: links } = await supabase
+    .from("binder_items")
+    .select("item_id")
+    .eq("binder_id", binderId);
+  const memberIds = new Set((links ?? []).map((l) => l.item_id));
+  const covers = coverItemIds.filter((id) => memberIds.has(id)).slice(0, 4);
+
+  const { error } = await supabase
+    .from("binders")
+    .update({ color: safeColor, cover_item_ids: covers.length ? covers : null })
+    .eq("id", binderId);
+
+  revalidatePath("/classeurs");
+  revalidatePath(`/classeurs/${binderId}`);
+  return { error: error?.message ?? null };
+}
+
 /** Fiche carte : remplace l'appartenance de l'exemplaire par la sélection */
 export async function setItemBinders(itemId: string, binderIds: string[]) {
   if (!itemId) return { error: "Carte manquante" };
