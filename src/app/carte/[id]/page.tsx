@@ -17,6 +17,10 @@ import { ValueUpdateButton } from "@/components/quick-value-edit";
 import { SellButton } from "@/components/sell-button";
 import { BinderPicker } from "@/components/binder-picker";
 import { PregradeButton } from "@/components/pregrade-wizard";
+import {
+  GradingReportButton,
+  type GradingReportData,
+} from "@/components/grading-report";
 import { GRADE_LABELS } from "@/lib/grading";
 import { ConfirmAction } from "@/components/confirm-action";
 import { cancelSale } from "@/app/items/actions";
@@ -110,22 +114,35 @@ export default async function CartePage({
       .order("recorded_at"),
     supabase
       .from("item_gradings")
-      .select("grade, centering, corners, edges, surface, created_at, rectified_path")
+      .select(
+        "grade, centering, corners, edges, surface, created_at, rectified_path, rectified_verso_path, ratios, details"
+      )
       .eq("item_id", id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
   ]);
 
-  // Visuel redressé de la pré-gradation : c'est TA carte, elle prime
-  // sur le scan officiel dans l'encart principal
+  // Visuels redressés de la pré-gradation : la TA carte prime sur le scan
+  // officiel dans l'encart principal ; le verso sert au rapport
   let rectifiedUrl: string | null = null;
-  if (lastGrading?.rectified_path) {
+  let rectifiedVersoUrl: string | null = null;
+  if (lastGrading?.rectified_path || lastGrading?.rectified_verso_path) {
     const admin = createAdminClient();
-    const { data: signedRect } = await admin.storage
+    const paths = [
+      lastGrading.rectified_path,
+      lastGrading.rectified_verso_path,
+    ].filter((p): p is string => p != null);
+    const { data: signed } = await admin.storage
       .from("card-photos")
-      .createSignedUrl(lastGrading.rectified_path, 3600);
-    rectifiedUrl = signedRect?.signedUrl ?? null;
+      .createSignedUrls(paths, 3600);
+    const byPath = new Map(paths.map((p, i) => [p, signed?.[i]?.signedUrl ?? null]));
+    rectifiedUrl = lastGrading.rectified_path
+      ? byPath.get(lastGrading.rectified_path) ?? null
+      : null;
+    rectifiedVersoUrl = lastGrading.rectified_verso_path
+      ? byPath.get(lastGrading.rectified_verso_path) ?? null
+      : null;
   }
 
   // URLs signées 1 h, générées côté serveur (bucket privé)
@@ -265,6 +282,27 @@ export default async function CartePage({
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
+                  {lastGrading && (
+                    <GradingReportButton
+                      data={{
+                        grade: lastGrading.grade ?? 0,
+                        centering: lastGrading.centering ?? 0,
+                        corners: lastGrading.corners ?? 0,
+                        edges: lastGrading.edges ?? 0,
+                        surface: lastGrading.surface ?? 0,
+                        createdAt: lastGrading.created_at,
+                        ratios: (lastGrading.ratios as GradingReportData["ratios"]) ?? null,
+                        annotations:
+                          ((lastGrading.details as { annotations?: GradingReportData["annotations"] })
+                            ?.annotations) ?? [],
+                        rectoUrl: rectifiedUrl,
+                        versoUrl: rectifiedVersoUrl,
+                        cardName: item.card_name ?? "",
+                        setName: item.set_name ?? "",
+                        localId: item.local_id ?? "",
+                      }}
+                    />
+                  )}
                   <PregradeButton itemId={item.id ?? id} photos={photos} />
                   <ValueUpdateButton
                     itemId={item.id ?? id}

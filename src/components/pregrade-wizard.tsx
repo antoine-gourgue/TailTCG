@@ -13,6 +13,8 @@ import {
 import { saveGrading } from "@/app/items/actions";
 import { GRADE_LABELS } from "@/lib/grading";
 import { loadImage, warpCardToCanvas, type Pt } from "@/lib/perspective";
+import type { Annotation } from "@/lib/grading-defects";
+import { DefectAnnotator } from "@/components/defect-annotator";
 import type { GalleryPhoto } from "@/components/photo-gallery";
 import { Toast } from "@/components/toast";
 
@@ -174,6 +176,7 @@ function PregradeWizard({
   const [corners, setCorners] = useState<(number | null)[]>([null, null, null, null]);
   const [edgeDefects, setEdgeDefects] = useState<Set<string>>(new Set());
   const [surfaceDefects, setSurfaceDefects] = useState<Set<string>>(new Set());
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
 
   const recto = photos.find((p) => p.id === rectoId) ?? photos[0] ?? null;
   const verso = photos.find((p) => p.id === versoId) ?? null;
@@ -239,6 +242,7 @@ function PregradeWizard({
     "Cadrage",
     "Centrage",
     "Coins",
+    "Défauts",
     "Bords & surface",
     "Verdict",
   ];
@@ -301,6 +305,7 @@ function PregradeWizard({
         corners,
         edgeDefects: [...edgeDefects],
         surfaceDefects: [...surfaceDefects],
+        annotations,
         verso: verso
           ? { lr: [lPctV, 100 - lPctV], tb: [tPctV, 100 - tPctV] }
           : null,
@@ -309,6 +314,13 @@ function PregradeWizard({
     if (rectified) {
       const blob = await (await fetch(rectified)).blob();
       fd.set("rectified", new File([blob], "rectified.jpg", { type: "image/jpeg" }));
+    }
+    if (rectifiedV) {
+      const blob = await (await fetch(rectifiedV)).blob();
+      fd.set(
+        "rectified_verso",
+        new File([blob], "rectified-verso.jpg", { type: "image/jpeg" })
+      );
     }
     const { error } = await saveGrading(fd);
     setSaving(false);
@@ -423,7 +435,25 @@ function PregradeWizard({
               />
             </>
           )}
-          {step === 4 && (
+          {step === 4 && workingUrl && (
+            <>
+              <p className="mb-1 text-sm font-medium">
+                Repère et entoure les défauts visibles.
+              </p>
+              <p className="mb-3 text-xs text-muted">
+                Incline la carte sous une lumière rasante. Chaque marque
+                apparaîtra dans le rapport de la carte.
+              </p>
+              <FaceTabs face={face} onFace={setFace} hasVerso={workingUrlV != null} />
+              <DefectAnnotator
+                url={face === "v" && workingUrlV ? workingUrlV : workingUrl}
+                face={face === "v" && workingUrlV ? "v" : "r"}
+                annotations={annotations}
+                onChange={setAnnotations}
+              />
+            </>
+          )}
+          {step === 5 && (
             <StepChecklists
               photos={photos}
               edgeDefects={edgeDefects}
@@ -432,7 +462,7 @@ function PregradeWizard({
               onSurface={setSurfaceDefects}
             />
           )}
-          {step === 5 && globalNote != null && (
+          {step === 6 && globalNote != null && (
             <StepVerdict
               centering={centeringNote}
               corners={cornersNote!}

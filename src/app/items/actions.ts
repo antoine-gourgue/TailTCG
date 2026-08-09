@@ -362,22 +362,24 @@ export async function saveGrading(formData: FormData) {
 
   const num = (k: string) => Number.parseInt(str(formData, k), 10);
 
-  // Visuel redressé : bucket privé, comme les photos perso.
+  // Visuels redressés (recto/verso) : bucket privé, comme les photos perso.
   // Chemin en UUID aléatoire (pas d'itemId brut), taille et type validés.
-  let rectified_path: string | null = null;
-  const file = formData.get("rectified");
-  if (file instanceof File && file.size > 0) {
-    if (file.size > 5_000_000 || !file.type.startsWith("image/")) {
-      return { error: "Visuel invalide (image de 5 Mo max)." };
-    }
-    const { createAdminClient } = await import("@/lib/supabase/admin");
-    const admin = createAdminClient();
-    const path = `${user.id}/gradings/${randomUUID()}.jpg`;
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+
+  async function uploadRectified(field: string): Promise<string | null> {
+    const file = formData.get(field);
+    if (!(file instanceof File) || file.size === 0) return null;
+    if (file.size > 5_000_000 || !file.type.startsWith("image/")) return null;
+    const path = `${user!.id}/gradings/${randomUUID()}.jpg`;
     const { error: upError } = await admin.storage
       .from("card-photos")
       .upload(path, file, { contentType: "image/jpeg" });
-    if (!upError) rectified_path = path;
+    return upError ? null : path;
   }
+
+  const rectified_path = await uploadRectified("rectified");
+  const rectified_verso_path = await uploadRectified("rectified_verso");
 
   const { error } = await supabase.from("item_gradings").insert({
     item_id: itemId,
@@ -389,6 +391,7 @@ export async function saveGrading(formData: FormData) {
     ratios: JSON.parse(str(formData, "ratios") || "null"),
     details: JSON.parse(str(formData, "details") || "null"),
     rectified_path,
+    rectified_verso_path,
   });
 
   revalidatePath(`/carte/${itemId}`);

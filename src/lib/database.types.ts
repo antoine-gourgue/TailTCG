@@ -161,6 +161,7 @@ export type Database = {
           owner_id: string
           ratios: Json | null
           rectified_path: string | null
+          rectified_verso_path: string | null
           surface: number
         }
         Insert: {
@@ -175,6 +176,7 @@ export type Database = {
           owner_id?: string
           ratios?: Json | null
           rectified_path?: string | null
+          rectified_verso_path?: string | null
           surface: number
         }
         Update: {
@@ -189,6 +191,7 @@ export type Database = {
           owner_id?: string
           ratios?: Json | null
           rectified_path?: string | null
+          rectified_verso_path?: string | null
           surface?: number
         }
         Relationships: [
