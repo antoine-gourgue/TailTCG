@@ -32,13 +32,38 @@ export default async function SharedCollectionPage({
     .select("owner_id")
     .eq("share_token", token)
     .maybeSingle();
-  if (!settings) notFound();
 
   // Visiteur déjà connecté : pas de CTA d'inscription
   const supabase = await createClient();
   const {
     data: { user: visitor },
   } = await supabase.auth.getUser();
+
+  // Jeton bien formé mais inconnu : le partage a été coupé ou renouvelé
+  if (!settings) {
+    return (
+      <main className="flex min-h-dvh flex-col items-center justify-center px-4 py-12 text-center">
+        <Logo variant="mark" size={44} />
+        <p className="label-xs mt-8 text-muted">Lien expiré</p>
+        <h1 className="display mt-2 text-3xl font-bold tracking-tight">
+          Cette collection n&apos;est plus partagée
+        </h1>
+        <p className="mt-3 max-w-sm text-sm text-muted">
+          Le propriétaire a coupé le partage ou généré un nouveau lien.
+          Demande-lui le lien à jour pour revoir sa collection.
+        </p>
+        {visitor ? (
+          <Link href="/" className="btn btn-primary mt-8">
+            Ma collection
+          </Link>
+        ) : (
+          <Link href="/login" className="btn btn-primary mt-8">
+            Créer ma collection
+          </Link>
+        )}
+      </main>
+    );
+  }
 
   const [{ data: items }, { data: sources }] = await Promise.all([
     admin
