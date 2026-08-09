@@ -28,6 +28,10 @@ export default async function ExtensionPage({
   const set = await getSet(id, lang);
   if (!set) notFound();
 
+  // Cartes déjà dans les recherchées (pour l'étoile de la modale)
+  const { data: wishes } = await supabase.from("wishlist").select("tcgdex_id");
+  const wishedIds = (wishes ?? []).map((w) => w.tcgdex_id);
+
   const releaseDate = set.releaseDate
     ? new Date(set.releaseDate).toLocaleDateString("fr-FR", {
         month: "long",
@@ -90,6 +94,9 @@ export default async function ExtensionPage({
           }))}
           officialCount={set.cardCount?.official ?? null}
           langSuffix={langSuffix}
+          setId={set.id}
+          setName={set.name}
+          wishedIds={wishedIds}
         />
       </main>
     </AppShell>
