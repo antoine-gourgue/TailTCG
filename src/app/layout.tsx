@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Instrument_Sans, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const sans = Instrument_Sans({
@@ -45,6 +46,7 @@ export default function RootLayout({
       <body className="relative min-h-full flex flex-col">
         <script dangerouslySetInnerHTML={{ __html: bootScript }} />
         {children}
+        <Analytics />
       </body>
     </html>
   );
