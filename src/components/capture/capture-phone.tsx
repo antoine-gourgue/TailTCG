@@ -19,63 +19,81 @@ function loadImg(src: string): Promise<HTMLImageElement> {
   });
 }
 
-/** Recadre une bande (fractions de l'image) et renvoie un canvas agrandi */
+/**
+ * Recadre une bande (fractions de l'image) et la prétraite pour l'OCR :
+ * agrandissement, niveaux de gris et étirement de contraste.
+ */
 function cropBand(
   img: HTMLImageElement,
   x: number,
   y: number,
   w: number,
-  h: number
+  h: number,
+  zoom = 3
 ): HTMLCanvasElement {
   const c = document.createElement("canvas");
   const sw = img.naturalWidth * w;
   const sh = img.naturalHeight * h;
-  const zoom = 2; // agrandir aide l'OCR
-  c.width = sw * zoom;
-  c.height = sh * zoom;
+  c.width = Math.round(sw * zoom);
+  c.height = Math.round(sh * zoom);
   const ctx = c.getContext("2d")!;
-  ctx.drawImage(
-    img,
-    img.naturalWidth * x,
-    img.naturalHeight * y,
-    sw,
-    sh,
-    0,
-    0,
-    c.width,
-    c.height
-  );
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, img.naturalWidth * x, img.naturalHeight * y, sw, sh, 0, 0, c.width, c.height);
+
+  // Niveaux de gris + contraste (étirement min/max)
+  const data = ctx.getImageData(0, 0, c.width, c.height);
+  const p = data.data;
+  let min = 255;
+  let max = 0;
+  const gray = new Uint8ClampedArray(p.length / 4);
+  for (let i = 0; i < gray.length; i++) {
+    const g = 0.3 * p[i * 4] + 0.59 * p[i * 4 + 1] + 0.11 * p[i * 4 + 2];
+    gray[i] = g;
+    if (g < min) min = g;
+    if (g > max) max = g;
+  }
+  const range = Math.max(1, max - min);
+  for (let i = 0; i < gray.length; i++) {
+    const v = ((gray[i] - min) / range) * 255;
+    p[i * 4] = p[i * 4 + 1] = p[i * 4 + 2] = v;
+  }
+  ctx.putImageData(data, 0, 0);
   return c;
 }
 
 /**
- * OCR ciblé : le nom en haut de la carte, le numéro (« 88/95 ») en bas.
- * Beaucoup plus fiable que d'OCR toute la carte (qui lit le texte d'attaque).
+ * OCR ciblé et prétraité : nom tout en haut (bande resserrée pour éviter
+ * le sous-titre « Évolution de… »), numéro en bas (chiffres uniquement).
+ * 100 % local, à confirmer par l'utilisateur.
  */
 async function ocrCard(dataUrl: string): Promise<string> {
   const { createWorker } = await import("tesseract.js");
   const img = await loadImg(dataUrl);
 
-  // Nom : bande du haut (hors bordure)
-  const nameCanvas = cropBand(img, 0.06, 0.03, 0.88, 0.12);
-  // Numéro : bande du bas
-  const numCanvas = cropBand(img, 0.04, 0.9, 0.92, 0.09);
+  // Bande du nom : très haute et fine (le nom occupe la 1re ligne)
+  const nameCanvas = cropBand(img, 0.08, 0.035, 0.7, 0.07);
+  // Bande du numéro : bas de carte
+  const numCanvas = cropBand(img, 0.03, 0.9, 0.94, 0.09);
 
-  const nameWorker = await createWorker("eng");
+  const nameWorker = await createWorker("fra");
   const { data: nameData } = await nameWorker.recognize(nameCanvas);
   await nameWorker.terminate();
 
   const numWorker = await createWorker("eng");
-  await numWorker.setParameters({ tessedit_char_whitelist: "0123456789/ " });
+  await numWorker.setParameters({
+    tessedit_char_whitelist: "0123456789/",
+    tessedit_pageseg_mode: "7" as unknown as never, // ligne unique
+  });
   const { data: numData } = await numWorker.recognize(numCanvas);
   await numWorker.terminate();
 
+  // Nom : 1re ligne assez « lettrée » (au plus haut, pas la plus longue)
   const nameLine = (nameData.text ?? "")
     .split("\n")
     .map((l) => l.replace(/[^a-zA-Zà-ÿ' -]/g, "").trim())
-    .filter((l) => l.replace(/[^a-zà-ÿ]/gi, "").length >= 3)
-    .sort((a, b) => b.length - a.length)[0];
-  const numMatch = (numData.text ?? "").match(/(\d{1,3})\s*\/\s*(\d{1,3})/);
+    .find((l) => l.replace(/[^a-zà-ÿ]/gi, "").length >= 3);
+  const numMatch = (numData.text ?? "").match(/(\d{1,3})\s*\/\s*\d{1,3}/) ??
+    (numData.text ?? "").match(/\b(\d{2,3})\b/);
 
   return [
     (nameLine ?? "").slice(0, 40).trim(),
