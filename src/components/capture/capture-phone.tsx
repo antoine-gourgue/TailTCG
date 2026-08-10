@@ -9,23 +9,81 @@ async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
   return (await fetch(dataUrl)).blob();
 }
 
-/** Lit le numéro de collection (« 88/95 ») et un nom probable via OCR */
+/** Charge un dataURL en image */
+function loadImg(src: string): Promise<HTMLImageElement> {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = rej;
+    img.src = src;
+  });
+}
+
+/** Recadre une bande (fractions de l'image) et renvoie un canvas agrandi */
+function cropBand(
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  const sw = img.naturalWidth * w;
+  const sh = img.naturalHeight * h;
+  const zoom = 2; // agrandir aide l'OCR
+  c.width = sw * zoom;
+  c.height = sh * zoom;
+  const ctx = c.getContext("2d")!;
+  ctx.drawImage(
+    img,
+    img.naturalWidth * x,
+    img.naturalHeight * y,
+    sw,
+    sh,
+    0,
+    0,
+    c.width,
+    c.height
+  );
+  return c;
+}
+
+/**
+ * OCR ciblé : le nom en haut de la carte, le numéro (« 88/95 ») en bas.
+ * Beaucoup plus fiable que d'OCR toute la carte (qui lit le texte d'attaque).
+ */
 async function ocrCard(dataUrl: string): Promise<string> {
-  const Tesseract = (await import("tesseract.js")).default;
-  const { data } = await Tesseract.recognize(dataUrl, "eng");
-  const text = data.text ?? "";
-  const num = text.match(/\b(\d{1,3})\s*\/\s*(\d{1,3})\b/);
-  // Ligne la plus « nom » : la plus longue en lettres, en haut de la carte
-  const nameLine = text
+  const { createWorker } = await import("tesseract.js");
+  const img = await loadImg(dataUrl);
+
+  // Nom : bande du haut (hors bordure)
+  const nameCanvas = cropBand(img, 0.06, 0.03, 0.88, 0.12);
+  // Numéro : bande du bas
+  const numCanvas = cropBand(img, 0.04, 0.9, 0.92, 0.09);
+
+  const nameWorker = await createWorker("eng");
+  const { data: nameData } = await nameWorker.recognize(nameCanvas);
+  await nameWorker.terminate();
+
+  const numWorker = await createWorker("eng");
+  await numWorker.setParameters({ tessedit_char_whitelist: "0123456789/ " });
+  const { data: numData } = await numWorker.recognize(numCanvas);
+  await numWorker.terminate();
+
+  const nameLine = (nameData.text ?? "")
     .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => /[a-zà-ÿ]{3,}/i.test(l))
-    .sort((a, b) => b.replace(/[^a-zà-ÿ]/gi, "").length - a.replace(/[^a-zà-ÿ]/gi, "").length)[0];
-  const parts = [
-    (nameLine ?? "").replace(/[^a-zà-ÿ' -]/gi, "").trim().slice(0, 40),
-    num ? num[1] : "",
-  ].filter(Boolean);
-  return parts.join(" ").trim();
+    .map((l) => l.replace(/[^a-zA-Zà-ÿ' -]/g, "").trim())
+    .filter((l) => l.replace(/[^a-zà-ÿ]/gi, "").length >= 3)
+    .sort((a, b) => b.length - a.length)[0];
+  const numMatch = (numData.text ?? "").match(/(\d{1,3})\s*\/\s*(\d{1,3})/);
+
+  return [
+    (nameLine ?? "").slice(0, 40).trim(),
+    numMatch ? numMatch[1] : "",
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 }
 
 export function CapturePhone({
