@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CardSearchResult, SerieWithSets, CatalogLang } from "@/lib/tcgdex";
 import { CardImage } from "@/components/card-image";
 import { ExtensionsBrowser } from "@/components/extensions-browser";
+import { PhoneCaptureButton } from "@/components/capture/phone-capture-button";
 
 type Status = "idle" | "loading" | "done" | "error";
 
@@ -66,14 +67,22 @@ export function SearchClient({
 
   return (
     <div>
-      <input
-        type="search"
-        value={query}
-        onChange={(e) => handleChange(e.target.value)}
-        placeholder="Nom ou nom + numéro… (ex. pikachu 27)"
-        autoFocus
-        className="field mb-8 max-w-md !px-4 !py-3 !text-base"
-      />
+      <div className="mb-8 flex max-w-md flex-wrap items-center gap-2">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => handleChange(e.target.value)}
+          placeholder="Nom ou nom + numéro… (ex. pikachu 27)"
+          autoFocus
+          className="field !w-auto flex-1 !px-4 !py-3 !text-base"
+        />
+        <PhoneCaptureButton
+          kind="detect"
+          label="Scanner"
+          className="btn btn-ghost !py-3 shrink-0"
+          onDetect={(q) => handleChange(q)}
+        />
+      </div>
 
       {status === "idle" && (
         <ExtensionsBrowser

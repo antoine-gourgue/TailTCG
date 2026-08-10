@@ -17,6 +17,7 @@ import { ValueUpdateButton } from "@/components/quick-value-edit";
 import { SellButton } from "@/components/sell-button";
 import { BinderPicker } from "@/components/binder-picker";
 import { PregradeButton } from "@/components/pregrade-wizard";
+import { PhoneCaptureButton } from "@/components/capture/phone-capture-button";
 import {
   GradingReportButton,
   type GradingReportData,
@@ -304,6 +305,11 @@ export default async function CartePage({
                     />
                   )}
                   <PregradeButton itemId={item.id ?? id} photos={photos} />
+                  <PhoneCaptureButton
+                    kind="photos"
+                    itemId={item.id ?? id}
+                    label="Photos"
+                  />
                   <ValueUpdateButton
                     itemId={item.id ?? id}
                     current={item.current_price}

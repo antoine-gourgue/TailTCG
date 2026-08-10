@@ -118,6 +118,57 @@ export type Database = {
         }
         Relationships: []
       }
+      capture_sessions: {
+        Row: {
+          created_at: string | null
+          expires_at: string
+          id: string
+          item_id: string | null
+          kind: string
+          owner_id: string
+          result: Json | null
+          status: string
+          token: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          item_id?: string | null
+          kind: string
+          owner_id?: string
+          result?: Json | null
+          status?: string
+          token?: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          item_id?: string | null
+          kind?: string
+          owner_id?: string
+          result?: Json | null
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "capture_sessions_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "collection_value"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "capture_sessions_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_cards: {
         Row: {
           created_at: string | null

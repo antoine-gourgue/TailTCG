@@ -8,6 +8,9 @@ const PUBLIC_PATHS = [
   "/auth",
   "/api/cron",
   "/v/",
+  // Capture depuis le téléphone : accès par jeton, sans connexion
+  "/capture/",
+  "/api/capture/",
   // Métadonnées récupérées par des robots non connectés
   "/opengraph-image",
   "/manifest.webmanifest",
