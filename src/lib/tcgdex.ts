@@ -45,6 +45,20 @@ export function cardImageUrl(
   return `${base}/${quality}.${format}`;
 }
 
+/** Ids des sets Pokémon Pocket (appli mobile), à exclure du catalogue */
+export async function pocketSetIds(): Promise<Set<string>> {
+  try {
+    const r = await fetch(`${TCGDEX_BASE}/series/tcgp`, {
+      next: { revalidate: DAY_SECONDS },
+    });
+    if (!r.ok) return new Set();
+    const d = (await r.json()) as { sets?: { id: string }[] };
+    return new Set((d.sets ?? []).map((s) => s.id));
+  } catch {
+    return new Set();
+  }
+}
+
 export async function fetchSetsIndex(): Promise<Map<string, TcgdexSetBrief>> {
   const res = await fetch(`${TCGDEX_BASE}/sets`, {
     next: { revalidate: DAY_SECONDS },
@@ -173,7 +187,11 @@ export async function fetchSeriesWithSets(
     next: { revalidate: DAY_SECONDS },
   });
   if (!res.ok) return [];
-  const list: { id: string; name: string }[] = await res.json();
+  const raw: { id: string; name: string }[] = await res.json();
+  // Exclut Pokémon Pocket (cartes de l'appli mobile, pas des cartes physiques)
+  const list = raw.filter(
+    (s) => s.id !== "tcgp" && !/pocket/i.test(s.name)
+  );
 
   const details = await Promise.all(
     list.map(async (s) => {
@@ -315,7 +333,10 @@ export async function searchCards(query: string): Promise<CardSearchResult[]> {
   const name = numMatch ? numMatch[1].trim() : q;
   const localId = numMatch ? numMatch[2] : null;
 
-  const setsIndex = await fetchSetsIndex();
+  const [setsIndex, pocket] = await Promise.all([
+    fetchSetsIndex(),
+    pocketSetIds(),
+  ]);
   let cards: TcgdexCardBrief[] = [];
 
   if (localId && name) {
@@ -351,7 +372,9 @@ export async function searchCards(query: string): Promise<CardSearchResult[]> {
     cards = await fetchCardBriefs(`?name=like:${encodeURIComponent(name)}`);
   }
 
-  const results = cards.map((c) => {
+  const results = cards
+    .filter((c) => !pocket.has(setIdFromCardId(c.id)))
+    .map((c) => {
     const setId = setIdFromCardId(c.id);
     return {
       id: c.id,
