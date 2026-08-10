@@ -76,12 +76,15 @@ export function SearchClient({
           autoFocus
           className="field !w-auto flex-1 !px-4 !py-3 !text-base"
         />
-        <PhoneCaptureButton
-          kind="detect"
-          label="Scanner"
-          className="btn btn-ghost !py-3 shrink-0"
-          onDetect={(q) => handleChange(q)}
-        />
+        {/* Scan OCR encore imparfait : masqué en production, gardé en dev */}
+        {process.env.NODE_ENV !== "production" && (
+          <PhoneCaptureButton
+            kind="detect"
+            label="Scanner"
+            className="btn btn-ghost !py-3 shrink-0"
+            onDetect={(q) => handleChange(q)}
+          />
+        )}
       </div>
 
       {status === "idle" && (
