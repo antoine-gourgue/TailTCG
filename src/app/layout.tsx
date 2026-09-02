@@ -35,9 +35,19 @@ export const metadata: Metadata = {
     title: "TailTCG — Ta collection Pokémon, enfin à sa hauteur",
     description:
       "Suivi, valeur, pré-gradation, classeurs et vitrine partageable. Gratuit, fait par un collectionneur.",
+    images: [
+      {
+        url: "https://tailtcg.vercel.app/og.png",
+        width: 1200,
+        height: 630,
+        type: "image/png",
+        alt: "TailTCG",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
+    images: ["https://tailtcg.vercel.app/og.png"],
   },
   appleWebApp: {
     capable: true,
