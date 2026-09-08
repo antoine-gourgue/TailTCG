@@ -16,8 +16,10 @@ import { CardImage } from "@/components/card-image";
 import { BinderCover, type CoverItem } from "@/components/binder-cover";
 import { Toast } from "@/components/toast";
 import {
-  moveBinderItem,
+  movePocket,
   placeItemInPocket,
+  placeWantedInPocket,
+  removeFromPocket,
   updateBinderPageGrid,
 } from "@/app/classeurs/actions";
 import {
@@ -26,16 +28,23 @@ import {
   pageGrid,
   pocketsPerPage,
 } from "@/lib/binder-pages";
+import type { CardSearchResult } from "@/lib/tcgdex";
 
-// Classeur simulé : couverture fermée à la taille des pages, puis pages
-// perforées sur des anneaux (la première seule, ensuite deux par deux). On
-// tourne les pages par les bords, les onglets, le clavier ou un balayage ;
-// on glisse une carte vers une pochette, un onglet ou un bord ; une pochette
-// vide ouvre un tiroir pour y ranger une carte de la collection.
+// Classeur simulé : couverture fermée à la taille exacte des pages, puis
+// pages perforées sur des anneaux (une feuille vierge face à la page 1,
+// ensuite deux par deux). On tourne les pages par les bords, les onglets,
+// le clavier ou un balayage ; on glisse une carte vers une pochette, un
+// onglet ou un bord ; une pochette vide ouvre un tiroir pour y ranger une
+// carte de la collection, ou une carte du catalogue qu'on ne possède pas.
 
+/** Une carte rangée : exemplaire possédé (`i:<item>`) ou hors collection (`w:<id>`) */
 export type PocketItem = {
   id: string;
+  kind: "owned" | "wanted";
   card_name: string;
+  set_name?: string;
+  local_id?: string;
+  tcgdex_id?: string;
   image_url: string;
   photo_fallback?: string | null;
   quantity: number;
@@ -46,6 +55,7 @@ export type PocketItem = {
 /** Carte de la collection proposée pour remplir une pochette vide */
 export type CandidateItem = {
   id: string;
+  tcgdex_id: string;
   card_name: string;
   set_name: string;
   local_id: string;
@@ -53,6 +63,9 @@ export type CandidateItem = {
   photo_fallback?: string | null;
   quantity: number;
 };
+
+/** Identifiant de la ligne derrière une clé de pochette */
+const refIdOf = (key: string) => key.slice(2);
 
 /** Déplacement souris avant de « soulever » la carte */
 const DRAG_THRESHOLD = 6;
@@ -68,6 +81,8 @@ const OPEN_FALLBACK_MS = 700;
 const RINGS = [0.13, 0.37, 0.63, 0.87];
 /** Cartes affichées au plus dans le tiroir */
 const PICKER_MAX = 80;
+/** Attente après la frappe avant d'interroger le catalogue */
+const SEARCH_DEBOUNCE_MS = 350;
 
 /** Deux pages face à face dès md, une seule en dessous */
 const SPREAD_QUERY = "(min-width: 768px)";
@@ -107,7 +122,9 @@ type Overrides = {
   key: string;
   map: Map<string, number>;
   extra: Map<string, PocketItem>;
+  removed: Set<string>;
 };
+type Catalog = { q: string; cards: CardSearchResult[]; error: boolean };
 
 /** minuscules sans accents, pour la recherche texte */
 function normalize(s: string): string {
@@ -175,7 +192,7 @@ export function BinderPages({
   colorHex: string | null;
   cover: { style: string | null; covers: CoverItem[] };
   readOnly?: boolean;
-  /** Préfixe du lien de la fiche d'une carte (`/carte/`) — absent en vitrine */
+  /** Préfixe du lien de la fiche d'un exemplaire (`/carte/`) — absent en vitrine */
   hrefBase?: string;
 }) {
   const router = useRouter();
@@ -196,10 +213,14 @@ export function BinderPages({
     key: "",
     map: new Map(),
     extra: new Map(),
+    removed: new Set(),
   });
   const live = ov.key === serverKey ? ov : null;
   const pockets = new Map(base);
-  if (live) for (const [id, p] of live.map) pockets.set(id, p);
+  if (live) {
+    for (const id of live.removed) pockets.delete(id);
+    for (const [id, p] of live.map) if (!live.removed.has(id)) pockets.set(id, p);
+  }
 
   const [opened, setOpened] = useState(false);
   const [opening, setOpening] = useState(false);
@@ -212,8 +233,11 @@ export function BinderPages({
   const [over, setOver] = useState<string | null>(null);
   /** Pochette en cours de remplissage (tiroir ouvert) */
   const [picker, setPicker] = useState<number | null>(null);
+  const [mode, setMode] = useState<"collection" | "catalogue">("collection");
   const [q, setQ] = useState("");
   const [fSet, setFSet] = useState("");
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const [savingGrid, setSavingGrid] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
@@ -239,25 +263,25 @@ export function BinderPages({
   const usedPages = Math.max(1, Math.ceil((maxPocket + 1) / perPage));
   // Propriétaire : toujours une page vide à la suite pour y ranger des cartes
   let totalPages = readOnly ? usedPages : usedPages + 1;
-  // Après la première page seule, les pages vont par deux : total impair
+  // Après la première page (face à une feuille vierge), les pages vont par
+  // deux : total impair
   if (perView === 2 && (totalPages - 1) % 2 === 1) totalPages += 1;
   const totalViews = perView === 2 ? 1 + (totalPages - 1) / 2 : totalPages;
   const view = Math.min(nav.view, totalViews - 1);
 
-  /** Pages d'une vue : la première est seule sur ses anneaux */
-  function pagesOf(v: number): number[] {
+  /** Pages d'une vue : la première fait face à une feuille vierge */
+  function pagesOf(v: number): (number | "blank")[] {
     if (perView === 1) return [v];
-    return v === 0 ? [0] : [2 * v - 1, 2 * v];
+    return v === 0 ? ["blank", 0] : [2 * v - 1, 2 * v];
   }
   function labelOf(v: number): string {
-    const ps = pagesOf(v);
+    const ps = pagesOf(v).filter((p): p is number => p !== "blank");
     return ps.length === 2 ? `${ps[0] + 1}–${ps[1] + 1}` : `${ps[0] + 1}`;
   }
   const visible = pagesOf(view);
   const dragItem = drag ? itemById.get(drag.id) : null;
   const dragging = drag != null;
-  /** Proportions d'une page fermée selon la grille (cartes 63×88) */
-  const coverAspect = `${grid.cols * 63} / ${grid.rows * 88}`;
+  const pickerOpen = picker != null;
 
   function go(v: number) {
     const target = Math.max(0, Math.min(totalViews - 1, v));
@@ -283,14 +307,54 @@ export function BinderPages({
     return () => window.clearTimeout(t);
   }, [opening]);
 
-  function patch(entries: [string, number][], extra?: PocketItem) {
+  // Catalogue TCGdex : recherche différée pendant la frappe
+  useEffect(() => {
+    if (!pickerOpen || mode !== "catalogue") return;
+    const query = q.trim();
+    if (query.length < 2) return;
+    const ctrl = new AbortController();
+    const t = window.setTimeout(async () => {
+      setCatalogLoading(true);
+      try {
+        const r = await fetch(`/api/tcgdex/search?q=${encodeURIComponent(query)}`, {
+          signal: ctrl.signal,
+        });
+        const d = (await r.json()) as { cards?: CardSearchResult[] };
+        setCatalog({
+          q: query,
+          // Les cartes perso ont déjà leur place dans la collection
+          cards: (d.cards ?? []).filter((c) => !c.id.startsWith("custom:")),
+          error: !r.ok,
+        });
+      } catch {
+        if (!ctrl.signal.aborted) setCatalog({ q: query, cards: [], error: true });
+      } finally {
+        if (!ctrl.signal.aborted) setCatalogLoading(false);
+      }
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      window.clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [pickerOpen, mode, q]);
+
+  function patchOv(
+    entries: [string, number][],
+    extra?: PocketItem,
+    removedKey?: string
+  ) {
     setOv((cur) => {
       const same = cur.key === serverKey;
       const map = new Map(same ? cur.map : []);
       const ex = new Map(same ? cur.extra : []);
-      for (const [k, v] of entries) map.set(k, v);
+      const removed = new Set(same ? cur.removed : []);
+      for (const [k, v] of entries) {
+        map.set(k, v);
+        removed.delete(k);
+      }
       if (extra) ex.set(extra.id, extra);
-      return { key: serverKey, map, extra: ex };
+      if (removedKey) removed.add(removedKey);
+      return { key: serverKey, map, extra: ex, removed };
     });
   }
 
@@ -300,9 +364,9 @@ export function BinderPages({
     const occupant = byPocket.get(to);
     const entries: [string, number][] = [[id, to]];
     if (occupant && from != null) entries.push([occupant.id, from]);
-    patch(entries);
+    patchOv(entries);
 
-    const { error } = await moveBinderItem(binderId, id, to);
+    const { error } = await movePocket(binderId, id, to);
     if (error) {
       setOv(before);
       setToast({ message: "Déplacement non enregistré", tone: "error" });
@@ -313,6 +377,7 @@ export function BinderPages({
 
   function firstFreeIn(v: number, after = -1): number | null {
     for (const pg of pagesOf(v)) {
+      if (pg === "blank") continue;
       for (let k = 0; k < perPage; k++) {
         const pocket = pg * perPage + k;
         if (pocket > after && !byPocket.has(pocket)) return pocket;
@@ -331,17 +396,27 @@ export function BinderPages({
     await commitMove(id, pocket);
   }
 
-  /** Range une carte dans la pochette ciblée, puis vise la pochette vide suivante */
+  /** Vise la pochette vide suivante pour enchaîner les rangements */
+  function advancePicker(fromPocket: number) {
+    setPicker(firstFreeIn(view, fromPocket) ?? firstFreeIn(view));
+  }
+
+  /** Range un exemplaire de la collection dans la pochette ciblée */
   async function place(c: CandidateItem, pocket: number) {
-    setPicker(firstFreeIn(view, pocket) ?? firstFreeIn(view));
-    if (pockets.has(c.id)) {
-      await commitMove(c.id, pocket);
+    advancePicker(pocket);
+    const key = `i:${c.id}`;
+    if (pockets.has(key)) {
+      await commitMove(key, pocket);
       return;
     }
     const before = ov;
-    patch([[c.id, pocket]], {
-      id: c.id,
+    patchOv([[key, pocket]], {
+      id: key,
+      kind: "owned",
       card_name: c.card_name,
+      set_name: c.set_name,
+      local_id: c.local_id,
+      tcgdex_id: c.tcgdex_id,
       image_url: c.image_url,
       photo_fallback: c.photo_fallback ?? null,
       quantity: c.quantity,
@@ -354,6 +429,64 @@ export function BinderPages({
       setToast({ message: "Carte non rangée", tone: "error" });
       return;
     }
+    router.refresh();
+  }
+
+  /** Range une carte du catalogue qu'on ne possède pas (hors collection) */
+  async function placeWanted(c: CardSearchResult, pocket: number) {
+    advancePicker(pocket);
+    const id = crypto.randomUUID();
+    const key = `w:${id}`;
+    const before = ov;
+    patchOv([[key, pocket]], {
+      id: key,
+      kind: "wanted",
+      card_name: c.name,
+      set_name: c.setName,
+      local_id: c.localId,
+      tcgdex_id: c.id,
+      image_url: c.image ?? "",
+      quantity: 1,
+      position: pocket,
+      created_at: "",
+    });
+    const { error } = await placeWantedInPocket(
+      binderId,
+      {
+        id,
+        tcgdex_id: c.id,
+        card_name: c.name,
+        set_name: c.setName,
+        local_id: c.localId,
+        image_url: c.image,
+      },
+      pocket
+    );
+    if (error) {
+      setOv(before);
+      setToast({ message: "Carte non rangée", tone: "error" });
+      return;
+    }
+    router.refresh();
+  }
+
+  /** Retire une carte de CE classeur — un exemplaire reste dans la collection */
+  async function remove(key: string) {
+    const item = itemById.get(key);
+    const before = ov;
+    patchOv([], undefined, key);
+    const { error } = await removeFromPocket(binderId, key);
+    if (error) {
+      setOv(before);
+      setToast({ message: "Retrait impossible", tone: "error" });
+      return;
+    }
+    setToast({
+      message:
+        item?.kind === "wanted"
+          ? "Carte hors collection retirée du classeur"
+          : "Retirée du classeur — elle reste dans ta collection",
+    });
     router.refresh();
   }
 
@@ -560,12 +693,12 @@ export function BinderPages({
     else goPrev();
   }
   function onKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Escape" && picker != null) {
+    if (e.key === "Escape" && pickerOpen) {
       e.preventDefault();
       setPicker(null);
       return;
     }
-    if (!opened || picker != null) return;
+    if (!opened || pickerOpen) return;
     if (e.key === "ArrowRight") {
       e.preventDefault();
       goNext();
@@ -579,8 +712,8 @@ export function BinderPages({
   /** Animation d'entrée d'une page selon le sens du changement */
   function turnClass(role: Role): string {
     if (!nav.dir) return "";
-    // Page 1 seule : elle se rabat depuis les anneaux
-    if (perView === 2 && view === 0) return "page-turn-right";
+    // À l'ouverture, la page 1 se rabat depuis les anneaux
+    if (perView === 2 && view === 0) return role === "right" ? "page-turn-right" : "page-fade";
     if (nav.dir === "next") return role === "right" ? "page-fade" : "page-turn-left";
     return role === "left" ? "page-fade" : "page-turn-right";
   }
@@ -596,7 +729,7 @@ export function BinderPages({
   );
   const needle = normalize(q.trim());
   const results =
-    picker == null
+    !pickerOpen || mode !== "collection"
       ? []
       : candidates
           .filter(
@@ -608,8 +741,19 @@ export function BinderPages({
                 ))
           )
           // Les cartes pas encore dans ce classeur d'abord
-          .sort((a, b) => (pockets.has(a.id) ? 1 : 0) - (pockets.has(b.id) ? 1 : 0))
+          .sort(
+            (a, b) =>
+              (pockets.has(`i:${a.id}`) ? 1 : 0) - (pockets.has(`i:${b.id}`) ? 1 : 0)
+          )
           .slice(0, PICKER_MAX);
+  /** Exemplaire possédé et carte hors collection déjà rangée, par carte TCGdex */
+  const ownedByTcgdex = new Map<string, CandidateItem>();
+  for (const c of candidates) if (!ownedByTcgdex.has(c.tcgdex_id)) ownedByTcgdex.set(c.tcgdex_id, c);
+  const wantedByTcgdex = new Map<string, PocketItem>();
+  for (const it of itemById.values()) {
+    if (it.kind === "wanted" && it.tcgdex_id && pockets.has(it.id)) wantedByTcgdex.set(it.tcgdex_id, it);
+  }
+  const catalogFresh = catalog != null && catalog.q === q.trim();
 
   // ---- Rendu ---------------------------------------------------------------
 
@@ -642,16 +786,42 @@ export function BinderPages({
     );
   }
 
-  function renderPage(pageIdx: number, role: Role) {
+  /** Feuille vierge face à la page 1 (l'intérieur de la couverture) */
+  function renderBlankPage() {
+    return (
+      <section
+        key="blank"
+        aria-label="Feuille vierge"
+        className={`relative z-0 min-w-0 rounded-l-xl border border-edge bg-surface shadow-[var(--shadow-panel)] ${PAGE_W} ${turnClass("left")}`}
+      >
+        <span
+          aria-hidden
+          className="absolute inset-y-2 -left-1 w-1 rounded-sm border border-edge bg-raised"
+        />
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 w-12 rounded-r-[inherit] bg-gradient-to-l from-black/30 to-transparent"
+        />
+        <Holes side="right" />
+        {renderEdge("prev", "left")}
+      </section>
+    );
+  }
+
+  function renderPage(pageIdx: number, role: Role, phantom = false) {
     // Perforations côté anneaux ; page seule (mobile) : perforée à gauche
     const holesLeft = role !== "left";
     return (
       <section
         key={pageIdx}
-        aria-label={`Page ${pageIdx + 1}`}
-        className={`relative z-0 min-w-0 border border-edge bg-surface shadow-[var(--shadow-panel)] [backface-visibility:hidden] ${PAGE_W} ${
+        aria-label={phantom ? undefined : `Page ${pageIdx + 1}`}
+        aria-hidden={phantom || undefined}
+        className={`relative z-0 min-w-0 border border-edge bg-surface shadow-[var(--shadow-panel)] [backface-visibility:hidden] ${
+          // Fantôme : il remplit le conteneur qui a déjà la largeur d'une page
+          phantom ? "invisible w-full" : PAGE_W
+        } ${
           role === "left" ? "rounded-l-xl" : role === "right" ? "rounded-r-xl" : "rounded-xl"
-        } ${turnClass(role)}`}
+        } ${phantom ? "" : turnClass(role)}`}
       >
         {/* Feuilles empilées derrière, côté extérieur */}
         <span
@@ -678,10 +848,10 @@ export function BinderPages({
         <Holes side={holesLeft ? "left" : "right"} />
 
         {/* Bords cliquables pour tourner (et cibles de survol en glissant) */}
-        {role === "left" && renderEdge("prev", "left")}
-        {role === "right" && renderEdge("next", "right")}
-        {role === "single" && renderEdge("prev", "left")}
-        {role === "single" && renderEdge("next", "right")}
+        {!phantom && role === "left" && renderEdge("prev", "left")}
+        {!phantom && role === "right" && renderEdge("next", "right")}
+        {!phantom && role === "single" && renderEdge("prev", "left")}
+        {!phantom && role === "single" && renderEdge("next", "right")}
 
         <div
           className={`grid gap-2 py-3 pb-6 sm:gap-2.5 sm:py-4 sm:pb-7 ${
@@ -693,12 +863,15 @@ export function BinderPages({
         >
           {Array.from({ length: perPage }, (_, k) => {
             const pocket = pageIdx * perPage + k;
-            const item = byPocket.get(pocket);
+            const item = phantom ? undefined : byPocket.get(pocket);
             const isSource = drag?.id === item?.id;
             const isOver =
               dragging && over === `pocket:${pocket}` && pockets.get(drag.id) !== pocket;
-            const isTarget = picker === pocket;
-            const href = item && hrefBase ? `${hrefBase}${item.id}` : null;
+            const isTarget = !phantom && picker === pocket;
+            const href =
+              item && item.kind === "owned" && hrefBase
+                ? `${hrefBase}${refIdOf(item.id)}`
+                : null;
             const handlers =
               item && !readOnly
                 ? {
@@ -713,11 +886,30 @@ export function BinderPages({
             const cardCls = `block h-full w-full select-none [-webkit-touch-callout:none] ${
               readOnly ? "" : "touch-manipulation cursor-grab active:cursor-grabbing"
             }`;
+            const wantedLabel =
+              item?.kind === "wanted" &&
+              (readOnly || !item.tcgdex_id ? (
+                <span className="tile-badge bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px]">
+                  Hors collection
+                </span>
+              ) : (
+                <Link
+                  href={`/ajouter?card=${encodeURIComponent(item.tcgdex_id)}`}
+                  title="Ajouter cette carte à ma collection"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (swallowClick()) e.preventDefault();
+                  }}
+                  className="tile-badge bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] transition hover:!bg-accent hover:!text-accent-ink"
+                >
+                  Hors collection
+                </Link>
+              ));
             const card = item && (
               <div
                 className={`card-tile h-full w-full transition-opacity ${
                   isSource ? "opacity-30" : ""
-                }`}
+                } ${item.kind === "wanted" ? "saturate-[.8]" : ""}`}
               >
                 <CardImage
                   base={item.image_url || null}
@@ -727,13 +919,14 @@ export function BinderPages({
                 {item.quantity > 1 && (
                   <span className="tile-badge num right-1 top-1">×{item.quantity}</span>
                 )}
+                {wantedLabel}
               </div>
             );
-            const fillable = !item && !readOnly;
+            const fillable = !phantom && !item && !readOnly;
             return (
               <div
                 key={pocket}
-                data-pocket={pocket}
+                data-pocket={phantom ? undefined : pocket}
                 onClick={
                   fillable
                     ? () => {
@@ -767,6 +960,26 @@ export function BinderPages({
                       </div>
                     )}
                   </div>
+                )}
+                {item && !readOnly && (
+                  <button
+                    type="button"
+                    aria-label="Retirer du classeur"
+                    title={
+                      item.kind === "owned"
+                        ? "Retirer de ce classeur (la carte reste dans ta collection)"
+                        : "Retirer cette carte hors collection du classeur"
+                    }
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (!swallowClick()) void remove(item.id);
+                    }}
+                    className="absolute left-1 top-1 z-20 flex h-6 w-6 items-center justify-center rounded-full border border-white/20 bg-black/65 text-white/90 opacity-0 shadow backdrop-blur-sm transition hover:!bg-loss hover:!text-white group-hover/p:opacity-100 pointer-coarse:opacity-100"
+                  >
+                    <X size={12} aria-hidden />
+                  </button>
                 )}
                 {fillable && (
                   <Plus
@@ -848,11 +1061,103 @@ export function BinderPages({
     );
   }
 
+  function renderCatalogResults(pocket: number) {
+    const query = q.trim();
+    if (query.length < 2) {
+      return (
+        <p className="text-sm text-muted">
+          Tape au moins deux lettres : la carte trouvée occupera la pochette en
+          attendant que tu l&apos;aies, marquée « Hors collection ».
+        </p>
+      );
+    }
+    if (catalogLoading && !catalogFresh) {
+      return <p className="text-sm text-muted">Recherche dans le catalogue…</p>;
+    }
+    if (!catalog || !catalogFresh) return null;
+    if (catalog.error) {
+      return (
+        <p className="text-sm text-loss">
+          TCGdex est injoignable, réessaie dans un instant.
+        </p>
+      );
+    }
+    if (catalog.cards.length === 0) {
+      return <p className="text-sm text-muted">Aucune carte ne correspond.</p>;
+    }
+    return (
+      <ul className="grid grid-cols-3 gap-3 xl:grid-cols-4">
+        {catalog.cards.slice(0, PICKER_MAX).map((c) => {
+          const owned = ownedByTcgdex.get(c.id);
+          const wanted = wantedByTcgdex.get(c.id);
+          const wantedAt = wanted ? pockets.get(wanted.id) : undefined;
+          const title = owned
+            ? "Tu la possèdes : ranger ton exemplaire ici"
+            : wanted
+              ? `Déjà page ${Math.floor((wantedAt ?? 0) / perPage) + 1} — déplacer ici`
+              : "Ranger ici, hors collection";
+          return (
+            <li key={c.id}>
+              <button
+                type="button"
+                onClick={() =>
+                  owned
+                    ? void place(owned, pocket)
+                    : wanted
+                      ? void commitMove(wanted.id, pocket)
+                      : void placeWanted(c, pocket)
+                }
+                className="group/c block w-full text-left"
+                title={title}
+              >
+                <div className="card-tile aspect-[63/88]">
+                  <CardImage base={c.image} alt={c.name} />
+                  {owned ? (
+                    <span className="tile-badge left-1.5 top-1.5 !bg-accent !text-accent-ink">
+                      Collection
+                    </span>
+                  ) : wanted ? (
+                    <span className="tile-badge num left-1.5 top-1.5">
+                      p. {Math.floor((wantedAt ?? 0) / perPage) + 1}
+                    </span>
+                  ) : (
+                    <span className="tile-badge bottom-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px]">
+                      Hors collection
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1.5 truncate text-xs font-medium transition group-hover/c:text-accent-strong">
+                  {c.name}
+                </p>
+                <p className="truncate text-[11px] text-faint">
+                  {c.setName} · <span className="num">{c.localId}</span>
+                </p>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
   function renderPicker() {
     if (picker == null) return null;
-    const page = Math.floor(picker / perPage) + 1;
-    const slot = (picker % perPage) + 1;
+    const pocket = picker;
+    const page = Math.floor(pocket / perPage) + 1;
+    const slot = (pocket % perPage) + 1;
     const close = () => setPicker(null);
+    const modeBtn = (m: typeof mode, label: string) => (
+      <button
+        type="button"
+        onClick={() => setMode(m)}
+        aria-pressed={mode === m}
+        className={`rounded-md px-2.5 py-1.5 text-[13px] font-medium transition ${
+          mode === m ? "bg-raised text-foreground shadow-sm" : "text-muted hover:text-foreground"
+        }`}
+      >
+        {label}
+      </button>
+    );
     return (
       <>
         <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={close} aria-hidden />
@@ -867,7 +1172,7 @@ export function BinderPages({
               <p className="display text-base font-semibold">Ranger une carte</p>
               <p className="mt-0.5 text-sm text-muted">
                 Page <span className="num">{page}</span>, pochette{" "}
-                <span className="num">{slot}</span> — choisis une carte de ta collection.
+                <span className="num">{slot}</span>
               </p>
             </div>
             <button
@@ -880,53 +1185,65 @@ export function BinderPages({
             </button>
           </header>
 
-          <div className="flex gap-2 border-b border-edge px-5 py-3">
-            <div className="relative flex-1">
-              <Search
-                size={14}
-                aria-hidden
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint"
-              />
-              <input
-                type="text"
-                autoFocus
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Nom, numéro…"
-                className="field !pl-9 text-[13px]"
-              />
+          <div className="flex flex-col gap-2.5 border-b border-edge px-5 py-3">
+            <div className="inline-flex self-start rounded-lg border border-edge bg-surface p-0.5">
+              {modeBtn("collection", "Ma collection")}
+              {modeBtn("catalogue", "Catalogue TCGdex")}
             </div>
-            {sets.length > 1 && (
-              <select
-                value={fSet}
-                onChange={(e) => setFSet(e.target.value)}
-                className="field !w-auto max-w-[45%] text-[13px]"
-                aria-label="Extension"
-              >
-                <option value="">Toutes les extensions</option>
-                {sets.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            )}
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search
+                  size={14}
+                  aria-hidden
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint"
+                />
+                <input
+                  type="text"
+                  autoFocus
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder={
+                    mode === "collection" ? "Nom, numéro…" : "Nom de la carte, numéro…"
+                  }
+                  className="field !pl-9 text-[13px]"
+                />
+              </div>
+              {mode === "collection" && sets.length > 1 && (
+                <select
+                  value={fSet}
+                  onChange={(e) => setFSet(e.target.value)}
+                  className="field !w-auto max-w-[45%] text-[13px]"
+                  aria-label="Extension"
+                >
+                  <option value="">Toutes les extensions</option>
+                  {sets.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-4">
-            {candidates.length === 0 ? (
-              <p className="text-sm text-muted">Ta collection est vide.</p>
+            {mode === "catalogue" ? (
+              renderCatalogResults(pocket)
+            ) : candidates.length === 0 ? (
+              <p className="text-sm text-muted">
+                Ta collection est vide — cherche une carte dans le catalogue.
+              </p>
             ) : results.length === 0 ? (
               <p className="text-sm text-muted">Aucune carte ne correspond.</p>
             ) : (
               <ul className="grid grid-cols-3 gap-3 xl:grid-cols-4">
                 {results.map((c) => {
-                  const at = pockets.get(c.id);
+                  const at = pockets.get(`i:${c.id}`);
                   return (
                     <li key={c.id}>
                       <button
                         type="button"
-                        onClick={() => place(c, picker)}
+                        onClick={() => void place(c, pocket)}
                         className="group/c block w-full text-left"
                         title={
                           at != null
@@ -967,7 +1284,7 @@ export function BinderPages({
                 })}
               </ul>
             )}
-            {results.length >= PICKER_MAX && (
+            {mode === "collection" && results.length >= PICKER_MAX && (
               <p className="mt-3 text-xs text-faint">
                 Affine ta recherche pour voir d&apos;autres cartes.
               </p>
@@ -986,29 +1303,33 @@ export function BinderPages({
   return (
     <div className="outline-none" tabIndex={0} onKeyDown={onKeyDown}>
       {!opened ? (
-        <div className="flex flex-col items-center py-4">
-          <button
-            type="button"
-            onClick={() => !opening && setOpening(true)}
-            disabled={opening}
-            aria-label="Ouvrir le classeur"
-            className={`group [perspective:2000px] ${PAGE_W}`}
-          >
-            <div
-              className={`transition-transform duration-300 [transform-origin:left_center] group-hover:[transform:rotateY(-7deg)] ${
-                opening ? "cover-open" : ""
-              }`}
-              onAnimationEnd={finishOpening}
+        <div className="flex flex-col items-center py-2 md:pr-12">
+          {/* La page fantôme donne à la couverture la taille exacte des pages */}
+          <div className={`relative ${PAGE_W}`}>
+            {renderPage(0, perView === 2 ? "right" : "single", true)}
+            <button
+              type="button"
+              onClick={() => !opening && setOpening(true)}
+              disabled={opening}
+              aria-label="Ouvrir le classeur"
+              className="group absolute inset-0 [perspective:2000px]"
             >
-              <BinderCover
-                style={cover.style}
-                covers={cover.covers}
-                name={name}
-                colorHex={colorHex}
-                aspect={coverAspect}
-              />
-            </div>
-          </button>
+              <div
+                className={`h-full w-full transition-transform duration-300 [transform-origin:left_center] group-hover:[transform:rotateY(-7deg)] ${
+                  opening ? "cover-open" : ""
+                }`}
+                onAnimationEnd={finishOpening}
+              >
+                <BinderCover
+                  style={cover.style}
+                  covers={cover.covers}
+                  name={name}
+                  colorHex={colorHex}
+                  fill
+                />
+              </div>
+            </button>
+          </div>
           <p className="mt-5 text-sm text-muted">Clique pour ouvrir le classeur</p>
           <p className="num mt-1 text-xs text-faint">
             {count} carte{count > 1 ? "s" : ""} · {usedPages} page{usedPages > 1 ? "s" : ""} · {grid.cols}×{grid.rows}
@@ -1061,12 +1382,11 @@ export function BinderPages({
               onPointerUp={onSpreadUp}
             >
               {visible.map((pg, i) => {
-                const role: Role =
-                  perView === 1 ? "single" : visible.length === 1 || i === 1 ? "right" : "left";
+                const role: Role = perView === 1 ? "single" : i === 0 ? "left" : "right";
                 return (
                   <Fragment key={pg}>
                     {role === "right" && <Spine colorHex={colorHex} />}
-                    {renderPage(pg, role)}
+                    {pg === "blank" ? renderBlankPage() : renderPage(pg, role)}
                   </Fragment>
                 );
               })}

@@ -52,13 +52,17 @@ export async function addItemsToBinder(binderId: string, itemIds: string[]) {
   const supabase = await createClient();
   // Chaque nouvelle carte prend la pochette suivante ; celles déjà rangées
   // gardent la leur
-  const { data: links } = await supabase
-    .from("binder_items")
-    .select("item_id, position")
-    .eq("binder_id", binderId);
+  const [{ data: links }, { data: wanted }] = await Promise.all([
+    supabase.from("binder_items").select("item_id, position").eq("binder_id", binderId),
+    supabase.from("binder_placeholders").select("position").eq("binder_id", binderId),
+  ]);
   const present = new Set((links ?? []).map((l) => l.item_id));
   let pocket =
-    Math.max(-1, ...(links ?? []).map((l) => l.position ?? -1)) + 1;
+    Math.max(
+      -1,
+      ...(links ?? []).map((l) => l.position ?? -1),
+      ...(wanted ?? []).map((w) => w.position)
+    ) + 1;
   const fresh = [...new Set(itemIds)].filter((id) => !present.has(id));
   if (fresh.length === 0) return { error: null };
 
@@ -194,12 +198,12 @@ export async function setItemBinders(itemId: string, binderIds: string[]) {
 
   if (binderIds.length > 0) {
     // La carte prend la pochette suivante dans chacun des classeurs
-    const { data: links } = await supabase
-      .from("binder_items")
-      .select("binder_id, position")
-      .in("binder_id", binderIds);
+    const [{ data: links }, { data: wanted }] = await Promise.all([
+      supabase.from("binder_items").select("binder_id, position").in("binder_id", binderIds),
+      supabase.from("binder_placeholders").select("binder_id, position").in("binder_id", binderIds),
+    ]);
     const last = new Map<string, number>();
-    for (const l of links ?? []) {
+    for (const l of [...(links ?? []), ...(wanted ?? [])]) {
       last.set(l.binder_id, Math.max(last.get(l.binder_id) ?? -1, l.position ?? -1));
     }
     const { error } = await supabase.from("binder_items").insert(
@@ -235,93 +239,176 @@ export async function updateBinderPageGrid(binderId: string, code: string) {
   return { error: error?.message ?? null };
 }
 
-/** Pages : range une carte de la collection dans une pochette libre (ou l'y déplace) */
-export async function placeItemInPocket(
+// ---- Pages de pochettes ----------------------------------------------------
+// Une pochette contient soit un exemplaire possédé (`i:<item_id>`), soit une
+// carte hors collection du catalogue (`w:<placeholder_id>`).
+
+type PocketRef = { kind: "i" | "w"; id: string };
+type Db = Awaited<ReturnType<typeof createClient>>;
+
+function parsePocketKey(key: string): PocketRef | null {
+  const m = key.match(/^([iw]):(.+)$/);
+  if (!m || !UUID_RE.test(m[2])) return null;
+  return { kind: m[1] as "i" | "w", id: m[2] };
+}
+
+/** Position d'une carte dans le classeur — undefined si elle n'y est pas */
+async function pocketOf(db: Db, binderId: string, ref: PocketRef) {
+  if (ref.kind === "i") {
+    const { data } = await db
+      .from("binder_items")
+      .select("position")
+      .eq("binder_id", binderId)
+      .eq("item_id", ref.id)
+      .maybeSingle();
+    return data ? data.position : undefined;
+  }
+  const { data } = await db
+    .from("binder_placeholders")
+    .select("position")
+    .eq("binder_id", binderId)
+    .eq("id", ref.id)
+    .maybeSingle();
+  return data ? data.position : undefined;
+}
+
+async function setPocket(db: Db, binderId: string, ref: PocketRef, position: number) {
+  const res =
+    ref.kind === "i"
+      ? await db
+          .from("binder_items")
+          .update({ position })
+          .eq("binder_id", binderId)
+          .eq("item_id", ref.id)
+      : await db
+          .from("binder_placeholders")
+          .update({ position })
+          .eq("binder_id", binderId)
+          .eq("id", ref.id);
+  return res.error?.message ?? null;
+}
+
+/** Occupant d'une pochette (exemplaire ou carte hors collection), sauf `except` */
+async function occupantOf(
+  db: Db,
   binderId: string,
-  itemId: string,
-  pocket: number
-) {
+  pocket: number,
+  except?: PocketRef
+): Promise<PocketRef | null> {
+  const [{ data: items }, { data: wanted }] = await Promise.all([
+    db.from("binder_items").select("item_id").eq("binder_id", binderId).eq("position", pocket),
+    db.from("binder_placeholders").select("id").eq("binder_id", binderId).eq("position", pocket),
+  ]);
+  for (const r of items ?? []) {
+    if (!(except?.kind === "i" && except.id === r.item_id)) return { kind: "i", id: r.item_id };
+  }
+  for (const r of wanted ?? []) {
+    if (!(except?.kind === "w" && except.id === r.id)) return { kind: "w", id: r.id };
+  }
+  return null;
+}
+
+/** Pages : déplace une carte vers une pochette — échange si elle est occupée */
+export async function movePocket(binderId: string, key: string, toPocket: number) {
+  const ref = parsePocketKey(key);
+  if (!UUID_RE.test(binderId) || !ref) return { error: "Classeur ou carte invalide" };
+  if (!Number.isInteger(toPocket) || toPocket < 0) return { error: "Pochette invalide" };
+
+  const db = await createClient();
+  const from = await pocketOf(db, binderId, ref);
+  if (from === undefined) return { error: "Carte absente du classeur" };
+  const occupant = await occupantOf(db, binderId, toPocket, ref);
+  if (occupant && from == null) return { error: "Pochette occupée" };
+
+  const errors = await Promise.all([
+    setPocket(db, binderId, ref, toPocket),
+    occupant && from != null ? setPocket(db, binderId, occupant, from) : Promise.resolve(null),
+  ]);
+  revalidatePath(`/classeurs/${binderId}`);
+  return { error: errors.find((e) => e != null) ?? null };
+}
+
+/** Pages : range un exemplaire de la collection dans une pochette libre (ou l'y déplace) */
+export async function placeItemInPocket(binderId: string, itemId: string, pocket: number) {
   if (!UUID_RE.test(binderId) || !UUID_RE.test(itemId)) {
     return { error: "Classeur ou carte invalide" };
   }
-  if (!Number.isInteger(pocket) || pocket < 0) {
-    return { error: "Pochette invalide" };
-  }
+  if (!Number.isInteger(pocket) || pocket < 0) return { error: "Pochette invalide" };
 
-  const supabase = await createClient();
-  const { data: rows, error: readError } = await supabase
-    .from("binder_items")
-    .select("item_id, position")
-    .eq("binder_id", binderId)
-    .or(`item_id.eq.${itemId},position.eq.${pocket}`);
-  if (readError) return { error: readError.message };
-  if (rows?.some((r) => r.item_id !== itemId && r.position === pocket)) {
-    return { error: "Pochette occupée" };
-  }
-
-  const already = rows?.some((r) => r.item_id === itemId);
-  const { error } = already
-    ? await supabase
-        .from("binder_items")
-        .update({ position: pocket })
-        .eq("binder_id", binderId)
-        .eq("item_id", itemId)
-    : await supabase
-        .from("binder_items")
-        .insert({ binder_id: binderId, item_id: itemId, position: pocket });
+  const db = await createClient();
+  const ref: PocketRef = { kind: "i", id: itemId };
+  if (await occupantOf(db, binderId, pocket, ref)) return { error: "Pochette occupée" };
+  const current = await pocketOf(db, binderId, ref);
+  const error =
+    current !== undefined
+      ? await setPocket(db, binderId, ref, pocket)
+      : ((
+          await db
+            .from("binder_items")
+            .insert({ binder_id: binderId, item_id: itemId, position: pocket })
+        ).error?.message ?? null);
 
   revalidatePath("/classeurs");
   revalidatePath(`/classeurs/${binderId}`);
   revalidatePath(`/carte/${itemId}`);
+  return { error };
+}
+
+/** Pages : range une carte du catalogue qu'on ne possède pas (hors collection) */
+export async function placeWantedInPocket(
+  binderId: string,
+  card: {
+    id: string;
+    tcgdex_id: string;
+    card_name: string;
+    set_name: string;
+    local_id: string;
+    image_url: string | null;
+  },
+  pocket: number
+) {
+  if (!UUID_RE.test(binderId) || !UUID_RE.test(card.id)) {
+    return { error: "Classeur ou carte invalide" };
+  }
+  if (!Number.isInteger(pocket) || pocket < 0) return { error: "Pochette invalide" };
+  const tcgdexId = card.tcgdex_id.trim();
+  const name = card.card_name.trim();
+  if (!tcgdexId || tcgdexId.startsWith("custom:") || !name) return { error: "Carte invalide" };
+
+  const db = await createClient();
+  if (await occupantOf(db, binderId, pocket)) return { error: "Pochette occupée" };
+  const { error } = await db.from("binder_placeholders").insert({
+    id: card.id,
+    binder_id: binderId,
+    tcgdex_id: tcgdexId.slice(0, 60),
+    card_name: name.slice(0, 120),
+    set_name: card.set_name.trim().slice(0, 120),
+    local_id: card.local_id.trim().slice(0, 20),
+    // Seuls les visuels du CDN TCGdex sont acceptés
+    image_url:
+      card.image_url && /^https:\/\/assets\.tcgdex\.net\//.test(card.image_url)
+        ? card.image_url
+        : null,
+    position: pocket,
+  });
+
+  revalidatePath(`/classeurs/${binderId}`);
   return { error: error?.message ?? null };
 }
 
-/** Pages : déplace une carte vers une pochette — échange si elle est occupée */
-export async function moveBinderItem(
-  binderId: string,
-  itemId: string,
-  toPocket: number
-) {
-  if (!UUID_RE.test(binderId) || !UUID_RE.test(itemId)) {
-    return { error: "Classeur ou carte invalide" };
-  }
-  if (!Number.isInteger(toPocket) || toPocket < 0) {
-    return { error: "Pochette invalide" };
-  }
+/** Pages : retire une carte de CE classeur — un exemplaire reste dans la collection */
+export async function removeFromPocket(binderId: string, key: string) {
+  const ref = parsePocketKey(key);
+  if (!UUID_RE.test(binderId) || !ref) return { error: "Classeur ou carte invalide" };
 
-  const supabase = await createClient();
-  const { data: rows, error: readError } = await supabase
-    .from("binder_items")
-    .select("item_id, position")
-    .eq("binder_id", binderId)
-    .or(`item_id.eq.${itemId},position.eq.${toPocket}`);
-  if (readError) return { error: readError.message };
+  const db = await createClient();
+  const { error } =
+    ref.kind === "i"
+      ? await db.from("binder_items").delete().eq("binder_id", binderId).eq("item_id", ref.id)
+      : await db.from("binder_placeholders").delete().eq("binder_id", binderId).eq("id", ref.id);
 
-  const mover = rows?.find((r) => r.item_id === itemId);
-  if (!mover) return { error: "Carte absente du classeur" };
-  const occupant = rows?.find(
-    (r) => r.item_id !== itemId && r.position === toPocket
-  );
-  if (occupant && mover.position == null) return { error: "Pochette occupée" };
-
-  const updates = [
-    supabase
-      .from("binder_items")
-      .update({ position: toPocket })
-      .eq("binder_id", binderId)
-      .eq("item_id", itemId),
-  ];
-  if (occupant) {
-    updates.push(
-      supabase
-        .from("binder_items")
-        .update({ position: mover.position })
-        .eq("binder_id", binderId)
-        .eq("item_id", occupant.item_id)
-    );
-  }
-  const results = await Promise.all(updates);
-
+  revalidatePath("/classeurs");
   revalidatePath(`/classeurs/${binderId}`);
-  return { error: results.find((r) => r.error)?.error?.message ?? null };
+  if (ref.kind === "i") revalidatePath(`/carte/${ref.id}`);
+  return { error: error?.message ?? null };
 }

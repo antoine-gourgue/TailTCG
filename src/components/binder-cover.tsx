@@ -19,16 +19,21 @@ type StyleProps = {
   covers: CoverItem[];
   name: string;
   colorHex: string | null;
-  /** Proportions imposées (ex. « 252 / 264 ») — par défaut celles d'une carte */
-  aspect?: string;
+  /** Remplit son conteneur (classeur fermé à la taille des pages) */
+  fill?: boolean;
 };
 
+/** Le conteneur dicte la taille au lieu des proportions d'une carte */
+function fillStyle(fill?: boolean): React.CSSProperties | undefined {
+  return fill ? { aspectRatio: "auto", height: "100%" } : undefined;
+}
+
 /** Classeur : tranche perforée + page de pochettes 2×2 */
-function StyleBinder({ covers, name, colorHex, aspect }: StyleProps) {
+function StyleBinder({ covers, name, colorHex, fill }: StyleProps) {
   return (
     <div
       className="relative aspect-[63/88] overflow-hidden rounded-l-lg rounded-r-xl border border-edge bg-surface"
-      style={aspect ? { aspectRatio: aspect } : undefined}
+      style={fillStyle(fill)}
     >
       <div
         className="absolute inset-y-0 left-0 flex w-7 flex-col items-center justify-evenly border-r border-edge bg-raised py-3"
@@ -64,11 +69,11 @@ function StyleBinder({ covers, name, colorHex, aspect }: StyleProps) {
 }
 
 /** Mosaïque : quatre cartes en grille nue, fond très légèrement teinté */
-function StyleMosaic({ covers, name, colorHex, aspect }: StyleProps) {
+function StyleMosaic({ covers, name, colorHex, fill }: StyleProps) {
   return (
     <div
       className="flex aspect-[63/88] items-center rounded-xl p-2"
-      style={{ backgroundColor: tint(colorHex, "1f"), aspectRatio: aspect }}
+      style={{ backgroundColor: tint(colorHex, "1f"), ...fillStyle(fill) }}
     >
       <div className="grid w-full grid-cols-2 gap-1.5">
         {[0, 1, 2, 3].map((i) =>
@@ -86,12 +91,12 @@ function StyleMosaic({ covers, name, colorHex, aspect }: StyleProps) {
 }
 
 /** Vitrine : une carte star sur un halo de couleur */
-function StyleShowcase({ covers, name, colorHex, aspect }: StyleProps) {
+function StyleShowcase({ covers, name, colorHex, fill }: StyleProps) {
   return (
     <div
       className="relative flex aspect-[63/88] items-center justify-center overflow-hidden rounded-xl border border-edge bg-raised/60"
       style={{
-        aspectRatio: aspect,
+        ...fillStyle(fill),
         backgroundImage: colorHex
           ? `radial-gradient(ellipse at 50% 35%, ${colorHex}59, transparent 70%)`
           : undefined,
@@ -114,13 +119,13 @@ function StyleShowcase({ covers, name, colorHex, aspect }: StyleProps) {
 
 /** Éventail : trois cartes en main, pivotées autour d'un point sous
  * l'éventail comme des cartes tenues entre les doigts */
-function StyleFan({ covers, name, colorHex, aspect }: StyleProps) {
+function StyleFan({ covers, name, colorHex, fill }: StyleProps) {
   const shown = covers.slice(0, 3);
   return (
     <div
       className="relative aspect-[63/88] overflow-hidden rounded-xl border border-edge bg-raised/60 transition-transform duration-300 group-hover:scale-[1.02]"
       style={{
-        aspectRatio: aspect,
+        ...fillStyle(fill),
         backgroundImage: colorHex
           ? `radial-gradient(ellipse at 50% 60%, ${colorHex}47, transparent 72%)`
           : undefined,
@@ -169,16 +174,16 @@ function StyleFan({ covers, name, colorHex, aspect }: StyleProps) {
 function StyleLabel({
   name,
   colorHex,
-  aspect,
+  fill,
 }: {
   name: string;
   colorHex: string | null;
-  aspect?: string;
+  fill?: boolean;
 }) {
   return (
     <div
       className="relative flex aspect-[63/88] items-center justify-center overflow-hidden rounded-l-md rounded-r-xl border border-edge bg-raised"
-      style={{ backgroundColor: colorHex ?? undefined, aspectRatio: aspect }}
+      style={{ backgroundColor: colorHex ?? undefined, ...fillStyle(fill) }}
     >
       <span
         className="absolute inset-y-0 left-0 w-2.5 bg-black/20"
@@ -207,21 +212,21 @@ export function BinderCover({
   covers,
   name,
   colorHex,
-  aspect,
+  fill,
 }: {
   style: string | null;
   covers: CoverItem[];
   name: string;
   colorHex: string | null;
-  /** Proportions imposées (classeur ouvert en pages) — sinon celles d'une carte */
-  aspect?: string;
+  /** Remplit son conteneur (classeur fermé à la taille exacte des pages) */
+  fill?: boolean;
 }) {
   const kind = binderStyle(style);
-  const props = { covers, name, colorHex, aspect };
+  const props = { covers, name, colorHex, fill };
   if (kind === "mosaic") return <StyleMosaic {...props} />;
   if (kind === "showcase") return <StyleShowcase {...props} />;
   if (kind === "fan") return <StyleFan {...props} />;
   if (kind === "label")
-    return <StyleLabel name={name} colorHex={colorHex} aspect={aspect} />;
+    return <StyleLabel name={name} colorHex={colorHex} fill={fill} />;
   return <StyleBinder {...props} />;
 }

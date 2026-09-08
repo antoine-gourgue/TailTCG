@@ -85,6 +85,53 @@ export type Database = {
           },
         ]
       }
+      binder_placeholders: {
+        Row: {
+          binder_id: string
+          card_name: string
+          created_at: string | null
+          id: string
+          image_url: string | null
+          local_id: string
+          owner_id: string
+          position: number
+          set_name: string
+          tcgdex_id: string
+        }
+        Insert: {
+          binder_id: string
+          card_name: string
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          local_id: string
+          owner_id?: string
+          position: number
+          set_name: string
+          tcgdex_id: string
+        }
+        Update: {
+          binder_id?: string
+          card_name?: string
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          local_id?: string
+          owner_id?: string
+          position?: number
+          set_name?: string
+          tcgdex_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "binder_placeholders_binder_id_fkey"
+            columns: ["binder_id"]
+            isOneToOne: false
+            referencedRelation: "binders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       binders: {
         Row: {
           color: string | null

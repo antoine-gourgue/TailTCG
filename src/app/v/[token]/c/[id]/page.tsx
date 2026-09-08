@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { binderColorHex } from "@/lib/binder-colors";
 import { Logo } from "@/components/logo";
-import { BinderPages } from "@/components/binder-pages";
+import { BinderPages, type PocketItem } from "@/components/binder-pages";
 import { ViewToggle } from "@/components/view-toggle";
 import {
   CollectionClient,
@@ -76,10 +76,15 @@ export default async function SharedBinderPage({
     .maybeSingle();
   if (!binder || binder.owner_id !== settings.owner_id) notFound();
 
-  const { data: links } = await admin
-    .from("binder_items")
-    .select("item_id, position")
-    .eq("binder_id", binder.id);
+  const [{ data: links }, { data: wanted }] = await Promise.all([
+    admin.from("binder_items").select("item_id, position").eq("binder_id", binder.id),
+    // Cartes hors collection : filtrées par propriétaire (client service role)
+    admin
+      .from("binder_placeholders")
+      .select("id, tcgdex_id, card_name, set_name, local_id, image_url, position, created_at")
+      .eq("binder_id", binder.id)
+      .eq("owner_id", settings.owner_id),
+  ]);
   const memberIds = (links ?? []).map((l) => l.item_id);
   const positionByItem = new Map(
     (links ?? []).map((l) => [l.item_id, l.position])
@@ -136,6 +141,30 @@ export default async function SharedBinderPage({
     .map((id) => withImage.find((i) => i.id === id))
     .filter((i): i is NonNullable<typeof i> => i != null);
   const covers = chosen.length > 0 ? chosen : withImage.slice(0, 4);
+  // Pochettes : exemplaires et cartes hors collection (visibles en vitrine)
+  const pocketItems: PocketItem[] = [
+    ...signedItems.map((i) => ({
+      id: `i:${i.id}`,
+      kind: "owned" as const,
+      card_name: i.card_name,
+      image_url: i.image_url,
+      quantity: i.quantity,
+      position: i.position,
+      created_at: i.created_at,
+    })),
+    ...(wanted ?? []).map((w) => ({
+      id: `w:${w.id}`,
+      kind: "wanted" as const,
+      card_name: w.card_name,
+      set_name: w.set_name,
+      local_id: w.local_id,
+      tcgdex_id: w.tcgdex_id,
+      image_url: w.image_url ?? "",
+      quantity: 1,
+      position: w.position,
+      created_at: w.created_at ?? "",
+    })),
+  ];
 
   return (
     <main
@@ -171,7 +200,7 @@ export default async function SharedBinderPage({
         <BinderPages
           binderId={binder.id}
           name={binder.name}
-          items={signedItems}
+          items={pocketItems}
           gridCode={binder.page_grid}
           colorHex={binderColorHex(binder.color)}
           cover={{ style: binder.style, covers }}

@@ -10,7 +10,7 @@ import { ConfirmAction } from "@/components/confirm-action";
 import { RenameBinderButton } from "@/components/rename-binder-button";
 import { BinderStyleButton } from "@/components/binder-style-button";
 import { BinderShareButton } from "@/components/binder-share-button";
-import { BinderPages } from "@/components/binder-pages";
+import { BinderPages, type PocketItem } from "@/components/binder-pages";
 import { ViewToggle } from "@/components/view-toggle";
 import { deleteBinder } from "@/app/classeurs/actions";
 import {
@@ -46,8 +46,13 @@ export default async function ClasseurPage({
     .maybeSingle();
   if (!binder) notFound();
 
-  const [{ data: links }, { data: sources }, { data: allBinders }, { data: settings }] =
-    await Promise.all([
+  const [
+    { data: links },
+    { data: sources },
+    { data: allBinders },
+    { data: settings },
+    { data: wanted },
+  ] = await Promise.all([
       supabase
         .from("binder_items")
         .select("item_id, position")
@@ -59,6 +64,11 @@ export default async function ClasseurPage({
         .select("share_token")
         .eq("owner_id", user.id)
         .maybeSingle(),
+      // Cartes hors collection rangées dans ce classeur
+      supabase
+        .from("binder_placeholders")
+        .select("id, tcgdex_id, card_name, set_name, local_id, image_url, position, created_at")
+        .eq("binder_id", id),
     ]);
 
   const memberIds = (links ?? []).map((l) => l.item_id);
@@ -121,10 +131,39 @@ export default async function ClasseurPage({
     position: positionByItem.get(i.id) ?? null,
   }));
   const signedItems = signedAll.filter((i) => memberSet.has(i.id));
+  // Pochettes : exemplaires possédés et cartes hors collection
+  const pocketItems: PocketItem[] = [
+    ...signedItems.map((i) => ({
+      id: `i:${i.id}`,
+      kind: "owned" as const,
+      card_name: i.card_name,
+      set_name: i.set_name,
+      local_id: i.local_id,
+      tcgdex_id: i.tcgdex_id,
+      image_url: i.image_url,
+      photo_fallback: i.photo_fallback,
+      quantity: i.quantity,
+      position: i.position,
+      created_at: i.created_at,
+    })),
+    ...(wanted ?? []).map((w) => ({
+      id: `w:${w.id}`,
+      kind: "wanted" as const,
+      card_name: w.card_name,
+      set_name: w.set_name,
+      local_id: w.local_id,
+      tcgdex_id: w.tcgdex_id,
+      image_url: w.image_url ?? "",
+      quantity: 1,
+      position: w.position,
+      created_at: w.created_at ?? "",
+    })),
+  ];
   const candidates = signedAll
     .filter((i) => i.sold_at == null)
     .map((i) => ({
       id: i.id,
+      tcgdex_id: i.tcgdex_id,
       card_name: i.card_name,
       set_name: i.set_name,
       local_id: i.local_id,
@@ -193,7 +232,7 @@ export default async function ClasseurPage({
           <BinderPages
             binderId={binder.id}
             name={binder.name}
-            items={signedItems}
+            items={pocketItems}
             candidates={candidates}
             gridCode={binder.page_grid}
             colorHex={binderColorHex(binder.color)}
