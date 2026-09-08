@@ -99,8 +99,9 @@ body {
 
 .app-main {
   min-height: 100vh;
-  /* Place pour le dock flottant mobile (62px + marge) */
-  padding-bottom: calc(5.75rem + env(safe-area-inset-bottom));
+  /* Place pour le dock flottant mobile : 62px + sa marge (12px) + respiration,
+     pour que le dernier texte ne passe jamais dessous */
+  padding-bottom: calc(6.75rem + env(safe-area-inset-bottom));
 }
 
 @media (min-width: 768px) {

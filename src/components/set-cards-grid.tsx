@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Star, Plus, Check, ListChecks } from "lucide-react";
+import { Star, Plus, Check, ListChecks, X } from "lucide-react";
 import { toggleWishlist } from "@/app/wishlist/actions";
 import { bulkAddToCollection } from "@/app/items/actions";
 import { CardImage } from "@/components/card-image";
 import { Toast } from "@/components/toast";
 import { Sheet } from "@/components/sheet";
+import { FloatingBar } from "@/components/floating-bar";
 
 export type SetCard = {
   id: string;
@@ -422,20 +423,26 @@ export function SetCardsGrid({
 
       {/* Barre d'ajout en masse */}
       {selecting && picked.size > 0 && (
-        <div className="fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border border-edge bg-surface px-4 py-2.5 shadow-2xl md:bottom-4">
-          <span className="num text-sm">
-            {picked.size} sélectionnée{picked.size > 1 ? "s" : ""}
-          </span>
+        <FloatingBar>
+          <button
+            type="button"
+            onClick={() => setPicked(new Set())}
+            aria-label="Tout désélectionner"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-raised hover:text-foreground"
+          >
+            <X size={16} aria-hidden />
+          </button>
+          <span className="num shrink-0 whitespace-nowrap text-sm font-semibold">{picked.size}</span>
           <button
             type="button"
             onClick={addPicked}
             disabled={busy}
-            className="btn btn-primary !py-1.5"
+            className="btn btn-primary shrink-0 !rounded-full !py-2 text-[13px] disabled:opacity-40"
           >
             <Plus size={15} aria-hidden />
             {busy ? "Ajout…" : "Ajouter à ma collection"}
           </button>
-        </div>
+        </FloatingBar>
       )}
 
       {toast && (

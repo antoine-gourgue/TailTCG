@@ -14,6 +14,8 @@ import {
   AlertTriangle,
   Trash2,
   SlidersHorizontal,
+  CheckCheck,
+  FolderMinus,
   X,
 } from "lucide-react";
 import { formatEur } from "@/lib/domain";
@@ -26,6 +28,7 @@ import {
 import { bulkDeleteItems } from "@/app/items/actions";
 import { CardImage } from "@/components/card-image";
 import { Sheet } from "@/components/sheet";
+import { FloatingBar } from "@/components/floating-bar";
 import { Logo } from "@/components/logo";
 import { Toast } from "@/components/toast";
 
@@ -857,37 +860,46 @@ export function CollectionClient({
 
       {/* Barre d'action flottante du mode sélection */}
       {selecting && (
-        <div className="fixed inset-x-3 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-[45] flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-edge bg-raised px-3 py-2 shadow-xl md:inset-x-auto md:bottom-5 md:left-1/2 md:max-w-[calc(100vw-2rem)] md:-translate-x-1/2">
-          <span className="px-1 text-sm text-muted">
-            <span className="num font-semibold text-foreground">
-              {selected.size}
-            </span>{" "}
-            sélectionnée{selected.size > 1 ? "s" : ""}
+        <FloatingBar>
+          <button
+            type="button"
+            onClick={exitSelect}
+            aria-label="Quitter la sélection"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-raised hover:text-foreground"
+          >
+            <X size={16} aria-hidden />
+          </button>
+          <span className="num shrink-0 whitespace-nowrap text-sm font-semibold">
+            {selected.size}
           </span>
           <button
             type="button"
-            onClick={() => setSelected(new Set(filtered.map((i) => i.id)))}
-            className="btn btn-ghost !px-2.5 !py-1.5 text-[13px]"
+            onClick={() =>
+              setSelected(
+                selected.size === filtered.length
+                  ? new Set()
+                  : new Set(filtered.map((i) => i.id))
+              )
+            }
+            title={selected.size === filtered.length ? "Tout désélectionner" : "Tout sélectionner"}
+            aria-label={selected.size === filtered.length ? "Tout désélectionner" : "Tout sélectionner"}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-raised hover:text-foreground"
           >
-            Tout
+            <CheckCheck size={17} aria-hidden />
           </button>
-          <button
-            type="button"
-            disabled={selected.size === 0 || busy}
-            onClick={() => setAddOpen(true)}
-            className="btn btn-primary !py-1.5 text-[13px] disabled:opacity-50"
-          >
-            <NotebookTabs size={14} aria-hidden />
-            Ajouter à un classeur
-          </button>
+
+          <span className="mx-0.5 h-5 w-px shrink-0 bg-edge" aria-hidden />
+
           {binderContext && (
             <button
               type="button"
               disabled={selected.size === 0 || busy}
               onClick={removeFromBinder}
-              className="btn btn-ghost !py-1.5 text-[13px] !text-loss disabled:opacity-50"
+              title="Retirer du classeur"
+              aria-label="Retirer du classeur"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-loss transition hover:bg-loss/10 disabled:opacity-40"
             >
-              {busy ? "Retrait…" : "Retirer du classeur"}
+              <FolderMinus size={17} aria-hidden />
             </button>
           )}
           {!readOnly && (
@@ -895,21 +907,24 @@ export function CollectionClient({
               type="button"
               disabled={selected.size === 0 || busy}
               onClick={() => setDeleteOpen(true)}
-              className="btn btn-ghost !py-1.5 text-[13px] !text-loss disabled:opacity-50"
+              title="Supprimer"
+              aria-label="Supprimer"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-loss transition hover:bg-loss/10 disabled:opacity-40"
             >
-              <Trash2 size={14} aria-hidden />
-              Supprimer
+              <Trash2 size={16} aria-hidden />
             </button>
           )}
           <button
             type="button"
-            onClick={exitSelect}
-            aria-label="Quitter la sélection"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:bg-surface hover:text-foreground"
+            disabled={selected.size === 0 || busy}
+            onClick={() => setAddOpen(true)}
+            className="btn btn-primary shrink-0 !rounded-full !py-2 text-[13px] disabled:opacity-40"
           >
-            <X size={15} aria-hidden />
+            <NotebookTabs size={15} aria-hidden />
+            <span className="hidden min-[400px]:inline">Ajouter au classeur</span>
+            <span className="min-[400px]:hidden">Classeur</span>
           </button>
-        </div>
+        </FloatingBar>
       )}
 
       {/* Choix du classeur de destination */}
