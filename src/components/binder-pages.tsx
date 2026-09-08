@@ -570,6 +570,10 @@ export function BinderPages({
   }
 
   /** Vise la pochette vide suivante pour enchaîner les rangements */
+  /** « Page 2 · Pochette 5 » pour une pochette absolue */
+  const pocketLabel = (p: number) =>
+    `Page ${Math.floor(p / perPage) + 1} · Pochette ${(p % perPage) + 1}`;
+
   function advancePicker(fromPocket: number) {
     const next = firstFreeIn(view, fromPocket) ?? firstFreeIn(view);
     if (next == null) requestClosePicker();
@@ -578,6 +582,7 @@ export function BinderPages({
 
   /** Range un exemplaire de la collection dans la pochette ciblée */
   async function place(c: CandidateItem, pocket: number) {
+    setToast({ message: `${c.card_name} · ${pocketLabel(pocket)}` });
     advancePicker(pocket);
     const key = `i:${c.id}`;
     if (pockets.has(key)) {
@@ -609,6 +614,7 @@ export function BinderPages({
 
   /** Range une carte du catalogue qu'on ne possède pas (hors collection) */
   async function placeWanted(c: CardSearchResult, pocket: number) {
+    setToast({ message: `${c.name} · ${pocketLabel(pocket)}` });
     advancePicker(pocket);
     const id = crypto.randomUUID();
     const key = `w:${id}`;
@@ -1539,9 +1545,11 @@ export function BinderPages({
         header={
           <div className="min-w-0 flex-1">
             <p className="display text-base font-semibold">Ranger une carte</p>
-            <p className="mt-0.5 text-sm text-muted">
-              Page <span className="num">{page}</span>, pochette{" "}
-              <span className="num">{slot}</span>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-sm">
+              <span className="text-muted">Emplacement visé :</span>
+              <span className="num font-semibold text-accent-strong">
+                Page {page} · Pochette {slot}
+              </span>
             </p>
           </div>
         }
