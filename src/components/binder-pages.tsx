@@ -1399,7 +1399,8 @@ export function BinderPages({
             />
           </>
         )}
-        <div className="relative shrink-0 [perspective:2000px]" style={pageStyle(s)}>
+        {/* Au-dessus de la tranche : la couverture qui pivote la recouvre au lieu de passer dessous */}
+        <div className="relative z-30 shrink-0 [perspective:2000px]" style={pageStyle(s)}>
           {renderPage(0, perView === 2 ? "right" : "single", s)}
           <div
             aria-hidden
