@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Star, Plus, Check, ListChecks, X } from "lucide-react";
+import { Star, Plus, Check, CheckCheck, ListChecks, X } from "lucide-react";
 import { toggleWishlist } from "@/app/wishlist/actions";
 import { bulkAddToCollection } from "@/app/items/actions";
 import { CardImage } from "@/components/card-image";
@@ -435,12 +435,24 @@ export function SetCardsGrid({
           <span className="num shrink-0 whitespace-nowrap text-sm font-semibold">{picked.size}</span>
           <button
             type="button"
+            onClick={selectMissingVisible}
+            title="Cocher les manquantes"
+            aria-label="Cocher les manquantes"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-raised hover:text-foreground"
+          >
+            <CheckCheck size={17} aria-hidden />
+          </button>
+          <button
+            type="button"
             onClick={addPicked}
             disabled={busy}
             className="btn btn-primary shrink-0 !rounded-full !py-2 text-[13px] disabled:opacity-40"
           >
             <Plus size={15} aria-hidden />
-            {busy ? "Ajout…" : "Ajouter à ma collection"}
+            <span className="hidden min-[400px]:inline">
+              {busy ? "Ajout…" : "Ajouter à ma collection"}
+            </span>
+            <span className="min-[400px]:hidden">{busy ? "Ajout…" : "Ajouter"}</span>
           </button>
         </FloatingBar>
       )}

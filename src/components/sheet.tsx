@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 // Dialogue de l'app, une seule DA : bottom-sheet sur mobile (poignée,
@@ -25,6 +26,9 @@ function subscribeSheet(onChange: () => void) {
 }
 const getSheet = () => window.matchMedia(SHEET_QUERY).matches;
 const getSheetOnServer = () => false;
+
+// Montage client (pour le portail) sans setState dans un effet
+const noopSubscribe = () => () => {};
 /** Glissement au-delà duquel la sheet se ferme */
 const CLOSE_DY = 90;
 
@@ -62,6 +66,10 @@ export function Sheet({
   const panel = useRef<HTMLDivElement>(null);
   const drag = useRef({ startY: 0, dy: 0, active: false });
   const isSheet = useSyncExternalStore(subscribeSheet, getSheet, getSheetOnServer);
+  // Rendu dans document.body : le dialogue échappe à tout contexte
+  // d'empilement d'une page (ex. <main class="relative z-10">) et passe donc
+  // bien au-dessus du dock mobile
+  const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
   function requestClose() {
     if (!dismissible || closing) return;
@@ -121,11 +129,11 @@ export function Sheet({
     d.dy = 0;
   }
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
   const hasHeader = header != null || title != null;
 
-  return (
+  return createPortal(
     <div className={`fixed inset-0 ${z} flex items-end justify-center sm:items-center sm:p-4`}>
       <div
         className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${
@@ -213,6 +221,7 @@ export function Sheet({
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
