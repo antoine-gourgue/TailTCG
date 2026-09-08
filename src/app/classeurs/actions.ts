@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import type { Json } from "@/lib/database.types";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -114,9 +115,41 @@ export async function createBinderFromSet(setId: string, lang: "fr" | "ja") {
     if (!ownedByTcgdex.has(o.tcgdex_id)) ownedByTcgdex.set(o.tcgdex_id, o.id);
   }
 
+  // Design par défaut : couverture sur mesure noire et lisse, logo de
+  // l'extension au centre, code de l'extension en bas à gauche.
+  const zones: Record<string, Json> = {
+    bl: {
+      type: "text",
+      text: set.id,
+      size: "sm",
+      weight: "bold",
+      color: "#ffffff",
+      font: "mono",
+    },
+  };
+  if (set.logo && /^https:\/\/assets\.tcgdex\.net\//.test(set.logo)) {
+    zones.mc = {
+      type: "logo",
+      setId: set.id,
+      setName: set.name,
+      url: set.logo,
+      size: "lg",
+    };
+  }
+  const cover: Json = {
+    bg: { kind: "color", color: "#1f1f23", image: null, card: null, dim: 35 },
+    zones,
+  };
+
   const { data: binder, error: bErr } = await supabase
     .from("binders")
-    .insert({ name: set.name, page_grid: "3x3" })
+    .insert({
+      name: set.name,
+      page_grid: "3x3",
+      style: "custom",
+      color: null,
+      cover,
+    })
     .select("id")
     .single();
   if (bErr || !binder) return { error: bErr?.message ?? "Création impossible" };
