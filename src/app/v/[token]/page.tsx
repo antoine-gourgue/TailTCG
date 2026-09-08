@@ -6,6 +6,7 @@ import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { formatEur } from "@/lib/domain";
 import { binderColorHex } from "@/lib/binder-colors";
 import { binderDesign } from "@/lib/binder-design";
+import { coverRenderFor } from "@/lib/binder-cover-server";
 import { Logo } from "@/components/logo";
 import { BinderCover } from "@/components/binder-cover";
 import { CardImage } from "@/components/card-image";
@@ -113,7 +114,7 @@ export default async function SharedCollectionPage({
       admin
         .from("binders")
         .select(
-          "id, name, color, style, cover_item_ids, design, created_at, binder_items(item_id)"
+          "id, name, color, style, cover_item_ids, design, cover, created_at, binder_items(item_id)"
         )
         .eq("owner_id", settings.owner_id)
         .order("position", { nullsFirst: false })
@@ -199,7 +200,7 @@ export default async function SharedCollectionPage({
       localId: item.local_id,
     } satisfies GradingReportData,
   }));
-  const binderTiles = (binders ?? []).map((b) => {
+  const binderTiles = await Promise.all((binders ?? []).map(async (b) => {
     let count = 0;
     let value = 0;
     let hasValue = false;
@@ -223,11 +224,17 @@ export default async function SharedCollectionPage({
       style: b.style,
       colorHex: binderColorHex(b.color),
       texture: binderDesign(b.design).coverTexture,
+      layout: await coverRenderFor(
+        b.style,
+        b.cover,
+        settings.owner_id,
+        (itemId) => itemById.get(itemId)?.image_url || null
+      ),
       count,
       value: hasValue ? value : null,
       covers: chosen.length > 0 ? chosen : covers,
     };
-  });
+  }));
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8">
@@ -311,6 +318,7 @@ export default async function SharedCollectionPage({
                     name={b.name}
                     colorHex={b.colorHex}
                     texture={b.texture}
+                    layout={b.layout}
                   />
                   <p className="mt-2.5 truncate text-sm font-semibold group-hover:text-accent-strong">
                     {b.name}

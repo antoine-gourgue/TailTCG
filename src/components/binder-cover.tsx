@@ -1,6 +1,13 @@
 import { NotebookTabs } from "lucide-react";
 import { binderStyle } from "@/lib/binder-styles";
 import { coverTextureClass, type CoverTexture } from "@/lib/binder-design";
+import {
+  ZONES,
+  coverHasContent,
+  type CoverRender,
+  type RenderElement,
+  type ZoneKey,
+} from "@/lib/binder-cover";
 import { CardImage } from "@/components/card-image";
 
 export type CoverItem = { image_url: string };
@@ -36,7 +43,130 @@ type StyleProps = {
   fill?: boolean;
   /** Matière de la couverture */
   texture?: CoverTexture;
+  /** Couverture sur mesure, résolue (URLs signées) */
+  layout?: CoverRender | null;
 };
+
+/** Alignement d'une zone : ligne (haut/milieu/bas) × colonne (gauche/centre/droite) */
+function zoneClass(z: ZoneKey): string {
+  const row = z[0] === "t" ? "items-start" : z[0] === "m" ? "items-center" : "items-end";
+  const col =
+    z[1] === "l"
+      ? "justify-start text-left"
+      : z[1] === "c"
+        ? "justify-center text-center"
+        : "justify-end text-right";
+  return `${row} ${col}`;
+}
+
+const TEXT_SIZE_CLASS = {
+  sm: "text-[4.5cqw]",
+  md: "text-[6.5cqw]",
+  lg: "text-[9cqw]",
+  xl: "text-[13cqw]",
+} as const;
+const FONT_CLASS = { display: "display", sans: "", mono: "font-mono" } as const;
+const MEDIA_WIDTH = { sm: "w-[22cqw]", md: "w-[34cqw]", lg: "w-[48cqw]" } as const;
+const CARD_WIDTH = { sm: "w-[22cqw]", md: "w-[32cqw]", lg: "w-[44cqw]" } as const;
+
+function CoverElementView({ el }: { el: RenderElement }) {
+  if (el.type === "text") {
+    return (
+      <span
+        className={`${FONT_CLASS[el.font]} ${TEXT_SIZE_CLASS[el.size]} ${
+          el.weight === "bold" ? "font-bold" : "font-normal"
+        } max-w-[88cqw] shrink-0 break-words leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,.45)]`}
+        style={{ color: el.color }}
+      >
+        {el.text}
+      </span>
+    );
+  }
+  if (el.type === "logo") {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={`${el.url}.png`}
+        alt=""
+        loading="lazy"
+        className={`${MEDIA_WIDTH[el.size]} shrink-0 object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,.5)]`}
+      />
+    );
+  }
+  if (el.type === "image") {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={el.url}
+        alt=""
+        loading="lazy"
+        className={`${MEDIA_WIDTH[el.size]} aspect-square shrink-0 object-cover shadow-lg ${
+          el.round ? "rounded-full" : "rounded-[2cqw]"
+        }`}
+      />
+    );
+  }
+  return (
+    <div className={`card-tile aspect-[63/88] ${CARD_WIDTH[el.size]} shrink-0`}>
+      <CardImage base={el.url || null} alt="" />
+    </div>
+  );
+}
+
+/** Sur mesure : fond (couleur, image, carte) et neuf zones composées par l'utilisateur */
+function StyleCustom({ name, colorHex, fill, texture, layout }: StyleProps) {
+  const bg = layout?.bg;
+  const hasContent = coverHasContent(layout);
+  return (
+    <div
+      className="relative aspect-[63/88] overflow-hidden rounded-l-lg rounded-r-xl border border-edge bg-raised [container-type:inline-size]"
+      style={{ backgroundColor: bg?.color ?? colorHex ?? undefined, ...fillStyle(fill) }}
+    >
+      {bg?.imageUrl &&
+        (bg.imageIsCard ? (
+          <div className="absolute inset-0">
+            <CardImage base={bg.imageUrl} alt="" quality="high" />
+          </div>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={bg.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        ))}
+      {bg?.imageUrl && bg.dim > 0 && (
+        <span
+          aria-hidden
+          className="absolute inset-0"
+          style={{ backgroundColor: `rgba(0,0,0,${bg.dim / 100})` }}
+        />
+      )}
+      {/* Pli de la couverture, côté tranche */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 left-0 w-[7cqw] bg-gradient-to-r from-black/35 to-transparent"
+      />
+      <Texture texture={texture} />
+      {/* Neuf zones égales ; chaque élément garde sa taille et déborde de sa
+          zone si besoin (un titre centré s'étale symétriquement) */}
+      {hasContent && layout ? (
+        <div className="absolute inset-0 z-20 grid grid-cols-3 grid-rows-3 gap-[3cqw] p-[6cqw] pl-[8cqw]">
+          {ZONES.map((z) => {
+            const el = layout.zones[z];
+            return (
+              <div key={z} className={`flex min-w-0 ${zoneClass(z)}`}>
+                {el && <CoverElementView el={el} />}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="absolute inset-0 z-20 flex items-center justify-center p-[10cqw]">
+          <span className="display text-center text-[9cqw] font-bold leading-tight text-white/85 drop-shadow-[0_1px_2px_rgba(0,0,0,.5)]">
+            {name}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Le conteneur dicte la taille au lieu des proportions d'une carte */
 function fillStyle(fill?: boolean): React.CSSProperties | undefined {
@@ -236,6 +366,7 @@ export function BinderCover({
   colorHex,
   fill,
   texture,
+  layout,
 }: {
   style: string | null;
   covers: CoverItem[];
@@ -245,9 +376,12 @@ export function BinderCover({
   fill?: boolean;
   /** Matière de la couverture (lisse par défaut) */
   texture?: CoverTexture;
+  /** Couverture sur mesure résolue — style « custom » */
+  layout?: CoverRender | null;
 }) {
   const kind = binderStyle(style);
-  const props = { covers, name, colorHex, fill, texture };
+  const props = { covers, name, colorHex, fill, texture, layout };
+  if (kind === "custom") return <StyleCustom {...props} />;
   if (kind === "mosaic") return <StyleMosaic {...props} />;
   if (kind === "showcase") return <StyleShowcase {...props} />;
   if (kind === "fan") return <StyleFan {...props} />;

@@ -8,6 +8,7 @@ import { reorderBinders } from "@/app/classeurs/actions";
 import { BinderCover, type CoverItem } from "@/components/binder-cover";
 import { Toast } from "@/components/toast";
 import type { CoverTexture } from "@/lib/binder-design";
+import type { CoverRender } from "@/lib/binder-cover";
 
 export type BinderTile = {
   id: string;
@@ -15,6 +16,7 @@ export type BinderTile = {
   style: string | null;
   colorHex: string | null;
   texture: CoverTexture;
+  layout: CoverRender | null;
   count: number;
   value: number | null;
   covers: CoverItem[];
@@ -85,6 +87,7 @@ export function BindersGrid({ binders }: { binders: BinderTile[] }) {
                   name={b.name}
                   colorHex={b.colorHex}
                   texture={b.texture}
+                  layout={b.layout}
                 />
                 <p className="mt-3 truncate text-base font-semibold group-hover:text-accent-strong">
                   {b.name}

@@ -7,6 +7,7 @@ import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { binderColorHex } from "@/lib/binder-colors";
 import { binderDesign } from "@/lib/binder-design";
 import { pageGrid, pocketsPerPage } from "@/lib/binder-pages";
+import { coverRenderFor } from "@/lib/binder-cover-server";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmAction } from "@/components/confirm-action";
 import { RenameBinderButton } from "@/components/rename-binder-button";
@@ -43,7 +44,7 @@ export default async function ClasseurPage({
 
   const { data: binder } = await supabase
     .from("binders")
-    .select("id, name, color, cover_item_ids, style, page_grid, design, page_count")
+    .select("id, name, color, cover_item_ids, style, page_grid, design, page_count, cover")
     .eq("id", id)
     .maybeSingle();
   if (!binder) notFound();
@@ -190,6 +191,13 @@ export default async function ClasseurPage({
     .map((id) => withImage.find((i) => i.id === id))
     .filter((i): i is NonNullable<typeof i> => i != null);
   const covers = chosen.length > 0 ? chosen : withImage.slice(0, 4);
+  // Couverture sur mesure (style « custom ») : images signées, cartes résolues
+  const coverRender = await coverRenderFor(
+    binder.style,
+    binder.cover,
+    user.id,
+    (itemId) => signedAll.find((i) => i.id === itemId)?.image_url || null
+  );
 
   return (
     <AppShell>
@@ -233,6 +241,7 @@ export default async function ClasseurPage({
               styleCode={binder.style}
               pageGridCode={binder.page_grid}
               design={design}
+              coverRender={coverRender}
               coverIds={binder.cover_item_ids ?? []}
               items={signedItems.map((i) => ({
                 id: i.id,
@@ -261,7 +270,7 @@ export default async function ClasseurPage({
             candidates={candidates}
             gridCode={binder.page_grid}
             colorHex={binderColorHex(binder.color)}
-            cover={{ style: binder.style, covers }}
+            cover={{ style: binder.style, covers, layout: coverRender }}
             design={design}
             pageCount={binder.page_count}
             hrefBase="/carte/"

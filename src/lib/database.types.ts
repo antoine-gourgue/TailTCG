@@ -135,6 +135,7 @@ export type Database = {
       binders: {
         Row: {
           color: string | null
+          cover: Json
           cover_item_ids: string[] | null
           created_at: string | null
           design: Json
@@ -148,6 +149,7 @@ export type Database = {
         }
         Insert: {
           color?: string | null
+          cover?: Json
           cover_item_ids?: string[] | null
           created_at?: string | null
           design?: Json
@@ -161,6 +163,7 @@ export type Database = {
         }
         Update: {
           color?: string | null
+          cover?: Json
           cover_item_ids?: string[] | null
           created_at?: string | null
           design?: Json

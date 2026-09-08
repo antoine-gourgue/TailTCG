@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { Book, ChevronLeft, ChevronRight, Minus, Plus, Search, X } from "lucide-react";
 import { CardImage } from "@/components/card-image";
 import { BinderCover, type CoverItem } from "@/components/binder-cover";
+import type { CoverRender } from "@/lib/binder-cover";
 import { Toast } from "@/components/toast";
 import {
   movePocket,
@@ -277,7 +278,7 @@ export function BinderPages({
   candidates?: CandidateItem[];
   gridCode: string | null;
   colorHex: string | null;
-  cover: { style: string | null; covers: CoverItem[] };
+  cover: { style: string | null; covers: CoverItem[]; layout?: CoverRender | null };
   /** Options de design : feuilles, anneaux, pochettes, matière, numéros */
   design: BinderDesign;
   /** Nombre minimal de pages (feuilles ajoutées à l'avance), 0 = automatique */
@@ -1347,6 +1348,7 @@ export function BinderPages({
           name={name}
           colorHex={colorHex}
           texture={design.coverTexture}
+          layout={cover.layout ?? null}
           fill
         />
       </div>

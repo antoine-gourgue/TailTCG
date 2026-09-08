@@ -6,6 +6,7 @@ import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
 import { BindersGrid } from "@/components/binders-grid";
 import { binderDesign } from "@/lib/binder-design";
+import { coverRenderFor } from "@/lib/binder-cover-server";
 import { NewBinderButton } from "@/components/new-binder-button";
 
 export const metadata = {
@@ -24,7 +25,7 @@ export default async function ClasseursPage() {
   const [{ data: binders }, { data: links }, { data: items }] = await Promise.all([
     supabase
       .from("binders")
-      .select("id, name, created_at, color, cover_item_ids, style, design")
+      .select("id, name, created_at, color, cover_item_ids, style, design, cover")
       .order("position", { nullsFirst: false })
       .order("created_at"),
     supabase
@@ -47,7 +48,7 @@ export default async function ClasseursPage() {
   const rectifiedItems = await applyRectifiedImages(gradings, signedItems, user.id);
   const itemById = new Map(rectifiedItems.map((i) => [i.id, i]));
 
-  const enriched = (binders ?? []).map((b) => {
+  const enriched = await Promise.all((binders ?? []).map(async (b) => {
     const memberIds = (links ?? [])
       .filter((l) => l.binder_id === b.id)
       .map((l) => l.item_id);
@@ -75,11 +76,17 @@ export default async function ClasseursPage() {
       style: b.style,
       colorHex: binderColorHex(b.color),
       texture: binderDesign(b.design).coverTexture,
+      layout: await coverRenderFor(
+        b.style,
+        b.cover,
+        user.id,
+        (itemId) => itemById.get(itemId)?.image_url || null
+      ),
       count,
       value: hasValue ? value : null,
       covers: chosen.length > 0 ? chosen : covers,
     };
-  });
+  }));
 
   return (
     <AppShell>

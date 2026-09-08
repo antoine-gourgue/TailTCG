@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { binderColorHex } from "@/lib/binder-colors";
 import { binderDesign } from "@/lib/binder-design";
+import { coverRenderFor } from "@/lib/binder-cover-server";
 import { Logo } from "@/components/logo";
 import { BinderPages, type PocketItem } from "@/components/binder-pages";
 import { ViewToggle } from "@/components/view-toggle";
@@ -72,7 +73,7 @@ export default async function SharedBinderPage({
 
   const { data: binder } = await admin
     .from("binders")
-    .select("id, name, owner_id, color, page_grid, style, cover_item_ids, design, page_count")
+    .select("id, name, owner_id, color, page_grid, style, cover_item_ids, design, page_count, cover")
     .eq("id", id)
     .maybeSingle();
   if (!binder || binder.owner_id !== settings.owner_id) notFound();
@@ -142,6 +143,12 @@ export default async function SharedBinderPage({
     .map((id) => withImage.find((i) => i.id === id))
     .filter((i): i is NonNullable<typeof i> => i != null);
   const covers = chosen.length > 0 ? chosen : withImage.slice(0, 4);
+  const coverRender = await coverRenderFor(
+    binder.style,
+    binder.cover,
+    settings.owner_id,
+    (itemId) => signedItems.find((i) => i.id === itemId)?.image_url || null
+  );
   // Pochettes : exemplaires et cartes hors collection (visibles en vitrine)
   const pocketItems: PocketItem[] = [
     ...signedItems.map((i) => ({
@@ -206,7 +213,7 @@ export default async function SharedBinderPage({
           items={pocketItems}
           gridCode={binder.page_grid}
           colorHex={binderColorHex(binder.color)}
-          cover={{ style: binder.style, covers }}
+          cover={{ style: binder.style, covers, layout: coverRender }}
           design={binderDesign(binder.design)}
           pageCount={binder.page_count}
           readOnly

@@ -31,6 +31,12 @@ export const BINDER_STYLES = [
     description: "Couverture pleine couleur, sans cartes",
     covers: 0,
   },
+  {
+    code: "custom",
+    label: "Sur mesure",
+    description: "Ta composition : fond, textes, logos d'extension, images, cartes",
+    covers: 0,
+  },
 ] as const;
 
 export type BinderStyle = (typeof BINDER_STYLES)[number]["code"];

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Palette,
   X,
@@ -11,7 +12,10 @@ import {
   Sparkles,
   Layers,
   Tag,
+  Brush,
+  ArrowRight,
 } from "lucide-react";
+import type { CoverRender } from "@/lib/binder-cover";
 import { BINDER_COLORS, binderColorHex } from "@/lib/binder-colors";
 import { BINDER_STYLES, binderStyle, binderStyleCovers } from "@/lib/binder-styles";
 import { PAGE_GRIDS, pageGrid } from "@/lib/binder-pages";
@@ -41,6 +45,7 @@ const STYLE_ICONS = {
   showcase: Sparkles,
   fan: Layers,
   label: Tag,
+  custom: Brush,
 } as const;
 
 /** Rangée de choix exclusifs, en pastilles */
@@ -109,6 +114,7 @@ export function BinderStyleButton({
   styleCode,
   pageGridCode,
   design,
+  coverRender,
 }: {
   binderId: string;
   name: string;
@@ -118,6 +124,8 @@ export function BinderStyleButton({
   styleCode: string | null;
   pageGridCode: string | null;
   design: BinderDesign;
+  /** Couverture sur mesure résolue, pour l'aperçu du style « Sur mesure » */
+  coverRender: CoverRender | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -246,6 +254,7 @@ export function BinderStyleButton({
                     name={name}
                     colorHex={binderColorHex(selColor)}
                     texture={selDesign.coverTexture}
+                    layout={coverRender}
                   />
                 </div>
               </div>
@@ -253,8 +262,17 @@ export function BinderStyleButton({
 
             <div className="flex flex-col gap-5 overflow-y-auto px-5 py-4">
               <section>
-                <p className="label-xs mb-2">Couverture</p>
-                <div className="mb-1.5 grid grid-cols-5 gap-1.5">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="label-xs">Couverture</p>
+                  <Link
+                    href={`/classeurs/${binderId}/couverture`}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-accent-strong transition hover:underline"
+                  >
+                    Éditeur de couverture
+                    <ArrowRight size={12} aria-hidden />
+                  </Link>
+                </div>
+                <div className="mb-1.5 grid grid-cols-3 gap-1.5 sm:grid-cols-6">
                   {BINDER_STYLES.map((s) => {
                     const Icon = STYLE_ICONS[s.code];
                     const active = selStyle === s.code;
