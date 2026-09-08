@@ -32,6 +32,18 @@ export default async function ExtensionPage({
   const { data: wishes } = await supabase.from("wishlist").select("tcgdex_id");
   const wishedIds = (wishes ?? []).map((w) => w.tcgdex_id);
 
+  // Exemplaires possédés de ce set (actifs, non vendus) → complétion + repères
+  const { data: owned } = await supabase
+    .from("collection_value")
+    .select("tcgdex_id, quantity, sold_at")
+    .eq("set_id", id);
+  const ownedQty: Record<string, number> = {};
+  for (const o of owned ?? []) {
+    if (o.sold_at == null && o.tcgdex_id) {
+      ownedQty[o.tcgdex_id] = (ownedQty[o.tcgdex_id] ?? 0) + (o.quantity ?? 1);
+    }
+  }
+
   const releaseDate = set.releaseDate
     ? new Date(set.releaseDate).toLocaleDateString("fr-FR", {
         month: "long",
@@ -97,6 +109,7 @@ export default async function ExtensionPage({
           setId={set.id}
           setName={set.name}
           wishedIds={wishedIds}
+          ownedQty={ownedQty}
         />
       </main>
     </AppShell>

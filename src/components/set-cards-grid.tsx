@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Star, X, Plus } from "lucide-react";
+import { Star, X, Plus, Check } from "lucide-react";
 import { toggleWishlist } from "@/app/wishlist/actions";
 import { CardImage } from "@/components/card-image";
 
@@ -70,6 +70,7 @@ export function SetCardsGrid({
   setId,
   setName,
   wishedIds = [],
+  ownedQty = {},
 }: {
   cards: SetCard[];
   officialCount: number | null;
@@ -77,7 +78,14 @@ export function SetCardsGrid({
   setId: string;
   setName: string;
   wishedIds?: string[];
+  /** Quantité possédée (active) par id TCGdex — pour la complétion */
+  ownedQty?: Record<string, number>;
 }) {
+  const isOwned = (c: SetCard) => (ownedQty[c.id] ?? 0) > 0;
+  const ownedCount = cards.reduce((n, c) => n + (isOwned(c) ? 1 : 0), 0);
+  const total = officialCount ?? cards.length;
+  const pct = total > 0 ? Math.round((100 * ownedCount) / total) : 0;
+  const [ownFilter, setOwnFilter] = useState<"all" | "owned" | "missing">("all");
   const [selected, setSelected] = useState<SetCard | null>(null);
   const [wished, setWished] = useState<Set<string>>(() => new Set(wishedIds));
   const [pendingWish, startWish] = useTransition();
@@ -135,10 +143,56 @@ export function SetCardsGrid({
     });
   }
 
-  const visible = cards.filter((c) => !hidden.has(c.rarity ?? UNKNOWN));
+  const visible = cards.filter(
+    (c) =>
+      !hidden.has(c.rarity ?? UNKNOWN) &&
+      (ownFilter === "all" || (ownFilter === "owned" ? isOwned(c) : !isOwned(c)))
+  );
+
+  const ownTabs = [
+    { code: "all" as const, label: "Toutes", n: cards.length },
+    { code: "owned" as const, label: "Possédées", n: ownedCount },
+    { code: "missing" as const, label: "Manquantes", n: cards.length - ownedCount },
+  ];
 
   return (
     <div>
+      {/* Complétion du set */}
+      <div className="mb-5">
+        <div className="mb-1.5 flex items-baseline justify-between text-sm">
+          <span className="font-medium">Complétion</span>
+          <span className="num text-muted">
+            {ownedCount} / {total}
+            <span className="text-faint"> · {pct}%</span>
+          </span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-raised">
+          <div
+            className="h-full rounded-full bg-accent transition-[width] duration-500"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Filtre possession */}
+      <div className="mb-6 inline-flex rounded-lg border border-edge bg-surface p-0.5">
+        {ownTabs.map((t) => (
+          <button
+            key={t.code}
+            type="button"
+            onClick={() => setOwnFilter(t.code)}
+            aria-pressed={ownFilter === t.code}
+            className={`rounded-md px-2.5 py-1.5 text-[13px] font-medium transition ${
+              ownFilter === t.code
+                ? "bg-raised text-foreground shadow-sm"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            {t.label} <span className="num text-faint">{t.n}</span>
+          </button>
+        ))}
+      </div>
+
       {/* Filtres de rareté, façon Pokécardex */}
       {rarities.length > 1 && (
         <div className="mb-8 flex flex-wrap items-center gap-2">
@@ -165,7 +219,7 @@ export function SetCardsGrid({
 
       {visible.length === 0 ? (
         <p className="text-sm text-muted">
-          Toutes les raretés sont masquées — réactive un filtre ci-dessus.
+          Aucune carte pour ce filtre.
         </p>
       ) : (
         <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -176,8 +230,18 @@ export function SetCardsGrid({
                 onClick={() => setSelected(card)}
                 className="group block w-full text-left"
               >
-                <div className="card-tile aspect-[63/88]">
+                <div
+                  className={`card-tile aspect-[63/88] ${
+                    isOwned(card) ? "" : "opacity-85"
+                  }`}
+                >
                   <CardImage base={card.image} alt={card.name} />
+                  {isOwned(card) && (
+                    <span className="tile-badge num left-1.5 top-1.5 flex items-center gap-0.5 !bg-gain !text-black">
+                      <Check size={11} strokeWidth={3} aria-hidden />
+                      {ownedQty[card.id] > 1 ? `×${ownedQty[card.id]}` : ""}
+                    </span>
+                  )}
                   {wished.has(card.id) && (
                     <span className="tile-badge right-1.5 top-1.5 flex items-center !bg-accent !text-accent-ink">
                       <Star size={11} fill="currentColor" aria-hidden />
