@@ -13,6 +13,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Book, ChevronLeft, ChevronRight, Minus, Plus, Search, X } from "lucide-react";
 import { useCleanView } from "@/components/binder-clean-view";
+import { Sheet } from "@/components/sheet";
 import { CardImage } from "@/components/card-image";
 import { BinderCover, type CoverItem } from "@/components/binder-cover";
 import type { CoverRender } from "@/lib/binder-cover";
@@ -104,18 +105,6 @@ function subscribeSpread(onChange: () => void) {
 }
 const getSpread = () => (window.matchMedia(SPREAD_QUERY).matches ? 2 : 1);
 const getSpreadOnServer = () => 2;
-
-/** Sous sm, le tiroir de rangement est une bottom-sheet (glisser pour fermer) */
-const SHEET_QUERY = "(max-width: 639px)";
-function subscribeSheet(onChange: () => void) {
-  const mq = window.matchMedia(SHEET_QUERY);
-  mq.addEventListener("change", onChange);
-  return () => mq.removeEventListener("change", onChange);
-}
-const getSheet = () => window.matchMedia(SHEET_QUERY).matches;
-const getSheetOnServer = () => false;
-/** Glissement vers le bas au-delà duquel la sheet se ferme */
-const SHEET_CLOSE_DY = 90;
 
 type Dir = "next" | "prev";
 type Role = "left" | "right" | "single";
@@ -280,7 +269,6 @@ export function BinderPages({
     getSpread,
     getSpreadOnServer
   );
-  const isSheet = useSyncExternalStore(subscribeSheet, getSheet, getSheetOnServer);
 
   const grid = pageGrid(gridCode);
   const perPage = pocketsPerPage(grid);
@@ -321,10 +309,8 @@ export function BinderPages({
   const [drag, setDrag] = useState<Drag | null>(null);
   /** Cible survolée en glissant : `pocket:12` ou `tab:2` */
   const [over, setOver] = useState<string | null>(null);
-  /** Pochette en cours de remplissage (tiroir ouvert) */
+  /** Pochette en cours de remplissage (dialogue ouvert) */
   const [picker, setPicker] = useState<number | null>(null);
-  /** Le tiroir joue son animation de sortie avant de disparaître */
-  const [drawerClosing, setDrawerClosing] = useState(false);
   const [mode, setMode] = useState<"collection" | "catalogue">("collection");
   const [q, setQ] = useState("");
   const [fSet, setFSet] = useState("");
@@ -344,12 +330,6 @@ export function BinderPages({
   const hoverTimer = useRef<number | null>(null);
   const suppressClick = useRef(false);
   const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
-  const sheetRef = useRef<HTMLElement>(null);
-  const sheetDrag = useRef<{ startY: number; dy: number; active: boolean }>({
-    startY: 0,
-    dy: 0,
-    active: false,
-  });
 
   const itemById = new Map<string, PocketItem>(items.map((i) => [i.id, i]));
   if (live) for (const [id, it] of live.extra) itemById.set(id, it);
@@ -388,7 +368,7 @@ export function BinderPages({
   const visible = pagesOf(view);
   const dragItem = drag ? itemById.get(drag.id) : null;
   const dragging = drag != null;
-  const pickerOpen = picker != null && !drawerClosing;
+  const pickerOpen = picker != null;
   const flipping = opening || closing;
 
   // Taille des pages : toute la hauteur restante de l'écran, sans dépasser la largeur
@@ -491,39 +471,14 @@ export function BinderPages({
     return () => window.clearTimeout(t);
   }, [flipping]);
 
-  // ---- Tiroir : ouverture immédiate, fermeture animée ---------------------
+  // ---- Dialogue de rangement (composant Sheet : voile, Échap, glisser) ----
 
   function openPicker(pocket: number) {
-    setDrawerClosing(false);
     setPicker(pocket);
   }
   function requestClosePicker() {
-    if (picker == null || drawerClosing) return;
-    setDrawerClosing(true);
-  }
-  function finishClosePicker() {
-    setDrawerClosing(false);
     setPicker(null);
   }
-  // Si l'animation de sortie n'aboutit pas, le tiroir disparaît quand même
-  useEffect(() => {
-    if (!drawerClosing) return;
-    const t = window.setTimeout(finishClosePicker, 300);
-    return () => window.clearTimeout(t);
-  }, [drawerClosing]);
-
-  // Tiroir ouvert : un clic en dehors le referme — sans bloquer ce clic, pour
-  // qu'une autre pochette vide prenne directement le relais
-  const onDocumentDown = useEffectEvent((e: PointerEvent) => {
-    const target = e.target as Element | null;
-    if (target?.closest("[data-drawer]")) return;
-    requestClosePicker();
-  });
-  useEffect(() => {
-    if (!pickerOpen) return;
-    document.addEventListener("pointerdown", onDocumentDown);
-    return () => document.removeEventListener("pointerdown", onDocumentDown);
-  }, [pickerOpen]);
 
   // Catalogue TCGdex : recherche différée pendant la frappe
   useEffect(() => {
@@ -1083,7 +1038,7 @@ export function BinderPages({
             const isSource = drag?.id === item?.id;
             const isOver =
               dragging && over === `pocket:${pocket}` && pockets.get(drag.id) !== pocket;
-            const isTarget = !drawerClosing && picker === pocket;
+            const isTarget = picker === pocket;
             const href =
               item && item.kind === "owned" && hrefBase
                 ? `${hrefBase}${refIdOf(item.id)}`
@@ -1544,50 +1499,10 @@ export function BinderPages({
     );
   }
 
-  // Bottom-sheet mobile : glisser vers le bas pour fermer
-  function onSheetDown(e: React.PointerEvent) {
-    if (!isSheet || e.pointerType === "mouse") return;
-    sheetDrag.current = { startY: e.clientY, dy: 0, active: true };
-    // Neutralise l'animation d'entrée (fill:both) qui, sinon, l'emporte sur
-    // le transform inline appliqué pendant le glisser
-    if (sheetRef.current) sheetRef.current.style.animation = "none";
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      // capture indisponible : le glisser reste géré par les events suivants
-    }
-  }
-  function onSheetMove(e: React.PointerEvent) {
-    const d = sheetDrag.current;
-    if (!d.active) return;
-    d.dy = Math.max(0, e.clientY - d.startY);
-    if (sheetRef.current) sheetRef.current.style.transform = `translateY(${d.dy}px)`;
-  }
-  function onSheetUp() {
-    const d = sheetDrag.current;
-    if (!d.active) return;
-    d.active = false;
-    const el = sheetRef.current;
-    if (d.dy > SHEET_CLOSE_DY) {
-      // Rend la main à l'animation de sortie (part du transform courant)
-      if (el) el.style.animation = "";
-      requestClosePicker();
-    } else if (el) {
-      el.style.transition = "transform 0.2s ease";
-      el.style.transform = "";
-      window.setTimeout(() => {
-        if (el) el.style.transition = "";
-      }, 220);
-    }
-    d.dy = 0;
-  }
-
   function renderPicker() {
-    if (picker == null) return null;
-    const pocket = picker;
+    const pocket = picker ?? 0;
     const page = Math.floor(pocket / perPage) + 1;
     const slot = (pocket % perPage) + 1;
-    const close = () => requestClosePicker();
     const modeBtn = (m: typeof mode, label: string) => (
       <button
         type="button"
@@ -1601,59 +1516,22 @@ export function BinderPages({
       </button>
     );
     return (
-      <>
-        <div
-          data-drawer
-          className={`fixed inset-0 z-40 bg-black/50 sm:hidden ${drawerClosing ? "fade-out" : ""}`}
-          onClick={close}
-          aria-hidden
-        />
-        <aside
-          role="dialog"
-          aria-modal="true"
-          aria-label="Ranger une carte"
-          ref={sheetRef}
-          data-drawer
-          className={`${
-            drawerClosing ? "drawer-out" : "drawer-in"
-          } fixed z-50 flex flex-col bg-surface shadow-2xl inset-x-0 bottom-0 max-h-[88dvh] rounded-t-2xl border-t border-edge sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:bottom-auto sm:max-h-none sm:w-[460px] sm:rounded-none sm:border-l sm:border-t-0 xl:w-[560px]`}
-          onAnimationEnd={(e) => {
-            if (e.animationName === "drawer-out" || e.animationName === "sheet-out") {
-              finishClosePicker();
-            }
-          }}
-        >
-          {/* Zone de préhension : glisser vers le bas pour fermer (mobile) */}
-          <div
-            onPointerDown={onSheetDown}
-            onPointerMove={onSheetMove}
-            onPointerUp={onSheetUp}
-            onPointerCancel={onSheetUp}
-            className={isSheet ? "cursor-grab select-none active:cursor-grabbing" : ""}
-            style={isSheet ? { touchAction: "none" } : undefined}
-          >
-            <div className="flex justify-center pt-2 sm:hidden" aria-hidden>
-              <span className="h-1 w-9 rounded-full bg-edge-strong" />
-            </div>
-            <header className="flex items-start justify-between gap-3 border-b border-edge px-5 py-4 pt-3 sm:pt-4">
-              <div>
-                <p className="display text-base font-semibold">Ranger une carte</p>
-                <p className="mt-0.5 text-sm text-muted">
-                  Page <span className="num">{page}</span>, pochette{" "}
-                  <span className="num">{slot}</span>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={close}
-                aria-label="Fermer"
-                className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-edge bg-raised text-muted transition hover:text-foreground sm:flex"
-              >
-                <X size={15} aria-hidden />
-              </button>
-            </header>
+      <Sheet
+        open={picker != null}
+        onClose={() => setPicker(null)}
+        label="Ranger une carte"
+        size="xl"
+        flush
+        header={
+          <div className="min-w-0 flex-1">
+            <p className="display text-base font-semibold">Ranger une carte</p>
+            <p className="mt-0.5 text-sm text-muted">
+              Page <span className="num">{page}</span>, pochette{" "}
+              <span className="num">{slot}</span>
+            </p>
           </div>
-
+        }
+      >
           <div className="flex flex-col gap-2.5 border-b border-edge px-5 py-3">
             <div className="inline-flex self-start rounded-lg border border-edge bg-surface p-0.5">
               {modeBtn("collection", "Ma collection")}
@@ -1764,8 +1642,7 @@ export function BinderPages({
             Après chaque carte rangée, la pochette vide suivante est visée. Échap
             pour fermer.
           </footer>
-        </aside>
-      </>
+      </Sheet>
     );
   }
 
