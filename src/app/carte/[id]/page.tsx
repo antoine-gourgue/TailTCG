@@ -79,9 +79,11 @@ export default async function CartePage({
       .select("id, path, label, position")
       .eq("item_id", id)
       .order("position"),
-    // Même ordre que la grille (ajout récent d'abord) pour feuilleter
+    // Voisins pour feuilleter : même vue que la grille et que la fiche
+    // (collection_value exclut les cartes supprimées), sinon une flèche peut
+    // pointer vers un id absent de la vue → 404
     supabase
-      .from("items")
+      .from("collection_value")
       .select("id")
       .order("created_at", { ascending: false }),
     supabase.from("binders").select("id, name").order("name"),
