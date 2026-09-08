@@ -6,6 +6,8 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_PATHS = [
   "/login",
   "/auth",
+  // Réinitialisation par lien admin : accessible sans session
+  "/reinitialiser",
   "/api/cron",
   "/v/",
   // Capture depuis le téléphone : accès par jeton, sans connexion

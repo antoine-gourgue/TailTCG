@@ -72,3 +72,42 @@ export async function signUp(
 
   redirect("/");
 }
+
+// Réinitialisation par lien admin : le jeton (token_hash) n'est vérifié qu'ici,
+// au moment où l'utilisateur choisit son nouveau mot de passe. Ainsi le simple
+// clic sur le lien n'ouvre aucune session — pas de navigation « connectée »
+// tant que le mot de passe n'est pas redéfini.
+export async function resetPasswordWithToken(
+  _prev: LoginState,
+  formData: FormData
+): Promise<LoginState> {
+  const tokenHash = String(formData.get("token_hash") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirm") ?? "");
+
+  if (!tokenHash) {
+    return { ok: false, message: "Lien invalide ou expiré." };
+  }
+  if (password.length < 8) {
+    return { ok: false, message: "8 caractères minimum." };
+  }
+  if (password !== confirm) {
+    return { ok: false, message: "Les deux saisies ne correspondent pas." };
+  }
+
+  const supabase = await createClient();
+  const { error: otpError } = await supabase.auth.verifyOtp({
+    type: "recovery",
+    token_hash: tokenHash,
+  });
+  if (otpError) {
+    return { ok: false, message: "Lien invalide ou expiré, redemande-en un." };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    return { ok: false, message: `Impossible : ${error.message}` };
+  }
+
+  redirect("/");
+}

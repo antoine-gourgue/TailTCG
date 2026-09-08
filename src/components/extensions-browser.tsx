@@ -188,9 +188,9 @@ export function ExtensionsBrowser({
                         <span className="num rounded bg-raised px-1.5 py-0.5 uppercase">
                           {set.id}
                         </span>
-                        {set.cardCount?.official ? (
+                        {(set.cardCount?.total ?? set.cardCount?.official) ? (
                           <span className="num">
-                            {set.cardCount.official} cartes
+                            {set.cardCount?.total ?? set.cardCount?.official} cartes
                           </span>
                         ) : null}
                       </p>

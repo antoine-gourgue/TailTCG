@@ -60,14 +60,13 @@ export async function adminRecoveryLink(email: string): Promise<Result<{ link: s
   if (error || !data?.properties?.hashed_token) {
     return { ok: false, message: error?.message ?? "Lien indisponible" };
   }
-  // On construit notre propre lien vers /auth/confirm (verifyOtp sur le
-  // token_hash) plutôt que l'action_link Supabase, qui renvoie la session
-  // dans le fragment d'URL — illisible côté serveur (/auth/callback n'y voit
-  // aucun `code`). Après vérification, on atterrit sur les paramètres pour
-  // définir un nouveau mot de passe.
-  const link = `${origin}/auth/confirm?token_hash=${encodeURIComponent(
+  // Lien vers notre page dédiée /reinitialiser : le jeton (token_hash) n'y est
+  // vérifié qu'à la soumission du nouveau mot de passe. Cliquer le lien
+  // n'ouvre donc aucune session — pas de navigation « connectée » dans l'app
+  // avant d'avoir redéfini le mot de passe.
+  const link = `${origin}/reinitialiser?token_hash=${encodeURIComponent(
     data.properties.hashed_token
-  )}&type=recovery&next=${encodeURIComponent("/parametres?reset=1")}`;
+  )}&type=recovery`;
   return { ok: true, link };
 }
 
