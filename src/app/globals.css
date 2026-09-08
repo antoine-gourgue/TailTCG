@@ -646,24 +646,33 @@ a:hover .card-tile,
   .page-turn-left, .page-turn-right, .page-fade { animation: none; }
 }
 
-/* Classeur en pages : la couverture pivote autour des anneaux et se pose à
-   gauche (ouverture), ou revient se poser sur la page 1 (fermeture) */
-@keyframes cover-flip-open {
+/* Classeur en pages : la couverture pivote autour des anneaux en deux
+   demi-tours (recto jusqu'à la tranche, verso ensuite), à l'ouverture comme
+   à la fermeture */
+@keyframes cover-flip-open-a {
   from { transform: rotateY(0deg); }
+  to   { transform: rotateY(-90deg); }
+}
+@keyframes cover-flip-open-b {
+  from { transform: rotateY(-90deg); }
   to   { transform: rotateY(-180deg); }
 }
-@keyframes cover-flip-close {
+@keyframes cover-flip-close-a {
   from { transform: rotateY(-180deg); }
+  to   { transform: rotateY(-90deg); }
+}
+@keyframes cover-flip-close-b {
+  from { transform: rotateY(-90deg); }
   to   { transform: rotateY(0deg); }
 }
-.cover-flip-open {
-  animation: cover-flip-open 0.7s cubic-bezier(0.45, 0.05, 0.2, 1) both;
-}
-.cover-flip-close {
-  animation: cover-flip-close 0.6s cubic-bezier(0.45, 0.05, 0.2, 1) both;
-}
+.cover-flip-open-a  { animation: cover-flip-open-a  0.34s cubic-bezier(0.5, 0, 1, 0.6) both; }
+.cover-flip-open-b  { animation: cover-flip-open-b  0.36s cubic-bezier(0, 0.4, 0.5, 1) both; }
+.cover-flip-close-a { animation: cover-flip-close-a 0.3s  cubic-bezier(0.5, 0, 1, 0.6) both; }
+.cover-flip-close-b { animation: cover-flip-close-b 0.3s  cubic-bezier(0, 0.4, 0.5, 1) both; }
 @media (prefers-reduced-motion: reduce) {
-  .cover-flip-open, .cover-flip-close { animation-duration: 0.01s; }
+  .cover-flip-open-a, .cover-flip-open-b, .cover-flip-close-a, .cover-flip-close-b {
+    animation-duration: 0.01s;
+  }
 }
 
 /* Tiroir de choix d'une carte pour une pochette */

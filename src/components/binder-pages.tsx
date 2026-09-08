@@ -326,6 +326,8 @@ export function BinderPages({
   const [opened, setOpened] = useState(false);
   const [opening, setOpening] = useState(false);
   const [closing, setClosing] = useState(false);
+  /** Seconde moitié du pivot de la couverture (au-delà de la tranche) */
+  const [half, setHalf] = useState(false);
   const [nav, setNav] = useState<{ view: number; dir: Dir | null }>({
     view: 0,
     dir: null,
@@ -443,6 +445,7 @@ export function BinderPages({
 
   function finishOpening() {
     setOpening(false);
+    setHalf(false);
     setOpened(true);
     setNav({ view: 0, dir: null });
     // Onglet cliqué classeur fermé : on tourne ensuite jusqu'à ses pages
@@ -453,6 +456,7 @@ export function BinderPages({
   }
   function finishClosing() {
     setClosing(false);
+    setHalf(false);
     setOpened(false);
     setNav({ view: 0, dir: null });
   }
@@ -464,18 +468,23 @@ export function BinderPages({
     }
     if (flipping) return;
     setPendingView(v);
+    setHalf(false);
     setOpening(true);
   }
   function closeBinder() {
     requestClosePicker();
     if (!opened || flipping) return;
+    const start = () => {
+      setHalf(false);
+      setClosing(true);
+    };
     if (view > 0) {
       // On revient d'abord à la page 1, puis la couverture se referme dessus
       go(0);
-      window.setTimeout(() => setClosing(true), 560);
+      window.setTimeout(start, 560);
       return;
     }
-    setClosing(true);
+    start();
   }
   const onFlipFallback = useEffectEvent(() => {
     if (opening) finishOpening();
@@ -1328,30 +1337,34 @@ export function BinderPages({
     );
   }
 
-  /** Couverture (recto) et intérieur de couverture (verso) qui pivotent ensemble */
-  function renderCoverFaces() {
+  /** Recto de la couverture */
+  function renderCoverFront() {
     return (
-      <>
-        <div className="absolute inset-0 [backface-visibility:hidden]">
-          <BinderCover
-            style={cover.style}
-            covers={cover.covers}
-            name={name}
-            colorHex={colorHex}
-            texture={design.coverTexture}
-            fill
-          />
-        </div>
-        <div
-          className={`absolute inset-0 rounded-l-xl border shadow-[var(--shadow-panel)] [backface-visibility:hidden] [transform:rotateY(180deg)] ${sheet.page}`}
-        >
-          <span
-            aria-hidden
-            className={`pointer-events-none absolute inset-y-0 right-0 w-12 rounded-r-[inherit] bg-gradient-to-l to-transparent ${sheet.gutter}`}
-          />
-          <Holes side="right" positions={ringPos} cls={sheet.holes} />
-        </div>
-      </>
+      <div className="absolute inset-0">
+        <BinderCover
+          style={cover.style}
+          covers={cover.covers}
+          name={name}
+          colorHex={colorHex}
+          texture={design.coverTexture}
+          fill
+        />
+      </div>
+    );
+  }
+
+  /** Verso de la couverture : la feuille vierge, retournée pour pivoter avec elle */
+  function renderCoverBack() {
+    return (
+      <div
+        className={`absolute inset-0 rounded-l-xl border shadow-[var(--shadow-panel)] [transform:rotateY(180deg)] ${sheet.page}`}
+      >
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute inset-y-0 right-0 w-12 rounded-r-[inherit] bg-gradient-to-l to-transparent ${sheet.gutter}`}
+        />
+        <Holes side="right" positions={ringPos} cls={sheet.holes} />
+      </div>
     );
   }
 
@@ -1373,8 +1386,8 @@ export function BinderPages({
             title="Ouvrir le classeur"
             className="group absolute inset-0 [transform-style:preserve-3d]"
           >
-            <div className="h-full w-full transition [transform-style:preserve-3d] group-hover:brightness-110">
-              {renderCoverFaces()}
+            <div className="relative h-full w-full transition group-hover:brightness-110">
+              {renderCoverFront()}
             </div>
           </button>
         </div>
@@ -1405,14 +1418,23 @@ export function BinderPages({
           <div
             aria-hidden
             className={`absolute inset-0 z-30 [transform-origin:left_center] [transform-style:preserve-3d] md:[transform-origin:-1.125rem_center] ${
-              closing ? "cover-flip-close" : "cover-flip-open"
+              closing
+                ? half
+                  ? "cover-flip-close-b"
+                  : "cover-flip-close-a"
+                : half
+                  ? "cover-flip-open-b"
+                  : "cover-flip-open-a"
             }`}
             onAnimationEnd={(e) => {
-              if (e.animationName === "cover-flip-open") finishOpening();
-              else if (e.animationName === "cover-flip-close") finishClosing();
+              const n = e.animationName;
+              if (n === "cover-flip-open-a" || n === "cover-flip-close-a") setHalf(true);
+              else if (n === "cover-flip-open-b") finishOpening();
+              else if (n === "cover-flip-close-b") finishClosing();
             }}
           >
-            {renderCoverFaces()}
+            {/* Une seule face à la fois : de profil à 90°, la bascule est invisible */}
+            {(closing ? half : !half) ? renderCoverFront() : renderCoverBack()}
           </div>
         </div>
       </>
