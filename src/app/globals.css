@@ -802,3 +802,32 @@ a:hover .card-tile,
 @media (prefers-reduced-motion: reduce) {
   .spine-in, .spine-out { animation-duration: 0.01s; animation-delay: 0s; }
 }
+
+/* ————— Curseurs des contrôles ————— */
+/* Tailwind v4 ne met plus cursor:pointer sur les contrôles natifs : on le
+   rétablit pour les boutons, sélecteurs et éléments cliquables. */
+button,
+select,
+summary,
+[role="button"],
+[role="tab"],
+[role="switch"],
+[role="option"],
+label:has(> input[type="checkbox"]),
+label:has(> input[type="radio"]) {
+  cursor: pointer;
+}
+input[type="checkbox"],
+input[type="radio"],
+input[type="range"],
+input[type="color"],
+input[type="file"],
+input[type="date"] {
+  cursor: pointer;
+}
+button:disabled,
+select:disabled,
+input:disabled,
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
