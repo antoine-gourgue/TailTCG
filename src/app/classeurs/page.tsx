@@ -5,6 +5,7 @@ import { binderColorHex } from "@/lib/binder-colors";
 import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
 import { BindersGrid } from "@/components/binders-grid";
+import { binderDesign } from "@/lib/binder-design";
 import { NewBinderButton } from "@/components/new-binder-button";
 
 export const metadata = {
@@ -23,7 +24,7 @@ export default async function ClasseursPage() {
   const [{ data: binders }, { data: links }, { data: items }] = await Promise.all([
     supabase
       .from("binders")
-      .select("id, name, created_at, color, cover_item_ids, style")
+      .select("id, name, created_at, color, cover_item_ids, style, design")
       .order("position", { nullsFirst: false })
       .order("created_at"),
     supabase
@@ -73,6 +74,7 @@ export default async function ClasseursPage() {
       name: b.name,
       style: b.style,
       colorHex: binderColorHex(b.color),
+      texture: binderDesign(b.design).coverTexture,
       count,
       value: hasValue ? value : null,
       covers: chosen.length > 0 ? chosen : covers,

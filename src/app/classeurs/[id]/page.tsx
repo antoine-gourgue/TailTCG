@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { binderColorHex } from "@/lib/binder-colors";
+import { binderDesign } from "@/lib/binder-design";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmAction } from "@/components/confirm-action";
 import { RenameBinderButton } from "@/components/rename-binder-button";
@@ -41,10 +42,11 @@ export default async function ClasseurPage({
 
   const { data: binder } = await supabase
     .from("binders")
-    .select("id, name, color, cover_item_ids, style, page_grid")
+    .select("id, name, color, cover_item_ids, style, page_grid, design")
     .eq("id", id)
     .maybeSingle();
   if (!binder) notFound();
+  const design = binderDesign(binder.design);
 
   const [
     { data: links },
@@ -206,8 +208,11 @@ export default async function ClasseurPage({
             />
             <BinderStyleButton
               binderId={binder.id}
+              name={binder.name}
               color={binder.color}
               styleCode={binder.style}
+              pageGridCode={binder.page_grid}
+              design={design}
               coverIds={binder.cover_item_ids ?? []}
               items={signedItems.map((i) => ({
                 id: i.id,
@@ -237,6 +242,7 @@ export default async function ClasseurPage({
             gridCode={binder.page_grid}
             colorHex={binderColorHex(binder.color)}
             cover={{ style: binder.style, covers }}
+            design={design}
             hrefBase="/carte/"
           />
         ) : signedItems.length === 0 ? (

@@ -1,0 +1,113 @@
+// Options de design d'un classeur, stockées en jsonb dans `binders.design`.
+// Chaque option a une valeur par défaut ; une valeur inconnue y retombe.
+
+export const PAGE_COLORS = [
+  { code: "black", label: "Noires", description: "Feuilles sombres, le classique" },
+  { code: "white", label: "Blanches", description: "Feuilles claires" },
+  { code: "clear", label: "Transparentes", description: "Feuilles translucides" },
+] as const;
+
+export const RING_FINISHES = [
+  { code: "silver", label: "Argent", hex: "#d4d4d8" },
+  { code: "black", label: "Noir", hex: "#52525b" },
+  { code: "gold", label: "Doré", hex: "#d9b45f" },
+] as const;
+
+export const RING_COUNTS = [2, 3, 4, 9] as const;
+
+export const POCKET_FINISHES = [
+  { code: "glossy", label: "Brillantes" },
+  { code: "matte", label: "Mates" },
+  { code: "clear", label: "Sans reflet" },
+] as const;
+
+export const COVER_TEXTURES = [
+  { code: "plain", label: "Lisse" },
+  { code: "leather", label: "Cuir" },
+  { code: "fabric", label: "Tissu" },
+  { code: "holo", label: "Holo" },
+] as const;
+
+export type PageColor = (typeof PAGE_COLORS)[number]["code"];
+export type RingFinish = (typeof RING_FINISHES)[number]["code"];
+export type RingCount = (typeof RING_COUNTS)[number];
+export type PocketFinish = (typeof POCKET_FINISHES)[number]["code"];
+export type CoverTexture = (typeof COVER_TEXTURES)[number]["code"];
+
+export type BinderDesign = {
+  pageColor: PageColor;
+  ringFinish: RingFinish;
+  ringCount: RingCount;
+  pocketFinish: PocketFinish;
+  coverTexture: CoverTexture;
+  pageNumbers: boolean;
+};
+
+export const DEFAULT_DESIGN: BinderDesign = {
+  pageColor: "black",
+  ringFinish: "silver",
+  ringCount: 4,
+  pocketFinish: "glossy",
+  coverTexture: "plain",
+  pageNumbers: true,
+};
+
+function pick<T extends string | number>(
+  value: unknown,
+  allowed: readonly T[],
+  fallback: T
+): T {
+  return (allowed as readonly unknown[]).includes(value) ? (value as T) : fallback;
+}
+
+/** Design normalisé depuis le jsonb — tolère null, champs manquants ou inconnus */
+export function binderDesign(raw: unknown): BinderDesign {
+  const d = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    pageColor: pick(d.pageColor, PAGE_COLORS.map((p) => p.code), DEFAULT_DESIGN.pageColor),
+    ringFinish: pick(d.ringFinish, RING_FINISHES.map((r) => r.code), DEFAULT_DESIGN.ringFinish),
+    ringCount: pick(d.ringCount, RING_COUNTS, DEFAULT_DESIGN.ringCount),
+    pocketFinish: pick(
+      d.pocketFinish,
+      POCKET_FINISHES.map((p) => p.code),
+      DEFAULT_DESIGN.pocketFinish
+    ),
+    coverTexture: pick(
+      d.coverTexture,
+      COVER_TEXTURES.map((t) => t.code),
+      DEFAULT_DESIGN.coverTexture
+    ),
+    pageNumbers:
+      typeof d.pageNumbers === "boolean" ? d.pageNumbers : DEFAULT_DESIGN.pageNumbers,
+  };
+}
+
+/** Hauteurs relatives des anneaux (et des perforations en face) */
+export function ringPositions(count: RingCount): number[] {
+  if (count === 2) return [0.25, 0.75];
+  if (count === 3) return [0.15, 0.5, 0.85];
+  if (count === 9) return Array.from({ length: 9 }, (_, i) => 0.08 + (i * 0.84) / 8);
+  return [0.13, 0.37, 0.63, 0.87];
+}
+
+export function ringHex(finish: RingFinish): string {
+  return RING_FINISHES.find((r) => r.code === finish)?.hex ?? DEFAULT_DESIGN_RING_HEX;
+}
+const DEFAULT_DESIGN_RING_HEX = "#d4d4d8";
+
+/**
+ * Calque de texture posé sur la couverture et le dos du classeur —
+ * classes Tailwind d'un élément absolu qui ne capture pas les clics.
+ */
+export function coverTextureClass(texture: CoverTexture): string {
+  switch (texture) {
+    case "leather":
+      return "bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.09)_1px,transparent_1.6px)] bg-[size:5px_5px] shadow-[inset_0_0_48px_rgba(0,0,0,0.45)]";
+    case "fabric":
+      return "bg-[repeating-linear-gradient(45deg,rgba(255,255,255,0.06)_0_2px,transparent_2px_5px),repeating-linear-gradient(-45deg,rgba(0,0,0,0.10)_0_2px,transparent_2px_5px)]";
+    case "holo":
+      return "bg-[linear-gradient(115deg,rgba(255,80,180,0.30),rgba(80,220,255,0.30)_30%,rgba(255,230,80,0.30)_55%,rgba(140,80,255,0.30)_80%,rgba(80,255,180,0.30))] mix-blend-screen";
+    default:
+      return "";
+  }
+}

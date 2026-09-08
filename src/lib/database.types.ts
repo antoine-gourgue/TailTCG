@@ -137,6 +137,7 @@ export type Database = {
           color: string | null
           cover_item_ids: string[] | null
           created_at: string | null
+          design: Json
           id: string
           name: string
           owner_id: string
@@ -148,6 +149,7 @@ export type Database = {
           color?: string | null
           cover_item_ids?: string[] | null
           created_at?: string | null
+          design?: Json
           id?: string
           name: string
           owner_id?: string
@@ -159,6 +161,7 @@ export type Database = {
           color?: string | null
           cover_item_ids?: string[] | null
           created_at?: string | null
+          design?: Json
           id?: string
           name?: string
           owner_id?: string

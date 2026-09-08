@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { binderColorHex } from "@/lib/binder-colors";
+import { binderDesign } from "@/lib/binder-design";
 import { Logo } from "@/components/logo";
 import { BinderPages, type PocketItem } from "@/components/binder-pages";
 import { ViewToggle } from "@/components/view-toggle";
@@ -71,7 +72,7 @@ export default async function SharedBinderPage({
 
   const { data: binder } = await admin
     .from("binders")
-    .select("id, name, owner_id, color, page_grid, style, cover_item_ids")
+    .select("id, name, owner_id, color, page_grid, style, cover_item_ids, design")
     .eq("id", id)
     .maybeSingle();
   if (!binder || binder.owner_id !== settings.owner_id) notFound();
@@ -204,6 +205,7 @@ export default async function SharedBinderPage({
           gridCode={binder.page_grid}
           colorHex={binderColorHex(binder.color)}
           cover={{ style: binder.style, covers }}
+          design={binderDesign(binder.design)}
           readOnly
         />
       ) : (

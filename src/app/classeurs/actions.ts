@@ -146,16 +146,23 @@ export async function reorderBinderItems(binderId: string, itemIds: string[]) {
   return { error: results.find((r) => r.error)?.error?.message ?? null };
 }
 
-/** Apparence du classeur : couleur de tranche + cartes de couverture */
+/**
+ * Apparence du classeur : couleur de tranche, style et cartes de couverture,
+ * format des pages et options de design (feuilles, anneaux, pochettes…)
+ */
 export async function updateBinderStyle(
   binderId: string,
   color: string | null,
   coverItemIds: string[],
-  style: string
+  style: string,
+  pageGridCode?: string,
+  design?: unknown
 ) {
   if (!binderId) return { error: "Classeur manquant" };
   const { BINDER_COLORS } = await import("@/lib/binder-colors");
   const { binderStyle, binderStyleCovers } = await import("@/lib/binder-styles");
+  const { pageGrid } = await import("@/lib/binder-pages");
+  const { binderDesign } = await import("@/lib/binder-design");
   const safeColor =
     color && BINDER_COLORS.some((c) => c.code === color) ? color : null;
   const safeStyle = binderStyle(style);
@@ -177,6 +184,8 @@ export async function updateBinderStyle(
       color: safeColor,
       cover_item_ids: covers.length ? covers : null,
       style: safeStyle,
+      ...(pageGridCode != null ? { page_grid: pageGrid(pageGridCode).code } : {}),
+      ...(design !== undefined ? { design: binderDesign(design) } : {}),
     })
     .eq("id", binderId);
 
@@ -219,24 +228,6 @@ export async function setItemBinders(itemId: string, binderIds: string[]) {
   revalidatePath("/classeurs");
   revalidatePath(`/carte/${itemId}`);
   return { error: null };
-}
-
-/** Pages : format des feuilles du classeur (3x3, 4x3…) */
-export async function updateBinderPageGrid(binderId: string, code: string) {
-  if (!UUID_RE.test(binderId)) return { error: "Classeur invalide" };
-  const { pageGrid } = await import("@/lib/binder-pages");
-  const grid = pageGrid(code);
-  if (grid.code !== code) return { error: "Format inconnu" };
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("binders")
-    .update({ page_grid: grid.code })
-    .eq("id", binderId);
-
-  revalidatePath("/classeurs");
-  revalidatePath(`/classeurs/${binderId}`);
-  return { error: error?.message ?? null };
 }
 
 // ---- Pages de pochettes ----------------------------------------------------

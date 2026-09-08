@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { formatEur } from "@/lib/domain";
 import { binderColorHex } from "@/lib/binder-colors";
+import { binderDesign } from "@/lib/binder-design";
 import { Logo } from "@/components/logo";
 import { BinderCover } from "@/components/binder-cover";
 import { CardImage } from "@/components/card-image";
@@ -112,7 +113,7 @@ export default async function SharedCollectionPage({
       admin
         .from("binders")
         .select(
-          "id, name, color, style, cover_item_ids, created_at, binder_items(item_id)"
+          "id, name, color, style, cover_item_ids, design, created_at, binder_items(item_id)"
         )
         .eq("owner_id", settings.owner_id)
         .order("position", { nullsFirst: false })
@@ -221,6 +222,7 @@ export default async function SharedCollectionPage({
       name: b.name,
       style: b.style,
       colorHex: binderColorHex(b.color),
+      texture: binderDesign(b.design).coverTexture,
       count,
       value: hasValue ? value : null,
       covers: chosen.length > 0 ? chosen : covers,
@@ -308,6 +310,7 @@ export default async function SharedCollectionPage({
                     covers={b.covers}
                     name={b.name}
                     colorHex={b.colorHex}
+                    texture={b.texture}
                   />
                   <p className="mt-2.5 truncate text-sm font-semibold group-hover:text-accent-strong">
                     {b.name}

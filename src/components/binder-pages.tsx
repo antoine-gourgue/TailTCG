@@ -20,14 +20,14 @@ import {
   placeItemInPocket,
   placeWantedInPocket,
   removeFromPocket,
-  updateBinderPageGrid,
 } from "@/app/classeurs/actions";
+import { layoutPockets, pageGrid, pocketsPerPage } from "@/lib/binder-pages";
 import {
-  PAGE_GRIDS,
-  layoutPockets,
-  pageGrid,
-  pocketsPerPage,
-} from "@/lib/binder-pages";
+  coverTextureClass,
+  ringHex,
+  ringPositions,
+  type BinderDesign,
+} from "@/lib/binder-design";
 import type { CardSearchResult } from "@/lib/tcgdex";
 
 // Classeur simulé : couverture fermée à la taille exacte des pages, puis
@@ -77,8 +77,33 @@ const HOVER_FLIP_MS = 450;
 const SWIPE_MIN = 60;
 /** Si l'animation d'ouverture ne se termine pas, on ouvre quand même */
 const OPEN_FALLBACK_MS = 700;
-/** Hauteur relative des anneaux (et des perforations en face) */
-const RINGS = [0.13, 0.37, 0.63, 0.87];
+/** Rendu des feuilles selon leur couleur (design du classeur) */
+const SHEETS = {
+  black: {
+    page: "border-white/10 bg-[#17161a]",
+    pocketBg: "bg-black/30",
+    pocketRing: "ring-white/[0.06]",
+    number: "text-white/35",
+    holes: "bg-black/80",
+    gutter: "from-black/35",
+  },
+  white: {
+    page: "border-black/10 bg-[#f3f1ec]",
+    pocketBg: "bg-black/[0.08]",
+    pocketRing: "ring-black/10",
+    number: "text-black/40",
+    holes: "bg-black/40",
+    gutter: "from-black/15",
+  },
+  clear: {
+    page: "border-white/15 bg-white/[0.06] backdrop-blur-[2px]",
+    pocketBg: "bg-white/[0.05]",
+    pocketRing: "ring-white/10",
+    number: "text-foreground/40",
+    holes: "bg-black/60",
+    gutter: "from-black/25",
+  },
+} as const;
 /** Cartes affichées au plus dans le tiroir */
 const PICKER_MAX = 80;
 /** Attente après la frappe avant d'interroger le catalogue */
@@ -134,35 +159,54 @@ function normalize(s: string): string {
     .replace(/\p{Diacritic}/gu, "");
 }
 
-/** Dos du classeur et anneaux métalliques qui traversent les pages */
-function Spine({ colorHex }: { colorHex: string | null }) {
+/** Dos du classeur (matière de la couverture) et anneaux qui traversent les pages */
+function Spine({
+  colorHex,
+  positions,
+  ringColor,
+  textureClass,
+}: {
+  colorHex: string | null;
+  positions: number[];
+  ringColor: string;
+  textureClass: string;
+}) {
   return (
     <div className="relative z-20 w-9 shrink-0 self-stretch" aria-hidden>
       <div
-        className="absolute inset-x-0 -inset-y-1.5 rounded-md bg-raised"
+        className="absolute inset-x-0 -inset-y-1.5 overflow-hidden rounded-md bg-raised"
         style={colorHex ? { backgroundColor: colorHex } : undefined}
       >
         <div className="absolute inset-0 rounded-md bg-gradient-to-r from-black/40 via-white/10 to-black/45" />
+        {textureClass && <span className={`absolute inset-0 rounded-md ${textureClass}`} />}
       </div>
-      {RINGS.map((t) => (
+      {positions.map((t) => (
         <span
           key={t}
-          className="absolute left-1/2 h-4 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-zinc-300 shadow-[0_1px_2px_rgba(0,0,0,.7),inset_0_1px_1px_rgba(255,255,255,.6)]"
-          style={{ top: `${t * 100}%` }}
+          className="absolute left-1/2 h-4 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] shadow-[0_1px_2px_rgba(0,0,0,.7),inset_0_1px_1px_rgba(255,255,255,.5)]"
+          style={{ top: `${t * 100}%`, borderColor: ringColor }}
         />
       ))}
     </div>
   );
 }
 
-function Holes({ side }: { side: "left" | "right" }) {
+function Holes({
+  side,
+  positions,
+  cls,
+}: {
+  side: "left" | "right";
+  positions: number[];
+  cls: string;
+}) {
   return (
     <>
-      {RINGS.map((t) => (
+      {positions.map((t) => (
         <span
           key={t}
           aria-hidden
-          className={`absolute h-3 w-3 -translate-y-1/2 rounded-full bg-black/70 shadow-[inset_0_1px_2px_rgba(0,0,0,.9),0_0_0_1px_rgba(255,255,255,.06)] ${
+          className={`absolute h-3 w-3 -translate-y-1/2 rounded-full shadow-[inset_0_1px_2px_rgba(0,0,0,.9),0_0_0_1px_rgba(255,255,255,.06)] ${cls} ${
             side === "left" ? "left-2" : "right-2"
           }`}
           style={{ top: `${t * 100}%` }}
@@ -180,6 +224,7 @@ export function BinderPages({
   gridCode,
   colorHex,
   cover,
+  design,
   readOnly = false,
   hrefBase,
 }: {
@@ -191,6 +236,8 @@ export function BinderPages({
   gridCode: string | null;
   colorHex: string | null;
   cover: { style: string | null; covers: CoverItem[] };
+  /** Options de design : feuilles, anneaux, pochettes, matière, numéros */
+  design: BinderDesign;
   readOnly?: boolean;
   /** Préfixe du lien de la fiche d'un exemplaire (`/carte/`) — absent en vitrine */
   hrefBase?: string;
@@ -202,9 +249,19 @@ export function BinderPages({
     getSpreadOnServer
   );
 
-  const [code, setCode] = useState<string>(pageGrid(gridCode).code);
-  const grid = pageGrid(code);
+  const grid = pageGrid(gridCode);
   const perPage = pocketsPerPage(grid);
+  // Design : feuilles, anneaux, pochettes, matière
+  const sheet = SHEETS[design.pageColor];
+  const ringPos = ringPositions(design.ringCount);
+  const ringColor = ringHex(design.ringFinish);
+  const textureClass = coverTextureClass(design.coverTexture);
+  const sheen =
+    design.pocketFinish === "glossy"
+      ? "from-white/[0.09] via-transparent to-black/10"
+      : design.pocketFinish === "matte"
+        ? "from-white/[0.03] via-transparent to-black/5"
+        : null;
 
   // Rangement : base serveur + surcharges optimistes liées à cet état serveur
   const serverKey = items.map((i) => `${i.id}:${i.position ?? ""}`).join("|");
@@ -240,7 +297,6 @@ export function BinderPages({
   const [fSet, setFSet] = useState("");
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(false);
-  const [savingGrid, setSavingGrid] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
     tone?: "success" | "error";
@@ -544,20 +600,6 @@ export function BinderPages({
     router.refresh();
   }
 
-  async function changeGrid(nextCode: string) {
-    const previous = code;
-    setCode(nextCode);
-    setSavingGrid(true);
-    const { error } = await updateBinderPageGrid(binderId, nextCode);
-    setSavingGrid(false);
-    if (error) {
-      setCode(previous);
-      setToast({ message: "Format non enregistré", tone: "error" });
-      return;
-    }
-    router.refresh();
-  }
-
   // ---- Glisser-déposer -----------------------------------------------------
 
   function placeGhost(x: number, y: number) {
@@ -853,7 +895,7 @@ export function BinderPages({
       <section
         key="blank"
         aria-label="Feuille vierge"
-        className={`relative z-0 min-w-0 rounded-l-xl border border-edge bg-surface shadow-[var(--shadow-panel)] ${PAGE_W} ${turnClass("left")}`}
+        className={`relative z-0 min-w-0 rounded-l-xl border shadow-[var(--shadow-panel)] ${sheet.page} ${PAGE_W} ${turnClass("left")}`}
       >
         <span
           aria-hidden
@@ -861,9 +903,9 @@ export function BinderPages({
         />
         <span
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 right-0 w-12 rounded-r-[inherit] bg-gradient-to-l from-black/30 to-transparent"
+          className={`pointer-events-none absolute inset-y-0 right-0 w-12 rounded-r-[inherit] bg-gradient-to-l to-transparent ${sheet.gutter}`}
         />
-        <Holes side="right" />
+        <Holes side="right" positions={ringPos} cls={sheet.holes} />
         {renderEdge("prev", "left")}
       </section>
     );
@@ -877,7 +919,7 @@ export function BinderPages({
         key={pageIdx}
         aria-label={phantom ? undefined : `Page ${pageIdx + 1}`}
         aria-hidden={phantom || undefined}
-        className={`relative z-0 min-w-0 border border-edge bg-surface shadow-[var(--shadow-panel)] [backface-visibility:hidden] ${
+        className={`relative z-0 min-w-0 border shadow-[var(--shadow-panel)] [backface-visibility:hidden] ${sheet.page} ${
           // Fantôme : il remplit le conteneur qui a déjà la largeur d'une page
           phantom ? "invisible w-full" : PAGE_W
         } ${
@@ -900,13 +942,13 @@ export function BinderPages({
         {/* Ombre de gouttière et perforations */}
         <span
           aria-hidden
-          className={`pointer-events-none absolute inset-y-0 w-12 ${
+          className={`pointer-events-none absolute inset-y-0 w-12 to-transparent ${sheet.gutter} ${
             holesLeft
-              ? "left-0 rounded-l-[inherit] bg-gradient-to-r from-black/30 to-transparent"
-              : "right-0 rounded-r-[inherit] bg-gradient-to-l from-black/30 to-transparent"
+              ? "left-0 rounded-l-[inherit] bg-gradient-to-r"
+              : "right-0 rounded-r-[inherit] bg-gradient-to-l"
           }`}
         />
-        <Holes side={holesLeft ? "left" : "right"} />
+        <Holes side={holesLeft ? "left" : "right"} positions={ringPos} cls={sheet.holes} />
 
         {/* Bords cliquables pour tourner (et cibles de survol en glissant) */}
         {!phantom && role === "left" && renderEdge("prev", "left")}
@@ -997,8 +1039,8 @@ export function BinderPages({
                       }
                     : undefined
                 }
-                className={`group/p relative aspect-[63/88] rounded-md bg-black/25 shadow-[inset_0_2px_8px_rgba(0,0,0,.45)] transition ${
-                  isOver || isTarget ? "ring-2 ring-accent" : "ring-1 ring-white/[0.06]"
+                className={`group/p relative aspect-[63/88] rounded-md shadow-[inset_0_2px_8px_rgba(0,0,0,.45)] transition ${sheet.pocketBg} ${
+                  isOver || isTarget ? "ring-2 ring-accent" : `ring-1 ${sheet.pocketRing}`
                 } ${fillable ? "cursor-pointer hover:ring-edge-strong" : ""}`}
                 title={fillable ? "Ranger une carte ici" : undefined}
               >
@@ -1060,26 +1102,32 @@ export function BinderPages({
                     className="pointer-events-none absolute inset-0 animate-pulse rounded-md ring-2 ring-accent"
                   />
                 )}
-                {/* Pochette plastique : reflet et ouverture en haut */}
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute inset-0 rounded-md bg-gradient-to-br from-white/[0.09] via-transparent to-black/10"
-                />
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-[8%] top-0 h-px bg-white/20"
-                />
+                {/* Pochette plastique : reflet et ouverture en haut, selon la finition */}
+                {sheen && (
+                  <span
+                    aria-hidden
+                    className={`pointer-events-none absolute inset-0 rounded-md bg-gradient-to-br ${sheen}`}
+                  />
+                )}
+                {design.pocketFinish === "glossy" && (
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-[8%] top-0 h-px bg-white/20"
+                  />
+                )}
               </div>
             );
           })}
         </div>
-        <span
-          className={`num absolute bottom-2 text-[11px] text-faint ${
-            holesLeft ? "right-4" : "left-4"
-          }`}
-        >
-          {pageIdx + 1}
-        </span>
+        {design.pageNumbers && (
+          <span
+            className={`num absolute bottom-2 text-[11px] ${sheet.number} ${
+              holesLeft ? "right-4" : "left-4"
+            }`}
+          >
+            {pageIdx + 1}
+          </span>
+        )}
       </section>
     );
   }
@@ -1429,6 +1477,7 @@ export function BinderPages({
                 covers={cover.covers}
                 name={name}
                 colorHex={colorHex}
+                texture={design.coverTexture}
                 fill
               />
             </div>
@@ -1453,32 +1502,17 @@ export function BinderPages({
               <span className="text-faint">
                 {" "}
                 · {count} carte{count > 1 ? "s" : ""} · {usedPages} page
-                {usedPages > 1 ? "s" : ""}
+                {usedPages > 1 ? "s" : ""} · {grid.cols}×{grid.rows}
               </span>
             </>
           )}
         </span>
         {!readOnly && (
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="hidden text-xs text-faint xl:inline">
-              {opened
-                ? "Glisse une carte vers une pochette, un onglet ou un bord · clique une pochette vide pour y ranger une carte"
-                : "Clique la couverture ou un onglet pour ouvrir le classeur"}
-            </span>
-            <select
-              value={code}
-              onChange={(e) => changeGrid(e.target.value)}
-              disabled={savingGrid}
-              className="field !w-auto text-[13px]"
-              aria-label="Format des pages"
-            >
-              {PAGE_GRIDS.map((g) => (
-                <option key={g.code} value={g.code}>
-                  {g.cols}×{g.rows} · {g.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <span className="hidden text-xs text-faint xl:inline">
+            {opened
+              ? "Glisse une carte vers une pochette, un onglet ou un bord · clique une pochette vide pour y ranger une carte"
+              : "Clique la couverture ou un onglet pour ouvrir le classeur · format et design dans « Personnaliser »"}
+          </span>
         )}
       </div>
 
@@ -1493,7 +1527,14 @@ export function BinderPages({
                 const role: Role = perView === 1 ? "single" : i === 0 ? "left" : "right";
                 return (
                   <Fragment key={pg}>
-                    {role === "right" && <Spine colorHex={colorHex} />}
+                    {role === "right" && (
+                      <Spine
+                        colorHex={colorHex}
+                        positions={ringPos}
+                        ringColor={ringColor}
+                        textureClass={textureClass}
+                      />
+                    )}
                     {pg === "blank" ? renderBlankPage() : renderPage(pg, role)}
                   </Fragment>
                 );

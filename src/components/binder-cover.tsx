@@ -1,8 +1,21 @@
 import { NotebookTabs } from "lucide-react";
 import { binderStyle } from "@/lib/binder-styles";
+import { coverTextureClass, type CoverTexture } from "@/lib/binder-design";
 import { CardImage } from "@/components/card-image";
 
 export type CoverItem = { image_url: string };
+
+/** Calque de matière (cuir, tissu, holo…) posé sur la couverture */
+function Texture({ texture }: { texture?: CoverTexture }) {
+  const cls = coverTextureClass(texture ?? "plain");
+  if (!cls) return null;
+  return (
+    <span
+      aria-hidden
+      className={`pointer-events-none absolute inset-0 z-10 rounded-[inherit] ${cls}`}
+    />
+  );
+}
 
 /** Teinte translucide dérivée de la couleur de tranche (#rrggbb + alpha) */
 function tint(hex: string | null, alpha: string): string | undefined {
@@ -21,6 +34,8 @@ type StyleProps = {
   colorHex: string | null;
   /** Remplit son conteneur (classeur fermé à la taille des pages) */
   fill?: boolean;
+  /** Matière de la couverture */
+  texture?: CoverTexture;
 };
 
 /** Le conteneur dicte la taille au lieu des proportions d'une carte */
@@ -29,12 +44,13 @@ function fillStyle(fill?: boolean): React.CSSProperties | undefined {
 }
 
 /** Classeur : tranche perforée + page de pochettes 2×2 */
-function StyleBinder({ covers, name, colorHex, fill }: StyleProps) {
+function StyleBinder({ covers, name, colorHex, fill, texture }: StyleProps) {
   return (
     <div
       className="relative aspect-[63/88] overflow-hidden rounded-l-lg rounded-r-xl border border-edge bg-surface"
       style={fillStyle(fill)}
     >
+      <Texture texture={texture} />
       <div
         className="absolute inset-y-0 left-0 flex w-7 flex-col items-center justify-evenly border-r border-edge bg-raised py-3"
         style={colorHex ? { backgroundColor: colorHex } : undefined}
@@ -69,12 +85,13 @@ function StyleBinder({ covers, name, colorHex, fill }: StyleProps) {
 }
 
 /** Mosaïque : quatre cartes en grille nue, fond très légèrement teinté */
-function StyleMosaic({ covers, name, colorHex, fill }: StyleProps) {
+function StyleMosaic({ covers, name, colorHex, fill, texture }: StyleProps) {
   return (
     <div
-      className="flex aspect-[63/88] items-center rounded-xl p-2"
+      className="relative flex aspect-[63/88] items-center rounded-xl p-2"
       style={{ backgroundColor: tint(colorHex, "1f"), ...fillStyle(fill) }}
     >
+      <Texture texture={texture} />
       <div className="grid w-full grid-cols-2 gap-1.5">
         {[0, 1, 2, 3].map((i) =>
           covers[i] ? (
@@ -91,7 +108,7 @@ function StyleMosaic({ covers, name, colorHex, fill }: StyleProps) {
 }
 
 /** Vitrine : une carte star sur un halo de couleur */
-function StyleShowcase({ covers, name, colorHex, fill }: StyleProps) {
+function StyleShowcase({ covers, name, colorHex, fill, texture }: StyleProps) {
   return (
     <div
       className="relative flex aspect-[63/88] items-center justify-center overflow-hidden rounded-xl border border-edge bg-raised/60"
@@ -102,6 +119,7 @@ function StyleShowcase({ covers, name, colorHex, fill }: StyleProps) {
           : undefined,
       }}
     >
+      <Texture texture={texture} />
       {covers[0] ? (
         <div className="card-tile aspect-[63/88] w-[62%] shadow-xl transition-transform duration-300 group-hover:scale-[1.03]">
           <CardImage
@@ -119,7 +137,7 @@ function StyleShowcase({ covers, name, colorHex, fill }: StyleProps) {
 
 /** Éventail : trois cartes en main, pivotées autour d'un point sous
  * l'éventail comme des cartes tenues entre les doigts */
-function StyleFan({ covers, name, colorHex, fill }: StyleProps) {
+function StyleFan({ covers, name, colorHex, fill, texture }: StyleProps) {
   const shown = covers.slice(0, 3);
   return (
     <div
@@ -131,6 +149,7 @@ function StyleFan({ covers, name, colorHex, fill }: StyleProps) {
           : undefined,
       }}
     >
+      <Texture texture={texture} />
       {shown.length === 0 && (
         <span className="absolute inset-0 flex items-center justify-center text-faint">
           <NotebookTabs size={40} strokeWidth={1.2} aria-hidden />
@@ -175,16 +194,19 @@ function StyleLabel({
   name,
   colorHex,
   fill,
+  texture,
 }: {
   name: string;
   colorHex: string | null;
   fill?: boolean;
+  texture?: CoverTexture;
 }) {
   return (
     <div
       className="relative flex aspect-[63/88] items-center justify-center overflow-hidden rounded-l-md rounded-r-xl border border-edge bg-raised"
       style={{ backgroundColor: colorHex ?? undefined, ...fillStyle(fill) }}
     >
+      <Texture texture={texture} />
       <span
         className="absolute inset-y-0 left-0 w-2.5 bg-black/20"
         aria-hidden
@@ -213,6 +235,7 @@ export function BinderCover({
   name,
   colorHex,
   fill,
+  texture,
 }: {
   style: string | null;
   covers: CoverItem[];
@@ -220,13 +243,15 @@ export function BinderCover({
   colorHex: string | null;
   /** Remplit son conteneur (classeur fermé à la taille exacte des pages) */
   fill?: boolean;
+  /** Matière de la couverture (lisse par défaut) */
+  texture?: CoverTexture;
 }) {
   const kind = binderStyle(style);
-  const props = { covers, name, colorHex, fill };
+  const props = { covers, name, colorHex, fill, texture };
   if (kind === "mosaic") return <StyleMosaic {...props} />;
   if (kind === "showcase") return <StyleShowcase {...props} />;
   if (kind === "fan") return <StyleFan {...props} />;
   if (kind === "label")
-    return <StyleLabel name={name} colorHex={colorHex} fill={fill} />;
+    return <StyleLabel name={name} colorHex={colorHex} fill={fill} texture={texture} />;
   return <StyleBinder {...props} />;
 }

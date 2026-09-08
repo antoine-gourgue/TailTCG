@@ -7,12 +7,14 @@ import { formatEur } from "@/lib/domain";
 import { reorderBinders } from "@/app/classeurs/actions";
 import { BinderCover, type CoverItem } from "@/components/binder-cover";
 import { Toast } from "@/components/toast";
+import type { CoverTexture } from "@/lib/binder-design";
 
 export type BinderTile = {
   id: string;
   name: string;
   style: string | null;
   colorHex: string | null;
+  texture: CoverTexture;
   count: number;
   value: number | null;
   covers: CoverItem[];
@@ -82,6 +84,7 @@ export function BindersGrid({ binders }: { binders: BinderTile[] }) {
                   covers={b.covers}
                   name={b.name}
                   colorHex={b.colorHex}
+                  texture={b.texture}
                 />
                 <p className="mt-3 truncate text-base font-semibold group-hover:text-accent-strong">
                   {b.name}
