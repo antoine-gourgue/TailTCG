@@ -538,6 +538,12 @@ export function BinderEditor({
             ))}
           </div>
 
+          <p className="mb-3 text-xs text-faint">
+            {preview === "ferme"
+              ? "Tu personnalises la couverture."
+              : "Tu personnalises les pages et les anneaux."}
+          </p>
+
           <div className="panel flex items-start justify-center p-6">
             {preview === "ferme" ? (
               <div className="relative w-full max-w-sm">
@@ -611,6 +617,8 @@ export function BinderEditor({
         </div>
 
         <div className="flex flex-col gap-5">
+          {preview === "ferme" ? (
+            <>
           {/* ---- Couverture ---- */}
           <section className="panel p-5">
             <p className="label-xs mb-2">Style de couverture</p>
@@ -843,7 +851,9 @@ export function BinderEditor({
               <CardPicker cards={cards} isSelected={(id) => coverIds.includes(id)} order={(id) => { const i = coverIds.indexOf(id); return i === -1 ? null : i; }} onPick={toggleCover} />
             </section>
           ) : null}
-
+            </>
+          ) : (
+            <>
           {/* ---- Intérieur ---- */}
           <section className="panel p-5">
             <p className="label-xs mb-3">Pages</p>
@@ -869,15 +879,29 @@ export function BinderEditor({
 
           <section className="panel p-5">
             <p className="label-xs mb-3">Anneaux</p>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-4">
               <div>
                 <p className="mb-1.5 text-xs text-muted">Finition</p>
-                <div className="flex items-center gap-2" role="group" aria-label="Finition des anneaux">
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Finition des anneaux">
                   {RING_FINISHES.map((r) => {
                     const active = design.ringFinish === r.code;
                     return (
-                      <button key={r.code} type="button" onClick={() => setD({ ringFinish: r.code })} title={r.label} aria-pressed={active} className={`flex h-8 items-center gap-2 rounded-lg border px-2.5 text-[12px] font-medium transition ${active ? "border-accent/50 bg-accent-soft text-accent-strong" : "border-edge text-muted hover:border-edge-strong hover:text-foreground"}`}>
-                        <span aria-hidden className="h-3.5 w-5 rounded-full border-[3px]" style={{ borderColor: r.hex }} />
+                      <button
+                        key={r.code}
+                        type="button"
+                        onClick={() => setD({ ringFinish: r.code })}
+                        aria-pressed={active}
+                        className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-lg border px-3 text-[12px] font-medium transition ${
+                          active
+                            ? "border-accent/50 bg-accent-soft text-accent-strong"
+                            : "border-edge text-muted hover:border-edge-strong hover:text-foreground"
+                        }`}
+                      >
+                        <span
+                          aria-hidden
+                          className="h-4 w-4 rounded-full border-[3px] bg-surface"
+                          style={{ borderColor: r.hex }}
+                        />
                         {r.label}
                       </button>
                     );
@@ -885,11 +909,18 @@ export function BinderEditor({
                 </div>
               </div>
               <div>
-                <p className="mb-1.5 text-xs text-muted">Nombre</p>
-                <Chips label="Nombre d'anneaux" options={RING_COUNTS.map((n) => ({ code: String(n), label: String(n) }))} value={String(design.ringCount)} onPick={(v) => setD({ ringCount: Number(v) as BinderDesign["ringCount"] })} />
+                <p className="mb-1.5 text-xs text-muted">Nombre d&apos;anneaux</p>
+                <Chips
+                  label="Nombre d'anneaux"
+                  options={RING_COUNTS.map((n) => ({ code: String(n), label: String(n) }))}
+                  value={String(design.ringCount)}
+                  onPick={(v) => setD({ ringCount: Number(v) as BinderDesign["ringCount"] })}
+                />
               </div>
             </div>
           </section>
+            </>
+          )}
         </div>
       </div>
 
