@@ -230,24 +230,24 @@ export function BinderStyleButton({
               <X size={15} aria-hidden />
             </button>
 
-            <div className="flex items-start justify-between gap-4 px-5 pt-5">
-              <div>
-                <p className="display text-base font-semibold">
-                  Personnaliser le classeur
-                </p>
-                <p className="mt-0.5 text-sm text-muted">
-                  L&apos;aperçu suit tes choix ; rien n&apos;est enregistré avant
-                  « Enregistrer ».
-                </p>
-              </div>
-              <div className="group w-20 shrink-0 sm:w-24">
-                <BinderCover
-                  style={selStyle}
-                  covers={previewCovers}
-                  name={name}
-                  colorHex={binderColorHex(selColor)}
-                  texture={selDesign.coverTexture}
-                />
+            <div className="px-5 pt-5">
+              <p className="display text-base font-semibold">
+                Personnaliser le classeur
+              </p>
+              <p className="mt-0.5 text-sm text-muted">
+                L&apos;aperçu suit tes choix ; rien n&apos;est enregistré avant
+                « Enregistrer ».
+              </p>
+              <div className="mt-4 flex justify-center rounded-xl border border-edge bg-raised/40 p-4">
+                <div className="group w-32 sm:w-36">
+                  <BinderCover
+                    style={selStyle}
+                    covers={previewCovers}
+                    name={name}
+                    colorHex={binderColorHex(selColor)}
+                    texture={selDesign.coverTexture}
+                  />
+                </div>
               </div>
             </div>
 

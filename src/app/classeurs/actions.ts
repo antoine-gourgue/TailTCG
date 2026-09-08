@@ -230,6 +230,21 @@ export async function setItemBinders(itemId: string, binderIds: string[]) {
   return { error: null };
 }
 
+/** Pages : nombre minimal de pages du classeur (feuilles vides ajoutées à l'avance) */
+export async function setBinderPageCount(binderId: string, count: number) {
+  if (!UUID_RE.test(binderId)) return { error: "Classeur invalide" };
+  if (!Number.isInteger(count) || count < 0 || count > 400) {
+    return { error: "Nombre de pages invalide" };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("binders")
+    .update({ page_count: count })
+    .eq("id", binderId);
+  revalidatePath(`/classeurs/${binderId}`);
+  return { error: error?.message ?? null };
+}
+
 // ---- Pages de pochettes ----------------------------------------------------
 // Une pochette contient soit un exemplaire possédé (`i:<item_id>`), soit une
 // carte hors collection du catalogue (`w:<placeholder_id>`).

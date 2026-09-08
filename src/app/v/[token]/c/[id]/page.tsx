@@ -72,7 +72,7 @@ export default async function SharedBinderPage({
 
   const { data: binder } = await admin
     .from("binders")
-    .select("id, name, owner_id, color, page_grid, style, cover_item_ids, design")
+    .select("id, name, owner_id, color, page_grid, style, cover_item_ids, design, page_count")
     .eq("id", id)
     .maybeSingle();
   if (!binder || binder.owner_id !== settings.owner_id) notFound();
@@ -208,6 +208,7 @@ export default async function SharedBinderPage({
           colorHex={binderColorHex(binder.color)}
           cover={{ style: binder.style, covers }}
           design={binderDesign(binder.design)}
+          pageCount={binder.page_count}
           readOnly
         />
       ) : (

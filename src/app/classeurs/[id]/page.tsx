@@ -43,7 +43,7 @@ export default async function ClasseurPage({
 
   const { data: binder } = await supabase
     .from("binders")
-    .select("id, name, color, cover_item_ids, style, page_grid, design")
+    .select("id, name, color, cover_item_ids, style, page_grid, design, page_count")
     .eq("id", id)
     .maybeSingle();
   if (!binder) notFound();
@@ -165,7 +165,11 @@ export default async function ClasseurPage({
   // Résumé d'en-tête : pages réellement occupées selon le format
   const grid = pageGrid(binder.page_grid);
   const lastPocket = Math.max(-1, ...pocketItems.map((p) => p.position ?? -1));
-  const pagesUsed = Math.max(1, Math.ceil((lastPocket + 1) / pocketsPerPage(grid)));
+  const pagesUsed = Math.max(
+    1,
+    Math.ceil((lastPocket + 1) / pocketsPerPage(grid)),
+    binder.page_count
+  );
   const candidates = signedAll
     .filter((i) => i.sold_at == null)
     .map((i) => ({
@@ -259,6 +263,7 @@ export default async function ClasseurPage({
             colorHex={binderColorHex(binder.color)}
             cover={{ style: binder.style, covers }}
             design={design}
+            pageCount={binder.page_count}
             hrefBase="/carte/"
           />
         ) : signedItems.length === 0 ? (

@@ -11,7 +11,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Book, ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react";
+import { Book, ChevronLeft, ChevronRight, Minus, Plus, Search, X } from "lucide-react";
 import { CardImage } from "@/components/card-image";
 import { BinderCover, type CoverItem } from "@/components/binder-cover";
 import { Toast } from "@/components/toast";
@@ -20,6 +20,7 @@ import {
   placeItemInPocket,
   placeWantedInPocket,
   removeFromPocket,
+  setBinderPageCount,
 } from "@/app/classeurs/actions";
 import { layoutPockets, pageGrid, pocketsPerPage } from "@/lib/binder-pages";
 import {
@@ -203,14 +204,16 @@ function Spine({
   positions,
   ringColor,
   textureClass,
+  className = "",
 }: {
   colorHex: string | null;
   positions: number[];
   ringColor: string;
   textureClass: string;
+  className?: string;
 }) {
   return (
-    <div className="relative z-20 w-9 shrink-0 self-stretch" aria-hidden>
+    <div className={`relative z-20 w-9 shrink-0 self-stretch ${className}`} aria-hidden>
       <div
         className="absolute inset-x-0 -inset-y-1.5 overflow-hidden rounded-md bg-raised"
         style={colorHex ? { backgroundColor: colorHex } : undefined}
@@ -263,6 +266,7 @@ export function BinderPages({
   colorHex,
   cover,
   design,
+  pageCount,
   readOnly = false,
   hrefBase,
 }: {
@@ -276,6 +280,8 @@ export function BinderPages({
   cover: { style: string | null; covers: CoverItem[] };
   /** Options de design : feuilles, anneaux, pochettes, matière, numéros */
   design: BinderDesign;
+  /** Nombre minimal de pages (feuilles ajoutées à l'avance), 0 = automatique */
+  pageCount: number;
   readOnly?: boolean;
   /** Préfixe du lien de la fiche d'un exemplaire (`/carte/`) — absent en vitrine */
   hrefBase?: string;
@@ -362,8 +368,11 @@ export function BinderPages({
   }
   const maxPocket = Math.max(-1, ...Array.from(pockets.values()));
   const usedPages = Math.max(1, Math.ceil((maxPocket + 1) / perPage));
+  /** Feuilles ajoutées à l'avance — état local optimiste */
+  const [pageMin, setPageMin] = useState(pageCount);
   // Propriétaire : toujours une page vide à la suite pour y ranger des cartes
-  let totalPages = readOnly ? usedPages : usedPages + 1;
+  const autoPages = readOnly ? usedPages : usedPages + 1;
+  let totalPages = Math.max(autoPages, pageMin);
   // Après la première page (face à une feuille vierge), les pages vont par
   // deux : total impair
   if (perView === 2 && (totalPages - 1) % 2 === 1) totalPages += 1;
@@ -676,6 +685,20 @@ export function BinderPages({
     }
     router.refresh();
   }
+
+  /** Ajoute ou retire une feuille (deux pages) — la dernière, si elle est vide */
+  async function changePageCount(next: number) {
+    const before = pageMin;
+    setPageMin(next);
+    const { error } = await setBinderPageCount(binderId, next);
+    if (error) {
+      setPageMin(before);
+      setToast({ message: "Pages non enregistrées", tone: "error" });
+      return;
+    }
+    router.refresh();
+  }
+  const canRemoveSheet = !readOnly && pageMin > autoPages;
 
   /** Retire une carte de CE classeur — un exemplaire reste dans la collection */
   async function remove(key: string) {
@@ -1271,6 +1294,36 @@ export function BinderPages({
             </button>
           );
         })}
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={() => void changePageCount(totalPages + 2)}
+            aria-label="Ajouter une feuille"
+            title="Ajouter une feuille (deux pages)"
+            className={`inline-flex shrink-0 items-center justify-center border-dashed text-muted shadow-md transition hover:text-foreground ${
+              vertical
+                ? "h-9 min-w-[2.75rem] rounded-r-lg border border-l-0 border-edge bg-raised/60 px-2"
+                : "h-8 min-w-[2.5rem] rounded-lg border border-edge bg-raised/60 px-2"
+            }`}
+          >
+            <Plus size={13} aria-hidden />
+          </button>
+        )}
+        {canRemoveSheet && (
+          <button
+            type="button"
+            onClick={() => void changePageCount(Math.max(0, pageMin - 2))}
+            aria-label="Retirer la dernière feuille"
+            title="Retirer la dernière feuille (vide)"
+            className={`inline-flex shrink-0 items-center justify-center border-dashed text-muted shadow-md transition hover:text-loss ${
+              vertical
+                ? "h-9 min-w-[2.75rem] rounded-r-lg border border-l-0 border-edge bg-raised/60 px-2"
+                : "h-8 min-w-[2.5rem] rounded-lg border border-edge bg-raised/60 px-2"
+            }`}
+          >
+            <Minus size={13} aria-hidden />
+          </button>
+        )}
       </div>
     );
   }
@@ -1320,7 +1373,7 @@ export function BinderPages({
             title="Ouvrir le classeur"
             className="group absolute inset-0 [transform-style:preserve-3d]"
           >
-            <div className="h-full w-full transition-transform duration-300 [transform-origin:left_center] [transform-style:preserve-3d] group-hover:[transform:rotateY(-7deg)]">
+            <div className="h-full w-full transition [transform-style:preserve-3d] group-hover:brightness-110">
               {renderCoverFaces()}
             </div>
           </button>
@@ -1336,11 +1389,13 @@ export function BinderPages({
         {perView === 2 && (
           <>
             <div className="shrink-0" style={{ width: s.w }} aria-hidden />
+            {/* La tranche apparaît avec l'ouverture et s'efface avec la fermeture */}
             <Spine
               colorHex={colorHex}
               positions={ringPos}
               ringColor={ringColor}
               textureClass={textureClass}
+              className={closing ? "spine-out" : "spine-in"}
             />
           </>
         )}

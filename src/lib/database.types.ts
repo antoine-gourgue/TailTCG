@@ -141,6 +141,7 @@ export type Database = {
           id: string
           name: string
           owner_id: string
+          page_count: number
           page_grid: string
           position: number | null
           style: string | null
@@ -153,6 +154,7 @@ export type Database = {
           id?: string
           name: string
           owner_id?: string
+          page_count?: number
           page_grid?: string
           position?: number | null
           style?: string | null
@@ -165,6 +167,7 @@ export type Database = {
           id?: string
           name?: string
           owner_id?: string
+          page_count?: number
           page_grid?: string
           position?: number | null
           style?: string | null
