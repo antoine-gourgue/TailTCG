@@ -23,7 +23,7 @@ export function Toast({
   return (
     <div
       role="status"
-      className="rise-in fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full border border-edge bg-raised px-4 py-2.5 text-sm shadow-lg"
+      className="rise-in fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2 rounded-full border border-edge bg-raised px-4 py-2.5 text-sm shadow-lg md:bottom-6"
     >
       {tone === "success" ? (
         <CircleCheck size={16} className="shrink-0 text-gain" aria-hidden />

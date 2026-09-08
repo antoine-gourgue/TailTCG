@@ -13,6 +13,7 @@ import {
   NotebookTabs,
   AlertTriangle,
   Trash2,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 import { formatEur } from "@/lib/domain";
@@ -24,6 +25,7 @@ import {
 } from "@/app/classeurs/actions";
 import { bulkDeleteItems } from "@/app/items/actions";
 import { CardImage } from "@/components/card-image";
+import { Sheet } from "@/components/sheet";
 import { Logo } from "@/components/logo";
 import { Toast } from "@/components/toast";
 
@@ -140,6 +142,7 @@ export function CollectionClient({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [newBinderName, setNewBinderName] = useState("");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{
@@ -410,6 +413,136 @@ export function CollectionClient({
 
   const selectCls = "field !w-auto text-[13px]";
 
+  // Les mêmes sélecteurs servent en ligne (desktop) et dans la sheet (mobile)
+  const filterSelects = (cls: string) => (
+    <>
+      <select
+        value={fSold}
+        onChange={(e) => setFSold(e.target.value as "active" | "sold" | "all")}
+        className={cls}
+        aria-label="Statut"
+      >
+        <option value="active">En collection</option>
+        <option value="sold">Vendues</option>
+        <option value="all">Toutes</option>
+      </select>
+      <select value={fSet} onChange={(e) => setFSet(e.target.value)} className={cls} aria-label="Set">
+        <option value="">Tous les sets</option>
+        {sets.map(([id, name]) => (
+          <option key={id} value={id}>
+            {name}
+          </option>
+        ))}
+      </select>
+      <select
+        value={fCondition}
+        onChange={(e) => setFCondition(e.target.value)}
+        className={cls}
+        aria-label="État"
+      >
+        <option value="">Tous états</option>
+        {conditions.map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </select>
+      {types.length > 0 && (
+        <select value={fType} onChange={(e) => setFType(e.target.value)} className={cls} aria-label="Type">
+          <option value="">Tous types</option>
+          {types.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+      )}
+      {languages.length > 1 && (
+        <select
+          value={fLanguage}
+          onChange={(e) => setFLanguage(e.target.value)}
+          className={cls}
+          aria-label="Langue"
+        >
+          <option value="">Toutes langues</option>
+          {languages.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
+      )}
+      {sources.length > 0 && (
+        <select
+          value={fSource}
+          onChange={(e) => setFSource(e.target.value)}
+          className={cls}
+          aria-label="Source"
+        >
+          <option value="">Toutes sources</option>
+          {sources.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      )}
+      <select value={fGraded} onChange={(e) => setFGraded(e.target.value)} className={cls} aria-label="Gradation">
+        <option value="">Gradée ou non</option>
+        <option value="oui">Gradées</option>
+        <option value="non">Non gradées</option>
+      </select>
+    </>
+  );
+  const sortSelect = (cls: string) => (
+    <select
+      value={sortKey}
+      onChange={(e) => {
+        setSortKey(e.target.value as SortKey);
+        setManualIds(null);
+        orderRef.current = null;
+      }}
+      className={cls}
+      aria-label="Tri"
+    >
+      {binderContext && <option value="custom">Tri : ordre du classeur</option>}
+      <option value="date">Tri : date d&apos;achat</option>
+      <option value="name">Tri : nom</option>
+      <option value="paid">Tri : prix payé</option>
+      <option value="price">Tri : valeur estimée</option>
+      <option value="gain">Tri : plus-value</option>
+    </select>
+  );
+  const sortToggle = (
+    <button
+      type="button"
+      onClick={() => setSortAsc((v) => !v)}
+      disabled={sortKey === "custom"}
+      className="btn btn-ghost shrink-0 !px-2.5 !py-1.5 disabled:opacity-40"
+      title={sortAsc ? "Croissant" : "Décroissant"}
+      aria-label={sortAsc ? "Tri croissant" : "Tri décroissant"}
+    >
+      {sortAsc ? <ArrowUp size={14} aria-hidden /> : <ArrowDown size={14} aria-hidden />}
+    </button>
+  );
+  const activeFilters =
+    (fSold !== "active" ? 1 : 0) +
+    (fSet ? 1 : 0) +
+    (fCondition ? 1 : 0) +
+    (fType ? 1 : 0) +
+    (fLanguage ? 1 : 0) +
+    (fSource ? 1 : 0) +
+    (fGraded ? 1 : 0);
+  function resetFilters() {
+    setFSold("active");
+    setFSet("");
+    setFCondition("");
+    setFType("");
+    setFLanguage("");
+    setFSource("");
+    setFGraded("");
+  }
+
   return (
     <div>
       {/* Résumé : la valeur du classeur, toujours visible */}
@@ -482,8 +615,8 @@ export function CollectionClient({
         </div>
       </div>
 
-      {/* Filtres et tri */}
-      <div className="mb-6 flex flex-wrap items-center gap-2">
+      {/* Filtres et tri — desktop : tout en ligne */}
+      <div className="mb-6 hidden flex-wrap items-center gap-2 sm:flex">
         <input
           type="search"
           value={q}
@@ -491,108 +624,40 @@ export function CollectionClient({
           placeholder="Chercher dans ma collection…"
           className="field !w-52 text-[13px]"
         />
-        <select
-          value={fSold}
-          onChange={(e) => setFSold(e.target.value as "active" | "sold" | "all")}
-          className={selectCls}
-        >
-          <option value="active">En collection</option>
-          <option value="sold">Vendues</option>
-          <option value="all">Toutes</option>
-        </select>
-        <select value={fSet} onChange={(e) => setFSet(e.target.value)} className={selectCls}>
-          <option value="">Tous les sets</option>
-          {sets.map(([id, name]) => (
-            <option key={id} value={id}>
-              {name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={fCondition}
-          onChange={(e) => setFCondition(e.target.value)}
-          className={selectCls}
-        >
-          <option value="">Tous états</option>
-          {conditions.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        {types.length > 0 && (
-          <select value={fType} onChange={(e) => setFType(e.target.value)} className={selectCls}>
-            <option value="">Tous types</option>
-            {types.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        )}
-        {languages.length > 1 && (
-          <select
-            value={fLanguage}
-            onChange={(e) => setFLanguage(e.target.value)}
-            className={selectCls}
-          >
-            <option value="">Toutes langues</option>
-            {languages.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </select>
-        )}
-        {sources.length > 0 && (
-          <select
-            value={fSource}
-            onChange={(e) => setFSource(e.target.value)}
-            className={selectCls}
-          >
-            <option value="">Toutes sources</option>
-            {sources.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        )}
-        <select value={fGraded} onChange={(e) => setFGraded(e.target.value)} className={selectCls}>
-          <option value="">Gradée ou non</option>
-          <option value="oui">Gradées</option>
-          <option value="non">Non gradées</option>
-        </select>
+        {filterSelects(selectCls)}
+        <span className="mx-1 h-5 w-px bg-edge" />
+        {sortSelect(selectCls)}
+        {sortToggle}
+      </div>
 
-        <span className="mx-1 hidden h-5 w-px bg-edge sm:block" />
-
-        <select
-          value={sortKey}
-          onChange={(e) => {
-            setSortKey(e.target.value as SortKey);
-            setManualIds(null);
-            orderRef.current = null;
-          }}
-          className={selectCls}
-        >
-          {binderContext && (
-            <option value="custom">Tri : ordre du classeur</option>
-          )}
-          <option value="date">Tri : date d&apos;achat</option>
-          <option value="name">Tri : nom</option>
-          <option value="paid">Tri : prix payé</option>
-          <option value="price">Tri : valeur estimée</option>
-          <option value="gain">Tri : plus-value</option>
-        </select>
-        <button
-          type="button"
-          onClick={() => setSortAsc((v) => !v)}
-          disabled={sortKey === "custom"}
-          className="btn btn-ghost !px-2.5 !py-1.5 disabled:opacity-40"
-          title={sortAsc ? "Croissant" : "Décroissant"}
-        >
-          {sortAsc ? <ArrowUp size={14} aria-hidden /> : <ArrowDown size={14} aria-hidden />}
-        </button>
+      {/* Mobile : recherche pleine largeur, filtres dans une sheet */}
+      <div className="mb-5 flex flex-col gap-2 sm:hidden">
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Chercher dans ma collection…"
+          className="field text-[15px]"
+        />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFiltersOpen(true)}
+            className={`btn btn-ghost flex-1 !justify-center ${
+              activeFilters > 0 ? "!border-accent/50 !text-accent-strong" : ""
+            }`}
+          >
+            <SlidersHorizontal size={15} aria-hidden />
+            Filtres
+            {activeFilters > 0 && (
+              <span className="num rounded-full bg-accent px-1.5 text-[11px] font-bold text-accent-ink">
+                {activeFilters}
+              </span>
+            )}
+          </button>
+          {sortSelect("field min-w-0 flex-1 text-[13px]")}
+          {sortToggle}
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -848,122 +913,108 @@ export function CollectionClient({
       )}
 
       {/* Choix du classeur de destination */}
-      {addOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center"
-          onClick={() => !busy && setAddOpen(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Ajouter à un classeur"
-        >
-          <div
-            className="panel rise-in relative w-full max-w-sm p-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => setAddOpen(false)}
-              aria-label="Fermer"
-              className="absolute -right-3 -top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-edge bg-raised text-muted shadow-lg transition hover:text-foreground"
-            >
-              <X size={15} aria-hidden />
-            </button>
-            <p className="display mb-1 text-base font-semibold">
-              Ajouter à un classeur
-            </p>
-            <p className="mb-4 text-sm text-muted">
-              {selected.size} carte{selected.size > 1 ? "s" : ""} sélectionnée
-              {selected.size > 1 ? "s" : ""}.
-            </p>
-
-            {(binders ?? []).length > 0 && (
-              <div className="mb-4 flex max-h-56 flex-col gap-1 overflow-y-auto">
-                {(binders ?? []).map((b) => (
-                  <button
-                    key={b.id}
-                    type="button"
-                    disabled={busy}
-                    onClick={() => addToBinder(b)}
-                    className="flex items-center gap-2.5 rounded-xl border border-edge px-3 py-2 text-left text-sm text-muted transition hover:border-edge-strong hover:text-foreground disabled:opacity-50"
-                  >
-                    <NotebookTabs size={14} aria-hidden />
-                    {b.name}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newBinderName}
-                onChange={(e) => setNewBinderName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") createAndAdd();
-                }}
-                maxLength={60}
-                placeholder={
-                  (binders ?? []).length === 0
-                    ? binderContext
-                      ? "Nom du nouveau classeur…"
-                      : "Nom du premier classeur…"
-                    : "Ou crée un nouveau classeur…"
-                }
-                className="field flex-1 text-[13px]"
-              />
+      <Sheet
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        dismissible={!busy}
+        title="Ajouter à un classeur"
+        description={`${selected.size} carte${selected.size > 1 ? "s" : ""} sélectionnée${
+          selected.size > 1 ? "s" : ""
+        }.`}
+      >
+        {(binders ?? []).length > 0 && (
+          <div className="mb-3 flex flex-col gap-1">
+            {(binders ?? []).map((b) => (
               <button
+                key={b.id}
                 type="button"
-                disabled={busy || !newBinderName.trim()}
-                onClick={createAndAdd}
-                className="btn btn-primary text-[13px] disabled:opacity-50"
+                disabled={busy}
+                onClick={() => addToBinder(b)}
+                className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] text-foreground transition active:bg-raised disabled:opacity-50"
               >
-                {busy ? "…" : "Créer"}
+                <NotebookTabs size={18} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
+                <span className="flex-1 truncate">{b.name}</span>
               </button>
-            </div>
+            ))}
           </div>
+        )}
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newBinderName}
+            onChange={(e) => setNewBinderName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") createAndAdd();
+            }}
+            maxLength={60}
+            placeholder={
+              (binders ?? []).length === 0
+                ? binderContext
+                  ? "Nom du nouveau classeur…"
+                  : "Nom du premier classeur…"
+                : "Ou crée un nouveau classeur…"
+            }
+            className="field min-w-0 flex-1 text-[13px]"
+          />
+          <button
+            type="button"
+            disabled={busy || !newBinderName.trim()}
+            onClick={createAndAdd}
+            className="btn btn-primary shrink-0 text-[13px] disabled:opacity-50"
+          >
+            {busy ? "…" : "Créer"}
+          </button>
         </div>
-      )}
+      </Sheet>
 
       {/* Confirmation de suppression en masse */}
-      {deleteOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center"
-          onClick={() => !busy && setDeleteOpen(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Supprimer les cartes"
-        >
-          <div
-            className="panel rise-in relative w-full max-w-sm p-5"
-            onClick={(e) => e.stopPropagation()}
+      <Sheet
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        dismissible={!busy}
+        title={`Supprimer ${selected.size} carte${selected.size > 1 ? "s" : ""} ?`}
+        description="Elles partent à la corbeille — restaurables 30 jours, puis purgées."
+      >
+        <div className="sheet-actions !mt-2">
+          <button
+            type="button"
+            onClick={() => setDeleteOpen(false)}
+            disabled={busy}
+            className="btn btn-ghost"
           >
-            <p className="display mb-1 text-base font-semibold">
-              Supprimer {selected.size} carte{selected.size > 1 ? "s" : ""} ?
-            </p>
-            <p className="mb-4 text-sm text-muted">
-              Elles partent à la corbeille — restaurables 30 jours, puis purgées.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setDeleteOpen(false)}
-                disabled={busy}
-                className="btn btn-ghost"
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                onClick={deleteSelected}
-                disabled={busy}
-                className="btn btn-danger"
-              >
-                {busy ? "Suppression…" : "Mettre à la corbeille"}
-              </button>
-            </div>
-          </div>
+            Annuler
+          </button>
+          <button type="button" onClick={deleteSelected} disabled={busy} className="btn btn-danger">
+            {busy ? "Suppression…" : "Mettre à la corbeille"}
+          </button>
         </div>
-      )}
+      </Sheet>
+
+      {/* Filtres (mobile) */}
+      <Sheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        title="Filtres"
+        description={`${filtered.length} carte${filtered.length > 1 ? "s" : ""} correspond${
+          filtered.length > 1 ? "ent" : ""
+        }.`}
+      >
+        <div className="flex flex-col gap-2.5">{filterSelects("field text-[15px]")}</div>
+        <div className="sheet-actions">
+          <button
+            type="button"
+            onClick={resetFilters}
+            disabled={activeFilters === 0}
+            className="btn btn-ghost disabled:opacity-40"
+          >
+            Réinitialiser
+          </button>
+          <button type="button" onClick={() => setFiltersOpen(false)} className="btn btn-primary">
+            Voir
+          </button>
+        </div>
+      </Sheet>
 
       {toast && (
         <Toast

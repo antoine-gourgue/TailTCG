@@ -98,8 +98,8 @@ export function AdminCardsTable({
         <span className="ml-auto text-xs text-faint">{rows.length} carte(s)</span>
       </div>
 
-      <div className="panel overflow-hidden !p-0">
-        <table className="w-full text-sm">
+      <div className="panel overflow-x-auto !p-0">
+        <table className="w-full min-w-[640px] text-sm">
           <tbody>
             {rows.length === 0 ? (
               <tr>

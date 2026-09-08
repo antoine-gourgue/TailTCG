@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Ruler,
-  X,
   ChevronLeft,
   ChevronRight,
   Camera,
@@ -17,6 +16,7 @@ import type { Annotation } from "@/lib/grading-defects";
 import { DefectAnnotator } from "@/components/defect-annotator";
 import type { GalleryPhoto } from "@/components/photo-gallery";
 import { Toast } from "@/components/toast";
+import { Sheet } from "@/components/sheet";
 
 /* ————— Barèmes ————— */
 
@@ -123,15 +123,6 @@ export function PregradeButton({
   photos: GalleryPhoto[];
 }) {
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
 
   return (
     <>
@@ -342,34 +333,22 @@ function PregradeWizard({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Pré-gradation"
-    >
-      <div
-        className="panel rise-in flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden !p-0"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* En-tête */}
-        <div className="flex items-center gap-3 border-b border-edge px-5 py-3.5">
+    <Sheet
+      open
+      onClose={onClose}
+      label="Pré-gradation"
+      size="xl"
+      flush
+      header={
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <Ruler size={16} className="shrink-0 text-accent-strong" aria-hidden />
           <p className="display text-base font-semibold">Pré-gradation</p>
           <p className="num ml-auto text-xs text-faint">
             {step + 1}/{STEPS.length} · {STEPS[step]}
           </p>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Fermer"
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition hover:bg-raised hover:text-foreground"
-          >
-            <X size={15} aria-hidden />
-          </button>
         </div>
-
+      }
+    >
         {/* Contenu */}
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
           {step === 0 && (
@@ -528,9 +507,8 @@ function PregradeWizard({
             </button>
           )}
         </div>
-      </div>
       {toast && <Toast message={toast} tone="error" onDone={() => setToast(null)} />}
-    </div>
+    </Sheet>
   );
 }
 

@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Star, X, Plus, Check, ListChecks } from "lucide-react";
+import { Star, Plus, Check, ListChecks } from "lucide-react";
 import { toggleWishlist } from "@/app/wishlist/actions";
 import { bulkAddToCollection } from "@/app/items/actions";
 import { CardImage } from "@/components/card-image";
 import { Toast } from "@/components/toast";
+import { Sheet } from "@/components/sheet";
 
 export type SetCard = {
   id: string;
@@ -101,15 +102,6 @@ export function SetCardsGrid({
   const [selected, setSelected] = useState<SetCard | null>(null);
   const [wished, setWished] = useState<Set<string>>(() => new Set(wishedIds));
   const [pendingWish, startWish] = useTransition();
-
-  useEffect(() => {
-    if (!selected) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setSelected(null);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [selected]);
 
   function toggleWish(card: SetCard) {
     startWish(async () => {
@@ -361,26 +353,14 @@ export function SetCardsGrid({
       )}
 
       {/* Aperçu de la carte */}
-      {selected && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center"
-          onClick={() => setSelected(null)}
-          role="dialog"
-          aria-modal="true"
-          aria-label={selected.name}
-        >
-          <div
-            className="panel rise-in relative w-full max-w-xs p-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => setSelected(null)}
-              aria-label="Fermer"
-              className="absolute -right-3 -top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-edge bg-raised text-muted shadow-lg transition hover:text-foreground"
-            >
-              <X size={15} aria-hidden />
-            </button>
+      <Sheet
+        open={selected != null}
+        onClose={() => setSelected(null)}
+        label={selected?.name ?? "Carte"}
+        size="xs"
+      >
+        {selected && (
+          <div className="mx-auto w-full max-w-[260px] sm:max-w-none">
             <div className="card-tile relative aspect-[63/88]">
               <CardImage base={selected.image} alt={selected.name} quality="high" />
               <button
@@ -437,8 +417,8 @@ export function SetCardsGrid({
               Ajouter à ma collection
             </Link>
           </div>
-        </div>
-      )}
+        )}
+      </Sheet>
 
       {/* Barre d'ajout en masse */}
       {selecting && picked.size > 0 && (

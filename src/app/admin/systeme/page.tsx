@@ -80,8 +80,8 @@ export default async function AdminSystem() {
       {/* Comptes par table */}
       <section>
         <h3 className="display mb-3 text-lg font-semibold">Base de données</h3>
-        <div className="panel overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="panel overflow-x-auto">
+          <table className="w-full min-w-[480px] text-sm">
             <tbody>
               {counts.map((c, i) => (
                 <tr key={c.table} className={i > 0 ? "border-t border-edge/50" : ""}>

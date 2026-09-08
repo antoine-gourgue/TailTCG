@@ -732,6 +732,50 @@ a:hover .card-tile,
 @media (prefers-reduced-motion: reduce) {
   .sheet-in, .sheet-out { animation-duration: 0.01s; }
 }
+
+/* Dialogue générique (<Sheet>) : sheet par le bas sur mobile, dialogue
+   centré qui se pose en fondu dès sm ; voile en fondu */
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes dialog-out {
+  to { opacity: 0; transform: translateY(10px) scale(0.98); }
+}
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.modal-in {
+  animation: sheet-in 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.modal-out {
+  animation: sheet-out 0.25s ease-in both;
+  pointer-events: none;
+}
+.backdrop-in {
+  animation: backdrop-in 0.25s ease both;
+}
+@media (min-width: 640px) {
+  .modal-in { animation: dialog-in 0.25s ease both; }
+  .modal-out { animation: dialog-out 0.18s ease-in both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-in, .modal-out, .backdrop-in { animation-duration: 0.01s; }
+}
+
+/* Actions d'un dialogue : alignées à droite, pleine largeur côte à côte
+   sur mobile (cibles tactiles confortables) */
+.sheet-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+@media (max-width: 639px) {
+  .sheet-actions > * { flex: 1 1 0; }
+  .sheet-actions .btn { padding-block: 0.7rem; }
+}
 @keyframes fade-out {
   to { opacity: 0; }
 }

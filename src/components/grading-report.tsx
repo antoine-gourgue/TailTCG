@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FileText, X } from "lucide-react";
+import { useState } from "react";
+import { FileText } from "lucide-react";
 import { GRADE_LABELS } from "@/lib/grading";
 import {
   defectMeta,
@@ -10,6 +10,7 @@ import {
   type Annotation,
 } from "@/lib/grading-defects";
 import { Logo } from "@/components/logo";
+import { Sheet } from "@/components/sheet";
 
 export type GradingReportData = {
   grade: number;
@@ -97,56 +98,34 @@ export function GradingReportModal({
   open: boolean;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Rapport de pré-gradation"
+    <Sheet
+      open
+      onClose={onClose}
+      label="Rapport de pré-gradation"
+      size="xl"
+      flush
+      z="z-[60]"
+      header={
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <Logo variant="mark" size={22} />
+          <div className="min-w-0 flex-1">
+            <p className="display truncate text-base font-semibold">{data.cardName}</p>
+            <p className="truncate text-xs text-muted">
+              {data.setName} <span className="num">· {data.localId}</span>
+            </p>
+          </div>
+          <div className="shrink-0 text-center">
+            <p className="num text-2xl font-black leading-none">{data.grade}</p>
+            <p className="text-[9px] font-semibold uppercase tracking-wider text-muted">
+              {GRADE_LABELS[data.grade] ?? ""}
+            </p>
+          </div>
+        </div>
+      }
     >
-      <div
-        className="panel rise-in flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden !p-0"
-        onClick={(e) => e.stopPropagation()}
-      >
-            {/* En-tête */}
-            <div className="flex items-center gap-3 border-b border-edge px-5 py-3.5">
-              <Logo variant="mark" size={22} />
-              <div className="min-w-0 flex-1">
-                <p className="display truncate text-base font-semibold">
-                  {data.cardName}
-                </p>
-                <p className="truncate text-xs text-muted">
-                  {data.setName} <span className="num">· {data.localId}</span>
-                </p>
-              </div>
-              <div className="shrink-0 text-center">
-                <p className="num text-2xl font-black leading-none">{data.grade}</p>
-                <p className="text-[9px] font-semibold uppercase tracking-wider text-muted">
-                  {GRADE_LABELS[data.grade] ?? ""}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Fermer"
-                className="ml-1 flex h-7 w-7 items-center justify-center rounded-lg text-muted transition hover:bg-raised hover:text-foreground"
-              >
-                <X size={15} aria-hidden />
-              </button>
-            </div>
-
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
               {/* Notes */}
               <div className="mb-6 grid gap-3 sm:grid-cols-2">
@@ -232,8 +211,7 @@ export function GradingReportModal({
                   : ""}
               </p>
             </div>
-      </div>
-    </div>
+    </Sheet>
   );
 }
 

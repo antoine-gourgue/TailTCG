@@ -53,8 +53,8 @@ export default async function AdminSourceDetail({
         {items.length === 0 ? (
           <p className="text-sm text-muted">Aucune carte rattachée.</p>
         ) : (
-          <div className="panel overflow-hidden !p-0">
-            <table className="w-full text-sm">
+          <div className="panel overflow-x-auto !p-0">
+            <table className="w-full min-w-[520px] text-sm">
               <tbody>
                 {items.map((i) => (
                   <tr key={i.id} className="border-t border-edge/50 first:border-t-0">

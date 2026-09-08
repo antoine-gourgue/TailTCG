@@ -7,6 +7,7 @@ import { X, Plus, SearchIcon, Check } from "lucide-react";
 import { adminAddToBinder, adminRemoveFromBinder } from "@/app/admin/actions";
 import { CardImage } from "@/components/card-image";
 import { Toast } from "@/components/toast";
+import { Sheet } from "@/components/sheet";
 
 export type BinderCard = {
   id: string;
@@ -101,23 +102,13 @@ export function AdminBinderCards({
         </ul>
       )}
 
-      {pickerOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center"
-          onClick={() => !busy && setPickerOpen(false)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="panel rise-in relative flex max-h-[85vh] w-full max-w-lg flex-col p-5" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={() => setPickerOpen(false)}
-              aria-label="Fermer"
-              className="absolute -right-3 -top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-edge bg-raised text-muted shadow-lg transition hover:text-foreground"
-            >
-              <X size={15} aria-hidden />
-            </button>
-            <p className="display mb-3 text-base font-semibold">Ajouter des cartes</p>
+      <Sheet
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        dismissible={!busy}
+        size="lg"
+        title="Ajouter des cartes"
+      >
             <div className="mb-3 flex items-center gap-2 rounded-xl border border-edge bg-raised px-3 py-2 text-sm">
               <SearchIcon size={14} className="text-faint" aria-hidden />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher…" className="w-full bg-transparent outline-none placeholder:text-faint" />
@@ -159,15 +150,13 @@ export function AdminBinderCards({
                 </ul>
               )}
             </div>
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="sheet-actions">
               <button type="button" onClick={() => setPickerOpen(false)} className="btn btn-ghost">Annuler</button>
               <button type="button" disabled={busy || sel.size === 0} onClick={addSelected} className="btn btn-primary disabled:opacity-50">
                 {busy ? "…" : `Ajouter (${sel.size})`}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+      </Sheet>
 
       {toast && <Toast message={toast.m} tone={toast.t} onDone={() => setToast(null)} />}
     </div>
