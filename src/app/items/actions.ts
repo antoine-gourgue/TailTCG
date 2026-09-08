@@ -258,6 +258,24 @@ export async function bulkAddToCollection(cards: BulkCard[], language: string) {
   return { error: null, added: clean.length };
 }
 
+/** Suppression douce en masse : les exemplaires partent à la corbeille */
+export async function bulkDeleteItems(ids: string[]) {
+  const clean = [...new Set(ids)].filter(Boolean).slice(0, 1000);
+  if (clean.length === 0) return { error: null, count: 0 };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("items")
+    .update({ deleted_at: new Date().toISOString() })
+    .in("id", clean)
+    .is("deleted_at", null);
+  if (error) {
+    console.error("bulkDeleteItems:", error.message);
+    return { error: "Suppression impossible, réessaie.", count: 0 };
+  }
+  revalidatePath("/");
+  return { error: null, count: clean.length };
+}
+
 export type QuickValueState = { ok: boolean; message?: string } | null;
 
 // Actualisation rapide de la valeur estimée depuis la fiche (point daté)

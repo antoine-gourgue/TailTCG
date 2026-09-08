@@ -12,6 +12,7 @@ import {
   Check,
   NotebookTabs,
   AlertTriangle,
+  Trash2,
   X,
 } from "lucide-react";
 import { formatEur } from "@/lib/domain";
@@ -21,6 +22,7 @@ import {
   removeItemsFromBinder,
   reorderBinderItems,
 } from "@/app/classeurs/actions";
+import { bulkDeleteItems } from "@/app/items/actions";
 import { CardImage } from "@/components/card-image";
 import { Logo } from "@/components/logo";
 import { Toast } from "@/components/toast";
@@ -137,6 +139,7 @@ export function CollectionClient({
   const [selecting, setSelecting] = useState(canSelect && initialSelect);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [newBinderName, setNewBinderName] = useState("");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{
@@ -251,6 +254,7 @@ export function CollectionClient({
     setSelecting(false);
     setSelected(new Set());
     setAddOpen(false);
+    setDeleteOpen(false);
     setNewBinderName("");
   }
 
@@ -304,6 +308,24 @@ export function CollectionClient({
             message: `Classeur « ${name} » créé avec ${ids.length} carte${
               ids.length > 1 ? "s" : ""
             }`,
+          }
+    );
+    exitSelect();
+    router.refresh();
+  }
+
+  async function deleteSelected() {
+    const ids = [...selected];
+    setBusy(true);
+    const { error, count } = await bulkDeleteItems(ids);
+    setBusy(false);
+    setToast(
+      error
+        ? { message: error, tone: "error" }
+        : {
+            message: `${count} carte${count > 1 ? "s" : ""} envoyée${
+              count > 1 ? "s" : ""
+            } à la corbeille`,
           }
     );
     exitSelect();
@@ -803,6 +825,17 @@ export function CollectionClient({
               {busy ? "Retrait…" : "Retirer du classeur"}
             </button>
           )}
+          {!readOnly && (
+            <button
+              type="button"
+              disabled={selected.size === 0 || busy}
+              onClick={() => setDeleteOpen(true)}
+              className="btn btn-ghost !py-1.5 text-[13px] !text-loss disabled:opacity-50"
+            >
+              <Trash2 size={14} aria-hidden />
+              Supprimer
+            </button>
+          )}
           <button
             type="button"
             onClick={exitSelect}
@@ -885,6 +918,47 @@ export function CollectionClient({
                 className="btn btn-primary text-[13px] disabled:opacity-50"
               >
                 {busy ? "…" : "Créer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation de suppression en masse */}
+      {deleteOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center"
+          onClick={() => !busy && setDeleteOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Supprimer les cartes"
+        >
+          <div
+            className="panel rise-in relative w-full max-w-sm p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="display mb-1 text-base font-semibold">
+              Supprimer {selected.size} carte{selected.size > 1 ? "s" : ""} ?
+            </p>
+            <p className="mb-4 text-sm text-muted">
+              Elles partent à la corbeille — restaurables 30 jours, puis purgées.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(false)}
+                disabled={busy}
+                className="btn btn-ghost"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={deleteSelected}
+                disabled={busy}
+                className="btn btn-danger"
+              >
+                {busy ? "Suppression…" : "Mettre à la corbeille"}
               </button>
             </div>
           </div>
