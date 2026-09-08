@@ -344,10 +344,13 @@ export function BinderPages({
   const [pageMin, setPageMin] = useState(pageCount);
   // Propriétaire : toujours une page vide à la suite pour y ranger des cartes
   const autoPages = readOnly ? usedPages : usedPages + 1;
-  let totalPages = Math.max(autoPages, pageMin);
   // Après la première page (face à une feuille vierge), les pages vont par
-  // deux : total impair
-  if (perView === 2 && (totalPages - 1) % 2 === 1) totalPages += 1;
+  // deux : le total doit être impair — même ajustement pour le minimum et
+  // pour le nombre demandé, afin que « ajouter » / « retirer » se comparent
+  // sur la même base (sinon le « − » persiste sans page à retirer)
+  const evenAdjust = (p: number) => (perView === 2 && (p - 1) % 2 === 1 ? p + 1 : p);
+  const minTotal = evenAdjust(autoPages);
+  const totalPages = Math.max(minTotal, evenAdjust(Math.max(0, pageMin)));
   const totalViews = perView === 2 ? 1 + (totalPages - 1) / 2 : totalPages;
   const view = Math.min(nav.view, totalViews - 1);
 
@@ -677,7 +680,7 @@ export function BinderPages({
     }
     router.refresh();
   }
-  const canRemoveSheet = !readOnly && pageMin > autoPages;
+  const canRemoveSheet = !readOnly && totalPages > minTotal;
 
   /** Retire une carte de CE classeur — un exemplaire reste dans la collection */
   async function remove(key: string) {
@@ -1291,7 +1294,7 @@ export function BinderPages({
         {canRemoveSheet && (
           <button
             type="button"
-            onClick={() => void changePageCount(Math.max(0, pageMin - 2))}
+            onClick={() => void changePageCount(totalPages - 2)}
             aria-label="Retirer la dernière feuille"
             title="Retirer la dernière feuille (vide)"
             className={`inline-flex shrink-0 items-center justify-center border-dashed text-muted shadow-md transition hover:text-loss ${
