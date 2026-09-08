@@ -646,6 +646,25 @@ a:hover .card-tile,
   .page-turn-left, .page-turn-right, .page-fade { animation: none; }
 }
 
+/* Mobile (une page à la fois) : glissement + fondu, sens du balayage */
+@keyframes page-slide-next {
+  from { transform: translateX(26px); opacity: 0.25; }
+  to   { transform: none; opacity: 1; }
+}
+@keyframes page-slide-prev {
+  from { transform: translateX(-26px); opacity: 0.25; }
+  to   { transform: none; opacity: 1; }
+}
+.page-slide-next {
+  animation: page-slide-next 0.3s cubic-bezier(0.3, 0.7, 0.2, 1) both;
+}
+.page-slide-prev {
+  animation: page-slide-prev 0.3s cubic-bezier(0.3, 0.7, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-slide-next, .page-slide-prev { animation: none; }
+}
+
 /* Classeur en pages : la couverture pivote autour des anneaux en deux
    demi-tours (recto jusqu'à la tranche, verso ensuite), à l'ouverture comme
    à la fermeture */

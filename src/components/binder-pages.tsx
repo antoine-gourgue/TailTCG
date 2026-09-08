@@ -920,6 +920,8 @@ export function BinderPages({
   /** Animation d'entrée d'une page selon le sens du changement */
   function turnClass(role: Role): string {
     if (!nav.dir) return "";
+    // Mobile (une page) : glissement horizontal plutôt qu'un flip 3D sur bord
+    if (perView === 1) return nav.dir === "next" ? "page-slide-next" : "page-slide-prev";
     if (nav.dir === "next") return role === "right" ? "page-fade" : "page-turn-left";
     return role === "left" ? "page-fade" : "page-turn-right";
   }
