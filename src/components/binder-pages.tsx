@@ -105,6 +105,18 @@ function subscribeSpread(onChange: () => void) {
 const getSpread = () => (window.matchMedia(SPREAD_QUERY).matches ? 2 : 1);
 const getSpreadOnServer = () => 2;
 
+/** Sous sm, le tiroir de rangement est une bottom-sheet (glisser pour fermer) */
+const SHEET_QUERY = "(max-width: 639px)";
+function subscribeSheet(onChange: () => void) {
+  const mq = window.matchMedia(SHEET_QUERY);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+const getSheet = () => window.matchMedia(SHEET_QUERY).matches;
+const getSheetOnServer = () => false;
+/** Glissement vers le bas au-delà duquel la sheet se ferme */
+const SHEET_CLOSE_DY = 90;
+
 type Dir = "next" | "prev";
 type Role = "left" | "right" | "single";
 type Drag = { id: string; w: number; h: number };
@@ -268,6 +280,7 @@ export function BinderPages({
     getSpread,
     getSpreadOnServer
   );
+  const isSheet = useSyncExternalStore(subscribeSheet, getSheet, getSheetOnServer);
 
   const grid = pageGrid(gridCode);
   const perPage = pocketsPerPage(grid);
@@ -331,6 +344,12 @@ export function BinderPages({
   const hoverTimer = useRef<number | null>(null);
   const suppressClick = useRef(false);
   const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
+  const sheetRef = useRef<HTMLElement>(null);
+  const sheetDrag = useRef<{ startY: number; dy: number; active: boolean }>({
+    startY: 0,
+    dy: 0,
+    active: false,
+  });
 
   const itemById = new Map<string, PocketItem>(items.map((i) => [i.id, i]));
   if (live) for (const [id, it] of live.extra) itemById.set(id, it);
@@ -1525,6 +1544,44 @@ export function BinderPages({
     );
   }
 
+  // Bottom-sheet mobile : glisser vers le bas pour fermer
+  function onSheetDown(e: React.PointerEvent) {
+    if (!isSheet || e.pointerType === "mouse") return;
+    sheetDrag.current = { startY: e.clientY, dy: 0, active: true };
+    // Neutralise l'animation d'entrée (fill:both) qui, sinon, l'emporte sur
+    // le transform inline appliqué pendant le glisser
+    if (sheetRef.current) sheetRef.current.style.animation = "none";
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // capture indisponible : le glisser reste géré par les events suivants
+    }
+  }
+  function onSheetMove(e: React.PointerEvent) {
+    const d = sheetDrag.current;
+    if (!d.active) return;
+    d.dy = Math.max(0, e.clientY - d.startY);
+    if (sheetRef.current) sheetRef.current.style.transform = `translateY(${d.dy}px)`;
+  }
+  function onSheetUp() {
+    const d = sheetDrag.current;
+    if (!d.active) return;
+    d.active = false;
+    const el = sheetRef.current;
+    if (d.dy > SHEET_CLOSE_DY) {
+      // Rend la main à l'animation de sortie (part du transform courant)
+      if (el) el.style.animation = "";
+      requestClosePicker();
+    } else if (el) {
+      el.style.transition = "transform 0.2s ease";
+      el.style.transform = "";
+      window.setTimeout(() => {
+        if (el) el.style.transition = "";
+      }, 220);
+    }
+    d.dy = 0;
+  }
+
   function renderPicker() {
     if (picker == null) return null;
     const pocket = picker;
@@ -1555,6 +1612,7 @@ export function BinderPages({
           role="dialog"
           aria-modal="true"
           aria-label="Ranger une carte"
+          ref={sheetRef}
           data-drawer
           className={`${
             drawerClosing ? "drawer-out" : "drawer-in"
@@ -1565,27 +1623,35 @@ export function BinderPages({
             }
           }}
         >
-          {/* Poignée de préhension (bottom-sheet mobile) */}
-          <div className="flex justify-center pt-2 sm:hidden" aria-hidden>
-            <span className="h-1 w-9 rounded-full bg-edge-strong" />
-          </div>
-          <header className="flex items-start justify-between gap-3 border-b border-edge px-5 py-4 pt-3 sm:pt-4">
-            <div>
-              <p className="display text-base font-semibold">Ranger une carte</p>
-              <p className="mt-0.5 text-sm text-muted">
-                Page <span className="num">{page}</span>, pochette{" "}
-                <span className="num">{slot}</span>
-              </p>
+          {/* Zone de préhension : glisser vers le bas pour fermer (mobile) */}
+          <div
+            onPointerDown={onSheetDown}
+            onPointerMove={onSheetMove}
+            onPointerUp={onSheetUp}
+            onPointerCancel={onSheetUp}
+            style={isSheet ? { touchAction: "none" } : undefined}
+          >
+            <div className="flex justify-center pt-2 sm:hidden" aria-hidden>
+              <span className="h-1 w-9 rounded-full bg-edge-strong" />
             </div>
-            <button
-              type="button"
-              onClick={close}
-              aria-label="Fermer"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-edge bg-raised text-muted transition hover:text-foreground"
-            >
-              <X size={15} aria-hidden />
-            </button>
-          </header>
+            <header className="flex items-start justify-between gap-3 border-b border-edge px-5 py-4 pt-3 sm:pt-4">
+              <div>
+                <p className="display text-base font-semibold">Ranger une carte</p>
+                <p className="mt-0.5 text-sm text-muted">
+                  Page <span className="num">{page}</span>, pochette{" "}
+                  <span className="num">{slot}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={close}
+                aria-label="Fermer"
+                className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-edge bg-raised text-muted transition hover:text-foreground sm:flex"
+              >
+                <X size={15} aria-hidden />
+              </button>
+            </header>
+          </div>
 
           <div className="flex flex-col gap-2.5 border-b border-edge px-5 py-3">
             <div className="inline-flex self-start rounded-lg border border-edge bg-surface p-0.5">
