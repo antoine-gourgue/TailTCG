@@ -99,8 +99,8 @@ body {
 
 .app-main {
   min-height: 100vh;
-  /* Place pour la barre d'onglets mobile */
-  padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+  /* Place pour le dock flottant mobile (62px + marge) */
+  padding-bottom: calc(5.75rem + env(safe-area-inset-bottom));
 }
 
 @media (min-width: 768px) {

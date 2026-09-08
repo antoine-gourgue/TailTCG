@@ -442,7 +442,7 @@ export function SetCardsGrid({
 
       {/* Barre d'ajout en masse */}
       {selecting && picked.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border border-edge bg-surface px-4 py-2.5 shadow-2xl">
+        <div className="fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border border-edge bg-surface px-4 py-2.5 shadow-2xl md:bottom-4">
           <span className="num text-sm">
             {picked.size} sélectionnée{picked.size > 1 ? "s" : ""}
           </span>

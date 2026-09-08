@@ -161,43 +161,37 @@ export function MobileNav({
         </div>
       </header>
 
-      {/* ——— Barre d'onglets ——— */}
+      {/* ——— Dock flottant : l'onglet actif s'étire avec son libellé ——— */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-edge bg-surface/95 backdrop-blur-md md:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        className="fixed inset-x-3 z-40 flex h-[62px] items-center gap-1 rounded-full border border-edge bg-surface/95 px-2 shadow-[0_10px_30px_rgba(0,0,0,.45)] backdrop-blur-md md:hidden"
+        style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
         aria-label="Navigation"
       >
-        <div className="grid h-14 grid-cols-5 items-stretch">
-          {TABS.slice(0, 2).map((t) => (
-            <TabLink key={t.href} tab={t} active={isTabActive(t.href, pathname)} />
-          ))}
-          <Link
-            href="/recherche"
-            aria-label="Ajouter une carte"
-            className="flex items-center justify-center"
-          >
-            <span
-              className={`flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-ink shadow-[0_6px_16px_rgba(0,0,0,.35)] transition active:scale-95 ${
-                isTabActive("/recherche", pathname) ? "ring-2 ring-accent/40 ring-offset-2 ring-offset-surface" : ""
-              }`}
-            >
-              <Plus size={22} strokeWidth={2.4} aria-hidden />
-            </span>
-          </Link>
-          <TabLink tab={TABS[2]} active={isTabActive("/wishlist", pathname)} />
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            aria-haspopup="dialog"
-            aria-expanded={open}
-            className={`flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition ${
-              profileActive || open ? "text-accent-strong" : "text-muted"
-            }`}
-          >
-            <UserRound size={20} strokeWidth={profileActive || open ? 2.1 : 1.8} aria-hidden />
-            Profil
-          </button>
-        </div>
+        {TABS.slice(0, 2).map((t) => (
+          <TabLink key={t.href} tab={t} active={isTabActive(t.href, pathname)} />
+        ))}
+        <Link
+          href="/recherche"
+          aria-label="Ajouter une carte"
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink shadow-md transition active:scale-95 ${
+            isTabActive("/recherche", pathname)
+              ? "ring-2 ring-accent/40 ring-offset-2 ring-offset-surface"
+              : ""
+          }`}
+        >
+          <Plus size={22} strokeWidth={2.4} aria-hidden />
+        </Link>
+        <TabLink tab={TABS[2]} active={isTabActive("/wishlist", pathname)} />
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          className={tabClass(profileActive || open)}
+        >
+          <UserRound size={profileActive || open ? 19 : 21} strokeWidth={profileActive || open ? 2.1 : 1.8} aria-hidden />
+          {(profileActive || open) && <span className="text-[13px] font-semibold">Profil</span>}
+        </button>
       </nav>
 
       {/* ——— Sheet Profil ——— */}
@@ -306,16 +300,18 @@ export function MobileNav({
   );
 }
 
+/** Onglet du dock : pastille avec libellé quand actif, icône seule sinon */
+function tabClass(active: boolean): string {
+  return active
+    ? "flex h-11 shrink-0 items-center gap-2 rounded-full bg-accent-soft px-3.5 text-accent-strong"
+    : "flex h-11 flex-1 items-center justify-center text-muted transition active:text-foreground";
+}
+
 function TabLink({ tab, active }: { tab: Tab; active: boolean }) {
   return (
-    <Link
-      href={tab.href}
-      className={`flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition ${
-        active ? "text-accent-strong" : "text-muted"
-      }`}
-    >
-      <tab.Icon size={20} strokeWidth={active ? 2.1 : 1.8} aria-hidden />
-      {tab.label}
+    <Link href={tab.href} aria-label={tab.label} className={tabClass(active)}>
+      <tab.Icon size={active ? 19 : 21} strokeWidth={active ? 2.1 : 1.8} aria-hidden />
+      {active && <span className="text-[13px] font-semibold">{tab.label}</span>}
     </Link>
   );
 }
