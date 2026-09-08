@@ -82,9 +82,12 @@ export default async function ExtensionPage({
                 {set.id}
               </span>
               {set.serie?.name && <span>{set.serie.name}</span>}
-              {set.cardCount?.official ? (
-                <span className="num">{set.cardCount.official} cartes</span>
-              ) : null}
+              {(() => {
+                // Toutes les cartes présentes (secrètes comprises), pas le
+                // seul total « officiel »
+                const n = set.cardCount?.total ?? set.cards.length;
+                return n > 0 ? <span className="num">{n} cartes</span> : null;
+              })()}
               {releaseDate && <span>{releaseDate}</span>}
             </p>
           </div>

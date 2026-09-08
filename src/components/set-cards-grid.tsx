@@ -88,7 +88,9 @@ export function SetCardsGrid({
 }) {
   const isOwned = (c: SetCard) => (ownedQty[c.id] ?? 0) > 0;
   const ownedCount = cards.reduce((n, c) => n + (isOwned(c) ? 1 : 0), 0);
-  const total = officialCount ?? cards.length;
+  // Complétion sur toutes les cartes réellement présentes (secrètes comprises),
+  // pas seulement le total « officiel » imprimé
+  const total = cards.length;
   const pct = total > 0 ? Math.round((100 * ownedCount) / total) : 0;
   const [ownFilter, setOwnFilter] = useState<"all" | "owned" | "missing">("all");
   const router = useRouter();

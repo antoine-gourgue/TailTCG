@@ -54,16 +54,21 @@ export async function adminRecoveryLink(email: string): Promise<Result<{ link: s
   if (!(await requireAdmin())) return { ok: false, message: "Non autorisé" };
   const db = createAdminClient();
   const h = await headers();
-  const origin = `https://${h.get("host")}`;
-  const { data, error } = await db.auth.admin.generateLink({
-    type: "recovery",
-    email,
-    options: { redirectTo: `${origin}/auth/callback` },
-  });
-  if (error || !data?.properties?.action_link) {
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const origin = `${proto}://${h.get("host")}`;
+  const { data, error } = await db.auth.admin.generateLink({ type: "recovery", email });
+  if (error || !data?.properties?.hashed_token) {
     return { ok: false, message: error?.message ?? "Lien indisponible" };
   }
-  return { ok: true, link: data.properties.action_link };
+  // On construit notre propre lien vers /auth/confirm (verifyOtp sur le
+  // token_hash) plutôt que l'action_link Supabase, qui renvoie la session
+  // dans le fragment d'URL — illisible côté serveur (/auth/callback n'y voit
+  // aucun `code`). Après vérification, on atterrit sur les paramètres pour
+  // définir un nouveau mot de passe.
+  const link = `${origin}/auth/confirm?token_hash=${encodeURIComponent(
+    data.properties.hashed_token
+  )}&type=recovery&next=${encodeURIComponent("/parametres?reset=1")}`;
+  return { ok: true, link };
 }
 
 /** Supprime définitivement un compte et toutes ses données */
