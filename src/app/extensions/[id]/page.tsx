@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSet, type CatalogLang } from "@/lib/tcgdex";
 import { AppShell } from "@/components/app-shell";
 import { SetCardsGrid } from "@/components/set-cards-grid";
+import { BinderFromSetButton } from "@/components/binder-from-set-button";
 
 export const metadata = {
   title: "Extension — TailTCG",
@@ -86,6 +87,9 @@ export default async function ExtensionPage({
               ) : null}
               {releaseDate && <span>{releaseDate}</span>}
             </p>
+          </div>
+          <div className="ml-auto">
+            <BinderFromSetButton setId={set.id} lang={lang} />
           </div>
         </div>
 

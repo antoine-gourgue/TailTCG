@@ -75,6 +75,85 @@ export async function addItemsToBinder(binderId: string, itemIds: string[]) {
   return { error: error?.message ?? null };
 }
 
+/**
+ * Crée un classeur reprenant tout un set, dans l'ordre des numéros : les
+ * cartes possédées remplissent leur pochette, les manquantes deviennent des
+ * cartes « hors collection » (placeholders) — la complétion se voit dans les
+ * pages. Redirige vers le classeur créé.
+ */
+export async function createBinderFromSet(setId: string, lang: "fr" | "ja") {
+  if (!setId) return { error: "Set manquant" };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Non connecté" };
+
+  const { getSet } = await import("@/lib/tcgdex");
+  const set = await getSet(setId, lang);
+  if (!set || (set.cards ?? []).length === 0) return { error: "Set introuvable ou vide" };
+
+  // Ordre par numéro (les numéros non numériques passent après)
+  const cards = [...set.cards].sort((a, b) => {
+    const na = Number.parseInt(a.localId, 10);
+    const nb = Number.parseInt(b.localId, 10);
+    if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+    return a.localId.localeCompare(b.localId, "fr");
+  });
+
+  // Exemplaires possédés de ce set (actifs, non vendus)
+  const { data: owned } = await supabase
+    .from("items")
+    .select("id, tcgdex_id")
+    .eq("set_id", set.id)
+    .is("deleted_at", null)
+    .is("sold_at", null);
+  const ownedByTcgdex = new Map<string, string>();
+  for (const o of owned ?? []) {
+    if (!ownedByTcgdex.has(o.tcgdex_id)) ownedByTcgdex.set(o.tcgdex_id, o.id);
+  }
+
+  const { data: binder, error: bErr } = await supabase
+    .from("binders")
+    .insert({ name: set.name, page_grid: "3x3" })
+    .select("id")
+    .single();
+  if (bErr || !binder) return { error: bErr?.message ?? "Création impossible" };
+
+  const items: { binder_id: string; item_id: string; position: number }[] = [];
+  const placeholders: {
+    binder_id: string;
+    tcgdex_id: string;
+    card_name: string;
+    set_name: string;
+    local_id: string;
+    image_url: string | null;
+    position: number;
+  }[] = [];
+  cards.forEach((c, i) => {
+    const itemId = ownedByTcgdex.get(c.id);
+    if (itemId) {
+      items.push({ binder_id: binder.id, item_id: itemId, position: i });
+    } else {
+      placeholders.push({
+        binder_id: binder.id,
+        tcgdex_id: c.id,
+        card_name: c.name,
+        set_name: set.name,
+        local_id: c.localId,
+        image_url:
+          c.image && /^https:\/\/assets\.tcgdex\.net\//.test(c.image) ? c.image : null,
+        position: i,
+      });
+    }
+  });
+  if (items.length > 0) await supabase.from("binder_items").insert(items);
+  if (placeholders.length > 0) await supabase.from("binder_placeholders").insert(placeholders);
+
+  revalidatePath("/classeurs");
+  redirect(`/classeurs/${binder.id}`);
+}
+
 export async function createBinderAndAdd(name: string, itemIds: string[]) {
   const trimmed = name.trim();
   if (!trimmed) return { error: "Nom manquant" };
