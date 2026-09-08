@@ -169,19 +169,21 @@ export default async function SharedBinderPage({
 
   return (
     <main
-      className={`mx-auto w-full px-4 py-8 ${
-        mode === "pages" ? "max-w-[1400px]" : "max-w-6xl"
+      className={`mx-auto w-full px-4 ${
+        mode === "pages" ? "max-w-[1400px] pb-3 pt-5" : "max-w-6xl py-8"
       }`}
     >
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-3">
           <Logo variant="mark" size={36} />
-          <div>
-            <h1 className="display text-2xl font-bold tracking-tight">
+          <div className="min-w-0">
+            <h1 className="display truncate text-2xl font-bold tracking-tight">
               {binder.name}
             </h1>
             <p className="text-sm text-muted">
-              Un classeur de cette collection partagée.
+              Un classeur de cette collection partagée ·{" "}
+              <span className="num">{pocketItems.length}</span> carte
+              {pocketItems.length > 1 ? "s" : ""}
             </p>
           </div>
         </div>

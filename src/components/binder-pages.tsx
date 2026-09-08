@@ -30,12 +30,13 @@ import {
 } from "@/lib/binder-design";
 import type { CardSearchResult } from "@/lib/tcgdex";
 
-// Classeur simulé : couverture fermée à la taille exacte des pages, puis
-// pages perforées sur des anneaux (une feuille vierge face à la page 1,
-// ensuite deux par deux). On tourne les pages par les bords, les onglets,
-// le clavier ou un balayage ; on glisse une carte vers une pochette, un
-// onglet ou un bord ; une pochette vide ouvre un tiroir pour y ranger une
-// carte de la collection, ou une carte du catalogue qu'on ne possède pas.
+// Classeur simulé, dimensionné pour tenir exactement dans l'écran : couverture
+// fermée à la place de la page de droite, qui pivote autour des anneaux pour
+// devenir la feuille vierge face à la page 1 ; puis pages perforées deux par
+// deux. On tourne les pages par les bords, les onglets, le clavier ou un
+// balayage ; on glisse une carte vers une pochette, un onglet ou un bord ; une
+// pochette vide ouvre un tiroir pour y ranger une carte de la collection, ou
+// une carte du catalogue qu'on ne possède pas.
 
 /** Une carte rangée : exemplaire possédé (`i:<item>`) ou hors collection (`w:<id>`) */
 export type PocketItem = {
@@ -75,8 +76,30 @@ const TOUCH_HOLD_MS = 220;
 const HOVER_FLIP_MS = 450;
 /** Balayage horizontal minimal pour tourner une page au doigt */
 const SWIPE_MIN = 60;
-/** Si l'animation d'ouverture ne se termine pas, on ouvre quand même */
-const OPEN_FALLBACK_MS = 700;
+/** Si l'animation de la couverture n'aboutit pas, on termine quand même */
+const FLIP_FALLBACK_MS = 900;
+/** Cartes affichées au plus dans le tiroir */
+const PICKER_MAX = 80;
+/** Attente après la frappe avant d'interroger le catalogue */
+const SEARCH_DEBOUNCE_MS = 350;
+
+/** Marges et écarts d'une page, en pixels — partagés par la mise en page et le calcul de taille */
+const PAD = { top: 14, bottom: 14, numbers: 22, gutter: 28, outer: 30, gap: 9 };
+const SPINE_W = 36;
+/** Espace laissé sous le classeur (barre d'onglets mobile comprise) */
+const BOTTOM_GAP = { desktop: 24, mobile: 96 };
+const MIN_PAGE_H = 240;
+
+/** Deux pages face à face dès md, une seule en dessous */
+const SPREAD_QUERY = "(min-width: 768px)";
+function subscribeSpread(onChange: () => void) {
+  const mq = window.matchMedia(SPREAD_QUERY);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+const getSpread = () => (window.matchMedia(SPREAD_QUERY).matches ? 2 : 1);
+const getSpreadOnServer = () => 2;
+
 /** Rendu des feuilles selon leur couleur (design du classeur) */
 const SHEETS = {
   black: {
@@ -104,23 +127,6 @@ const SHEETS = {
     gutter: "from-black/25",
   },
 } as const;
-/** Cartes affichées au plus dans le tiroir */
-const PICKER_MAX = 80;
-/** Attente après la frappe avant d'interroger le catalogue */
-const SEARCH_DEBOUNCE_MS = 350;
-
-/** Deux pages face à face dès md, une seule en dessous */
-const SPREAD_QUERY = "(min-width: 768px)";
-function subscribeSpread(onChange: () => void) {
-  const mq = window.matchMedia(SPREAD_QUERY);
-  mq.addEventListener("change", onChange);
-  return () => mq.removeEventListener("change", onChange);
-}
-const getSpread = () => (window.matchMedia(SPREAD_QUERY).matches ? 2 : 1);
-const getSpreadOnServer = () => 2;
-
-/** Largeur d'une page : la moitié de la double page, moins la demi-tranche */
-const PAGE_W = "w-full md:w-[calc(50%-1.125rem)] md:flex-none";
 
 type Dir = "next" | "prev";
 type Role = "left" | "right" | "single";
@@ -150,6 +156,38 @@ type Overrides = {
   removed: Set<string>;
 };
 type Catalog = { q: string; cards: CardSearchResult[]; error: boolean };
+/** Place disponible pour le classeur : position dans le document et largeur */
+type Frame = { top: number; width: number; vh: number };
+/** Taille d'une page et de ses pochettes, en pixels */
+type PageSize = { w: number; h: number; cardW: number; padB: number };
+
+/**
+ * Taille de page qui remplit la hauteur disponible sans dépasser la largeur :
+ * les pochettes gardent les proportions d'une carte (63×88).
+ */
+function fitPage(
+  availH: number,
+  availW: number,
+  cols: number,
+  rows: number,
+  perView: number,
+  pageNumbers: boolean
+): PageSize {
+  const padB = PAD.bottom + (pageNumbers ? PAD.numbers : 0);
+  const chromeH = PAD.top + padB + 2 + (rows - 1) * PAD.gap;
+  const chromeW = PAD.gutter + PAD.outer + 2 + (cols - 1) * PAD.gap;
+  let cardW = ((Math.max(availH, MIN_PAGE_H) - chromeH) / rows) * (63 / 88);
+  const maxW = availW / perView;
+  if (cols * cardW + chromeW > maxW) cardW = (maxW - chromeW) / cols;
+  cardW = Math.max(40, Math.floor(cardW));
+  const cardH = (cardW * 88) / 63;
+  return {
+    w: cols * cardW + chromeW,
+    h: Math.ceil(rows * cardH + chromeH),
+    cardW,
+    padB,
+  };
+}
 
 /** minuscules sans accents, pour la recherche texte */
 function normalize(s: string): string {
@@ -281,10 +319,13 @@ export function BinderPages({
 
   const [opened, setOpened] = useState(false);
   const [opening, setOpening] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [nav, setNav] = useState<{ view: number; dir: Dir | null }>({
     view: 0,
     dir: null,
   });
+  /** Vue à rejoindre une fois la couverture ouverte (onglet cliqué fermé) */
+  const [pendingView, setPendingView] = useState(0);
   const [drag, setDrag] = useState<Drag | null>(null);
   /** Cible survolée en glissant : `pocket:12` ou `tab:2` */
   const [over, setOver] = useState<string | null>(null);
@@ -301,6 +342,9 @@ export function BinderPages({
     message: string;
     tone?: "success" | "error";
   } | null>(null);
+  /** Rangée des pages, mesurée pour dimensionner le classeur à l'écran */
+  const [spreadEl, setSpreadEl] = useState<HTMLDivElement | null>(null);
+  const [frame, setFrame] = useState<Frame | null>(null);
 
   const ghostRef = useRef<HTMLDivElement>(null);
   const pointer = useRef<Pointer | null>(null);
@@ -308,8 +352,6 @@ export function BinderPages({
   const hoverTimer = useRef<number | null>(null);
   const suppressClick = useRef(false);
   const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
-  /** Vue à afficher une fois la couverture ouverte (onglet cliqué fermé) */
-  const [pendingView, setPendingView] = useState(0);
 
   const itemById = new Map<string, PocketItem>(items.map((i) => [i.id, i]));
   if (live) for (const [id, it] of live.extra) itemById.set(id, it);
@@ -318,7 +360,6 @@ export function BinderPages({
     const item = itemById.get(id);
     if (item) byPocket.set(p, item);
   }
-  const count = byPocket.size;
   const maxPocket = Math.max(-1, ...Array.from(pockets.values()));
   const usedPages = Math.max(1, Math.ceil((maxPocket + 1) / perPage));
   // Propriétaire : toujours une page vide à la suite pour y ranger des cartes
@@ -342,6 +383,45 @@ export function BinderPages({
   const dragItem = drag ? itemById.get(drag.id) : null;
   const dragging = drag != null;
   const pickerOpen = picker != null && !drawerClosing;
+  const flipping = opening || closing;
+
+  // Taille des pages : toute la hauteur restante de l'écran, sans dépasser la largeur
+  const size: PageSize | null = frame
+    ? fitPage(
+        frame.vh - frame.top - (perView === 1 ? BOTTOM_GAP.mobile : BOTTOM_GAP.desktop),
+        frame.width - (perView === 2 ? SPINE_W : 0),
+        grid.cols,
+        grid.rows,
+        perView,
+        design.pageNumbers
+      )
+    : null;
+
+  // La rangée est mesurée à sa première observation, puis à chaque changement
+  useEffect(() => {
+    if (!spreadEl) return;
+    const measure = () => {
+      const r = spreadEl.getBoundingClientRect();
+      const next: Frame = {
+        top: Math.round(r.top + window.scrollY),
+        width: Math.round(r.width),
+        vh: window.innerHeight,
+      };
+      setFrame((f) =>
+        f && f.top === next.top && f.width === next.width && f.vh === next.vh ? f : next
+      );
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(spreadEl);
+    window.addEventListener("resize", measure);
+    // Secours si l'observateur tarde (onglet en arrière-plan)
+    const t = window.setTimeout(measure, 0);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+      window.clearTimeout(t);
+    };
+  }, [spreadEl]);
 
   function go(v: number) {
     const target = Math.max(0, Math.min(totalViews - 1, v));
@@ -349,29 +429,54 @@ export function BinderPages({
   }
   const goNext = () => go(view + 1);
   const goPrev = () => go(view - 1);
+
+  // ---- Couverture : ouverture et fermeture par pivot autour des anneaux ---
+
   function finishOpening() {
     setOpening(false);
     setOpened(true);
-    setNav({
-      view: Math.max(0, Math.min(totalViews - 1, pendingView)),
-      dir: "next",
-    });
+    setNav({ view: 0, dir: null });
+    // Onglet cliqué classeur fermé : on tourne ensuite jusqu'à ses pages
+    if (pendingView > 0) {
+      const target = pendingView;
+      window.setTimeout(() => go(target), 80);
+    }
   }
-  /** Ouvre le classeur (animation de la couverture) sur une vue donnée */
+  function finishClosing() {
+    setClosing(false);
+    setOpened(false);
+    setNav({ view: 0, dir: null });
+  }
+  /** Ouvre le classeur sur une vue donnée (ou y va s'il est déjà ouvert) */
   function openTo(v: number) {
     if (opened) {
       go(v);
       return;
     }
-    if (opening) return;
+    if (flipping) return;
     setPendingView(v);
     setOpening(true);
   }
   function closeBinder() {
     requestClosePicker();
-    setOpened(false);
-    setNav({ view: 0, dir: null });
+    if (!opened || flipping) return;
+    if (view > 0) {
+      // On revient d'abord à la page 1, puis la couverture se referme dessus
+      go(0);
+      window.setTimeout(() => setClosing(true), 560);
+      return;
+    }
+    setClosing(true);
   }
+  const onFlipFallback = useEffectEvent(() => {
+    if (opening) finishOpening();
+    else if (closing) finishClosing();
+  });
+  useEffect(() => {
+    if (!flipping) return;
+    const t = window.setTimeout(onFlipFallback, FLIP_FALLBACK_MS);
+    return () => window.clearTimeout(t);
+  }, [flipping]);
 
   // ---- Tiroir : ouverture immédiate, fermeture animée ---------------------
 
@@ -393,14 +498,6 @@ export function BinderPages({
     const t = window.setTimeout(finishClosePicker, 300);
     return () => window.clearTimeout(t);
   }, [drawerClosing]);
-
-  // Ouverture : l'animation de la couverture, ou le repli si elle n'aboutit pas
-  const onOpenFallback = useEffectEvent(() => finishOpening());
-  useEffect(() => {
-    if (!opening) return;
-    const t = window.setTimeout(onOpenFallback, OPEN_FALLBACK_MS);
-    return () => window.clearTimeout(t);
-  }, [opening]);
 
   // Tiroir ouvert : un clic en dehors le referme — sans bloquer ce clic, pour
   // qu'une autre pochette vide prenne directement le relais
@@ -794,7 +891,7 @@ export function BinderPages({
       requestClosePicker();
       return;
     }
-    if (pickerOpen) return;
+    if (pickerOpen || flipping) return;
     if (!opened) {
       if (e.key === "ArrowRight") {
         e.preventDefault();
@@ -815,8 +912,6 @@ export function BinderPages({
   /** Animation d'entrée d'une page selon le sens du changement */
   function turnClass(role: Role): string {
     if (!nav.dir) return "";
-    // À l'ouverture, la page 1 se rabat depuis les anneaux
-    if (perView === 2 && view === 0) return role === "right" ? "page-turn-right" : "page-fade";
     if (nav.dir === "next") return role === "right" ? "page-fade" : "page-turn-left";
     return role === "left" ? "page-fade" : "page-turn-right";
   }
@@ -889,13 +984,16 @@ export function BinderPages({
     );
   }
 
+  const pageStyle = (s: PageSize) => ({ width: s.w, height: s.h });
+
   /** Feuille vierge face à la page 1 (l'intérieur de la couverture) */
-  function renderBlankPage() {
+  function renderBlankPage(s: PageSize) {
     return (
       <section
         key="blank"
         aria-label="Feuille vierge"
-        className={`relative z-0 min-w-0 rounded-l-xl border shadow-[var(--shadow-panel)] ${sheet.page} ${PAGE_W} ${turnClass("left")}`}
+        style={pageStyle(s)}
+        className={`relative z-0 shrink-0 rounded-l-xl border shadow-[var(--shadow-panel)] ${sheet.page} ${turnClass("left")}`}
       >
         <span
           aria-hidden
@@ -911,34 +1009,20 @@ export function BinderPages({
     );
   }
 
-  function renderPage(pageIdx: number, role: Role, phantom = false) {
+  function renderPage(pageIdx: number, role: Role, s: PageSize) {
     // Perforations côté anneaux ; page seule (mobile) : perforée à gauche
     const holesLeft = role !== "left";
+    const padLeft = holesLeft ? PAD.gutter : PAD.outer;
+    const padRight = holesLeft ? PAD.outer : PAD.gutter;
     return (
       <section
         key={pageIdx}
-        aria-label={phantom ? undefined : `Page ${pageIdx + 1}`}
-        aria-hidden={phantom || undefined}
-        className={`relative z-0 min-w-0 border shadow-[var(--shadow-panel)] [backface-visibility:hidden] ${sheet.page} ${
-          // Fantôme : il remplit le conteneur qui a déjà la largeur d'une page
-          phantom ? "invisible w-full" : PAGE_W
-        } ${
+        aria-label={`Page ${pageIdx + 1}`}
+        style={pageStyle(s)}
+        className={`relative z-0 shrink-0 overflow-hidden border shadow-[var(--shadow-panel)] [backface-visibility:hidden] ${sheet.page} ${
           role === "left" ? "rounded-l-xl" : role === "right" ? "rounded-r-xl" : "rounded-xl"
-        } ${phantom ? "" : turnClass(role)}`}
+        } ${turnClass(role)}`}
       >
-        {/* Feuilles empilées derrière, côté extérieur */}
-        <span
-          aria-hidden
-          className={`absolute inset-y-2 w-1 rounded-sm border border-edge bg-raised ${
-            holesLeft ? "-right-1" : "-left-1"
-          }`}
-        />
-        <span
-          aria-hidden
-          className={`absolute inset-y-4 w-1 rounded-sm border border-edge bg-raised/60 ${
-            holesLeft ? "-right-2" : "-left-2"
-          }`}
-        />
         {/* Ombre de gouttière et perforations */}
         <span
           aria-hidden
@@ -951,26 +1035,26 @@ export function BinderPages({
         <Holes side={holesLeft ? "left" : "right"} positions={ringPos} cls={sheet.holes} />
 
         {/* Bords cliquables pour tourner (et cibles de survol en glissant) */}
-        {!phantom && role === "left" && renderEdge("prev", "left")}
-        {!phantom && role === "right" && renderEdge("next", "right")}
-        {!phantom && role === "single" && renderEdge("prev", "left")}
-        {!phantom && role === "single" && renderEdge("next", "right")}
+        {role === "left" && renderEdge("prev", "left")}
+        {role === "right" && renderEdge("next", "right")}
+        {role === "single" && renderEdge("prev", "left")}
+        {role === "single" && renderEdge("next", "right")}
 
         <div
-          className={`grid gap-2 py-3 pb-6 sm:gap-2.5 sm:py-4 sm:pb-7 ${
-            role === "single" ? "px-8" : holesLeft ? "pl-7 pr-8 sm:pl-8" : "pl-8 pr-7 sm:pr-8"
-          }`}
+          className="grid"
           style={{
-            gridTemplateColumns: `repeat(${grid.cols}, minmax(0, 1fr))`,
+            gridTemplateColumns: `repeat(${grid.cols}, ${s.cardW}px)`,
+            gap: PAD.gap,
+            padding: `${PAD.top}px ${padRight}px ${s.padB}px ${padLeft}px`,
           }}
         >
           {Array.from({ length: perPage }, (_, k) => {
             const pocket = pageIdx * perPage + k;
-            const item = phantom ? undefined : byPocket.get(pocket);
+            const item = byPocket.get(pocket);
             const isSource = drag?.id === item?.id;
             const isOver =
               dragging && over === `pocket:${pocket}` && pockets.get(drag.id) !== pocket;
-            const isTarget = !phantom && !drawerClosing && picker === pocket;
+            const isTarget = !drawerClosing && picker === pocket;
             const href =
               item && item.kind === "owned" && hrefBase
                 ? `${hrefBase}${refIdOf(item.id)}`
@@ -1025,11 +1109,11 @@ export function BinderPages({
                 {wantedLabel}
               </div>
             );
-            const fillable = !phantom && !item && !readOnly;
+            const fillable = !item && !readOnly;
             return (
               <div
                 key={pocket}
-                data-pocket={phantom ? undefined : pocket}
+                data-pocket={pocket}
                 onClick={
                   fillable
                     ? () => {
@@ -1189,6 +1273,113 @@ export function BinderPages({
         })}
       </div>
     );
+  }
+
+  /** Couverture (recto) et intérieur de couverture (verso) qui pivotent ensemble */
+  function renderCoverFaces() {
+    return (
+      <>
+        <div className="absolute inset-0 [backface-visibility:hidden]">
+          <BinderCover
+            style={cover.style}
+            covers={cover.covers}
+            name={name}
+            colorHex={colorHex}
+            texture={design.coverTexture}
+            fill
+          />
+        </div>
+        <div
+          className={`absolute inset-0 rounded-l-xl border shadow-[var(--shadow-panel)] [backface-visibility:hidden] [transform:rotateY(180deg)] ${sheet.page}`}
+        >
+          <span
+            aria-hidden
+            className={`pointer-events-none absolute inset-y-0 right-0 w-12 rounded-r-[inherit] bg-gradient-to-l to-transparent ${sheet.gutter}`}
+          />
+          <Holes side="right" positions={ringPos} cls={sheet.holes} />
+        </div>
+      </>
+    );
+  }
+
+  /** Classeur fermé : la couverture à la place de la page de droite */
+  function renderClosed(s: PageSize) {
+    return (
+      <>
+        {perView === 2 && (
+          <>
+            <div className="shrink-0" style={{ width: s.w }} aria-hidden />
+            <div className="w-9 shrink-0" aria-hidden />
+          </>
+        )}
+        <div className="relative shrink-0 [perspective:2000px]" style={pageStyle(s)}>
+          <button
+            type="button"
+            onClick={() => openTo(0)}
+            aria-label="Ouvrir le classeur"
+            title="Ouvrir le classeur"
+            className="group absolute inset-0 [transform-style:preserve-3d]"
+          >
+            <div className="h-full w-full transition-transform duration-300 [transform-origin:left_center] [transform-style:preserve-3d] group-hover:[transform:rotateY(-7deg)]">
+              {renderCoverFaces()}
+            </div>
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  /** La couverture pivote autour des anneaux et se pose à gauche (ou revient) */
+  function renderFlipping(s: PageSize) {
+    return (
+      <>
+        {perView === 2 && (
+          <>
+            <div className="shrink-0" style={{ width: s.w }} aria-hidden />
+            <Spine
+              colorHex={colorHex}
+              positions={ringPos}
+              ringColor={ringColor}
+              textureClass={textureClass}
+            />
+          </>
+        )}
+        <div className="relative shrink-0 [perspective:2000px]" style={pageStyle(s)}>
+          {renderPage(0, perView === 2 ? "right" : "single", s)}
+          <div
+            aria-hidden
+            className={`absolute inset-0 z-30 [transform-origin:left_center] [transform-style:preserve-3d] md:[transform-origin:-1.125rem_center] ${
+              closing ? "cover-flip-close" : "cover-flip-open"
+            }`}
+            onAnimationEnd={(e) => {
+              if (e.animationName === "cover-flip-open") finishOpening();
+              else if (e.animationName === "cover-flip-close") finishClosing();
+            }}
+          >
+            {renderCoverFaces()}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  function renderOpen(s: PageSize) {
+    return visible.map((pg, i) => {
+      const role: Role = perView === 1 ? "single" : i === 0 ? "left" : "right";
+      return (
+        <Fragment key={pg}>
+          {role === "right" && (
+            <Spine
+              colorHex={colorHex}
+              positions={ringPos}
+              ringColor={ringColor}
+              textureClass={textureClass}
+            />
+          )}
+          {pg === "blank" ? renderBlankPage(s) : renderPage(pg, role, s)}
+        </Fragment>
+      );
+    });
   }
 
   function renderCatalogResults(pocket: number) {
@@ -1441,105 +1632,19 @@ export function BinderPages({
     );
   }
 
-  /** Classeur fermé : la couverture à la place de la page de droite */
-  function renderCover() {
-    return (
-      <>
-        {perView === 2 && (
-          // La place de la page de gauche et de la tranche : la couverture
-          // se rabattra dessus en s'ouvrant
-          <>
-            <div className={`hidden md:block ${PAGE_W}`} aria-hidden />
-            <div className="hidden w-9 shrink-0 md:block" aria-hidden />
-          </>
-        )}
-        {/* La page fantôme donne à la couverture la taille exacte des pages */}
-        <div className={`relative ${PAGE_W}`}>
-          {renderPage(0, perView === 2 ? "right" : "single", true)}
-          <button
-            type="button"
-            onClick={() => openTo(0)}
-            disabled={opening}
-            aria-label="Ouvrir le classeur"
-            title="Ouvrir le classeur"
-            className="group absolute inset-0 [perspective:2000px]"
-          >
-            <div
-              className={`h-full w-full transition-transform duration-300 [transform-origin:left_center] group-hover:[transform:rotateY(-7deg)] ${
-                opening ? "cover-open" : ""
-              }`}
-              onAnimationEnd={(e) => {
-                if (e.animationName === "cover-open") finishOpening();
-              }}
-            >
-              <BinderCover
-                style={cover.style}
-                covers={cover.covers}
-                name={name}
-                colorHex={colorHex}
-                texture={design.coverTexture}
-                fill
-              />
-            </div>
-          </button>
-        </div>
-      </>
-    );
-  }
-
   return (
     <div className="outline-none" tabIndex={0} onKeyDown={onKeyDown}>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <span className="num text-sm text-muted">
-          {opened ? (
-            <>
-              Page{labelOf(view).includes("–") ? "s" : ""} {labelOf(view)}
-              <span className="text-faint"> / {totalPages}</span>
-            </>
-          ) : (
-            <>
-              Couverture
-              <span className="text-faint">
-                {" "}
-                · {count} carte{count > 1 ? "s" : ""} · {usedPages} page
-                {usedPages > 1 ? "s" : ""} · {grid.cols}×{grid.rows}
-              </span>
-            </>
-          )}
-        </span>
-        {!readOnly && (
-          <span className="hidden text-xs text-faint xl:inline">
-            {opened
-              ? "Glisse une carte vers une pochette, un onglet ou un bord · clique une pochette vide pour y ranger une carte"
-              : "Clique la couverture ou un onglet pour ouvrir le classeur · format et design dans « Personnaliser »"}
-          </span>
-        )}
-      </div>
-
-      <div className="relative md:pr-12">
+      <div className="relative overflow-x-clip md:pr-12">
         <div
-          className="flex items-stretch justify-center [perspective:2000px]"
+          ref={setSpreadEl}
+          className={`flex items-stretch justify-center [perspective:2000px] ${
+            size ? "" : "invisible"
+          }`}
           onPointerDown={opened ? onSpreadDown : undefined}
           onPointerUp={opened ? onSpreadUp : undefined}
         >
-          {opened
-            ? visible.map((pg, i) => {
-                const role: Role = perView === 1 ? "single" : i === 0 ? "left" : "right";
-                return (
-                  <Fragment key={pg}>
-                    {role === "right" && (
-                      <Spine
-                        colorHex={colorHex}
-                        positions={ringPos}
-                        ringColor={ringColor}
-                        textureClass={textureClass}
-                      />
-                    )}
-                    {pg === "blank" ? renderBlankPage() : renderPage(pg, role)}
-                  </Fragment>
-                );
-              })
-            : renderCover()}
+          {size &&
+            (flipping ? renderFlipping(size) : opened ? renderOpen(size) : renderClosed(size))}
         </div>
         {perView === 2 && renderTabs("vertical")}
       </div>

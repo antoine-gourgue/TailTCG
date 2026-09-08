@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Trash2, ListChecks } from "lucide-react";
+import { Trash2, ListChecks, ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { binderColorHex } from "@/lib/binder-colors";
 import { binderDesign } from "@/lib/binder-design";
+import { pageGrid, pocketsPerPage } from "@/lib/binder-pages";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmAction } from "@/components/confirm-action";
 import { RenameBinderButton } from "@/components/rename-binder-button";
@@ -161,6 +162,10 @@ export default async function ClasseurPage({
       created_at: w.created_at ?? "",
     })),
   ];
+  // Résumé d'en-tête : pages réellement occupées selon le format
+  const grid = pageGrid(binder.page_grid);
+  const lastPocket = Math.max(-1, ...pocketItems.map((p) => p.position ?? -1));
+  const pagesUsed = Math.max(1, Math.ceil((lastPocket + 1) / pocketsPerPage(grid)));
   const candidates = signedAll
     .filter((i) => i.sold_at == null)
     .map((i) => ({
@@ -185,21 +190,32 @@ export default async function ClasseurPage({
   return (
     <AppShell>
       <main
-        className={`relative z-10 mx-auto w-full px-4 py-8 ${
-          // Les pages face à face ont besoin de largeur pour rester lisibles
-          mode === "pages" ? "max-w-[1400px]" : "max-w-6xl"
+        className={`relative z-10 mx-auto w-full px-4 ${
+          // Les pages face à face ont besoin de largeur, et de toute la
+          // hauteur de l'écran : en-tête compact
+          mode === "pages" ? "max-w-[1400px] pb-3 pt-5" : "max-w-6xl py-8"
         }`}
       >
-        <Link
-          href="/classeurs"
-          className="mb-4 inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground"
-        >
-          ← Classeurs
-        </Link>
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="display text-3xl font-bold tracking-tight">
-            {binder.name}
-          </h1>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <Link
+              href="/classeurs"
+              aria-label="Retour aux classeurs"
+              title="Classeurs"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-edge text-muted transition hover:border-edge-strong hover:text-foreground"
+            >
+              <ChevronLeft size={16} aria-hidden />
+            </Link>
+            <div className="min-w-0">
+              <h1 className="display truncate text-2xl font-bold tracking-tight">
+                {binder.name}
+              </h1>
+              <p className="num text-xs text-muted">
+                {pocketItems.length} carte{pocketItems.length > 1 ? "s" : ""} ·{" "}
+                {pagesUsed} page{pagesUsed > 1 ? "s" : ""} · {grid.cols}×{grid.rows}
+              </p>
+            </div>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <ViewToggle base={`/classeurs/${binder.id}`} current={mode} />
             <BinderShareButton
