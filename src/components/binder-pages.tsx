@@ -307,6 +307,19 @@ export function BinderPages({
     return () => window.clearTimeout(t);
   }, [opening]);
 
+  // Tiroir ouvert : un clic en dehors le referme — sans bloquer ce clic, pour
+  // qu'une autre pochette vide prenne directement le relais
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (target?.closest("[data-drawer]")) return;
+      setPicker(null);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [pickerOpen]);
+
   // Catalogue TCGdex : recherche différée pendant la frappe
   useEffect(() => {
     if (!pickerOpen || mode !== "catalogue") return;
@@ -930,6 +943,8 @@ export function BinderPages({
                 onClick={
                   fillable
                     ? () => {
+                        // Le pointerdown a déjà fermé le tiroir : ce clic le
+                        // rouvre sur cette pochette
                         if (!swallowClick()) setPicker(pocket);
                       }
                     : undefined
@@ -1160,11 +1175,12 @@ export function BinderPages({
     );
     return (
       <>
-        <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={close} aria-hidden />
+        <div data-drawer className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={close} aria-hidden />
         <aside
           role="dialog"
           aria-modal="true"
           aria-label="Ranger une carte"
+          data-drawer
           className="drawer-in fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-edge bg-surface shadow-2xl sm:w-[460px] xl:w-[560px]"
         >
           <header className="flex items-start justify-between gap-3 border-b border-edge px-5 py-4">
