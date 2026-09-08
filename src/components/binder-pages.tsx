@@ -1629,6 +1629,7 @@ export function BinderPages({
             onPointerMove={onSheetMove}
             onPointerUp={onSheetUp}
             onPointerCancel={onSheetUp}
+            className={isSheet ? "cursor-grab select-none active:cursor-grabbing" : ""}
             style={isSheet ? { touchAction: "none" } : undefined}
           >
             <div className="flex justify-center pt-2 sm:hidden" aria-hidden>

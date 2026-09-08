@@ -15,7 +15,6 @@ import {
   Moon,
   LogOut,
   ChevronLeft,
-  Plus,
   History,
   Award,
   ShieldCheck,
@@ -29,9 +28,10 @@ import {
 } from "@/lib/shell-store";
 import { Logo } from "@/components/logo";
 import { ImageGate } from "@/components/image-gate";
-import { ThemeToggle, useTheme } from "@/components/theme-toggle";
+import { useTheme } from "@/components/theme-toggle";
 import { DisplayNameGate } from "@/components/display-name-gate";
 import { CommandPalette, OPEN_PALETTE_EVENT } from "@/components/command-palette";
+import { MobileNav } from "@/components/mobile-nav";
 
 /* État de la sidebar : vit sur <html data-sidebar>, comme le thème */
 let sidebarListeners: Array<() => void> = [];
@@ -57,15 +57,6 @@ const NAV = [
   { href: "/stats", label: "Stats", Icon: BarChart3 },
   { href: "/journal", label: "Journal", Icon: History },
   { href: "/parametres", label: "Paramètres", Icon: Settings },
-];
-
-/* Onglets du bas sur mobile — Ajouter au centre, en avant */
-const MOBILE_TABS = [
-  { href: "/", label: "Collection", Icon: LayoutGrid },
-  { href: "/classeurs", label: "Classeurs", Icon: NotebookTabs },
-  { href: "/recherche", label: "Ajouter", Icon: Plus, primary: true },
-  { href: "/wishlist", label: "Recherchées", Icon: Star },
-  { href: "/stats", label: "Stats", Icon: BarChart3 },
 ];
 
 function isActive(href: string, pathname: string) {
@@ -270,92 +261,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* ——— Barre haute (mobile) : logo + accès secondaires ——— */}
-      <header className="sticky top-0 z-40 border-b border-edge bg-surface/90 backdrop-blur-md md:hidden">
-        <div className="flex h-13 items-center gap-1.5 px-3 py-2">
-          <Link href="/" className="mr-auto flex items-center">
-            <Logo variant="lockup" size={26} />
-          </Link>
-          <button
-            type="button"
-            onClick={openPalette}
-            aria-label="Recherche rapide"
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-edge text-muted"
-          >
-            <SearchIcon size={14} aria-hidden />
-          </button>
-          <Link
-            href="/boutiques"
-            aria-label="Boutiques"
-            className={`flex h-8 w-8 items-center justify-center rounded-lg border border-edge ${
-              isActive("/boutiques", pathname)
-                ? "text-accent-strong"
-                : "text-muted"
-            }`}
-          >
-            <MapPin size={14} aria-hidden />
-          </Link>
-          <Link
-            href="/parametres"
-            aria-label="Paramètres"
-            className={`flex h-8 w-8 items-center justify-center rounded-lg border border-edge ${
-              isActive("/parametres", pathname)
-                ? "text-accent-strong"
-                : "text-muted"
-            }`}
-          >
-            <Settings size={14} aria-hidden />
-          </Link>
-          <ThemeToggle />
-          <form action={signOut}>
-            <button
-              type="submit"
-              aria-label="Déconnexion"
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-edge text-muted"
-            >
-              <LogOut size={14} aria-hidden />
-            </button>
-          </form>
-        </div>
-      </header>
-
-      {/* ——— Barre d'onglets (mobile) ——— */}
-      <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-edge bg-surface/95 backdrop-blur-md md:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      >
-        <div className="grid grid-cols-5">
-          {MOBILE_TABS.map((tab) => {
-            const active = isActive(tab.href, pathname);
-            if (tab.primary) {
-              return (
-                <Link
-                  key={tab.href}
-                  href={tab.href}
-                  aria-label={tab.label}
-                  className="flex flex-col items-center justify-end pb-1.5"
-                >
-                  <span className="flex h-11 w-11 -translate-y-3.5 items-center justify-center rounded-full border-4 border-surface bg-accent text-accent-ink shadow-lg">
-                    <tab.Icon size={20} strokeWidth={2.2} aria-hidden />
-                  </span>
-                </Link>
-              );
-            }
-            return (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                className={`flex flex-col items-center gap-1 pb-2 pt-2.5 text-[10px] font-medium transition ${
-                  active ? "text-accent-strong" : "text-muted"
-                }`}
-              >
-                <tab.Icon size={18} strokeWidth={active ? 2.1 : 1.8} aria-hidden />
-                {tab.label}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      {/* ——— Navigation mobile : barre haute sobre + onglets + sheet Profil ——— */}
+      <MobileNav
+        pathname={pathname}
+        shell={shell}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onOpenPalette={openPalette}
+      />
 
       {/* ——— Contenu ——— */}
       <ImageGate />
