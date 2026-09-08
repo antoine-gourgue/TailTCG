@@ -694,25 +694,32 @@ a:hover .card-tile,
   }
 }
 
-/* Tiroir de choix d'une carte pour une pochette */
+/* Choix d'une carte pour une pochette : bottom-sheet sur mobile
+   (glisse du bas), tiroir latéral droit dès sm (glisse de la droite). */
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to   { transform: none; }
+}
+@keyframes sheet-out {
+  to { transform: translateY(100%); }
+}
 @keyframes drawer-in {
   from { transform: translateX(28px); opacity: 0; }
   to   { transform: none; opacity: 1; }
 }
-.drawer-in {
-  animation: drawer-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-@media (prefers-reduced-motion: reduce) {
-  .drawer-in { animation: none; }
-}
-
-/* Tiroir : sortie en glissant, voile en fondu */
 @keyframes drawer-out {
   to { transform: translateX(28px); opacity: 0; }
 }
+.drawer-in {
+  animation: sheet-in 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
 .drawer-out {
-  animation: drawer-out 0.22s ease-in both;
+  animation: sheet-out 0.25s ease-in both;
   pointer-events: none;
+}
+@media (min-width: 640px) {
+  .drawer-in { animation-name: drawer-in; }
+  .drawer-out { animation-name: drawer-out; }
 }
 @keyframes fade-out {
   to { opacity: 0; }
@@ -722,7 +729,7 @@ a:hover .card-tile,
   pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .drawer-out, .fade-out { animation-duration: 0.01s; }
+  .drawer-in, .drawer-out, .fade-out { animation-duration: 0.01s; }
 }
 
 /* Tranche et anneaux : apparaissent pendant l'ouverture, s'effacent à la fermeture */
