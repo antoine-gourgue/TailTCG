@@ -118,6 +118,7 @@ export function CollectionClient({
   readOnly = false,
   binders,
   binderContext,
+  memberships,
   initialSelect = false,
   orderable = false,
   hideValues = false,
@@ -132,6 +133,8 @@ export function CollectionClient({
   binders?: BinderRef[];
   /** Rendu dans un classeur : la sélection permet aussi d'en retirer */
   binderContext?: BinderRef;
+  /** Appartenance carte → classeurs, pour marquer/empêcher un double ajout */
+  memberships?: Record<string, string[]>;
   initialSelect?: boolean;
   /** Autorise le glisser-déposer en tri « ordre du classeur » */
   orderable?: boolean;
@@ -282,17 +285,30 @@ export function CollectionClient({
     });
   }
 
+  /** Nombre de cartes sélectionnées déjà présentes dans ce classeur */
+  function alreadyIn(binderId: string): number {
+    let n = 0;
+    for (const id of selected) if (memberships?.[id]?.includes(binderId)) n += 1;
+    return n;
+  }
+
   async function addToBinder(binder: BinderRef) {
     const ids = [...selected];
+    // Ne réajoute pas les cartes déjà rangées dans ce classeur
+    const fresh = ids.filter((id) => !memberships?.[id]?.includes(binder.id));
+    if (fresh.length === 0) {
+      setToast({ message: `Déjà dans « ${binder.name} »`, tone: "error" });
+      return;
+    }
     setBusy(true);
-    const { error } = await addItemsToBinder(binder.id, ids);
+    const { error } = await addItemsToBinder(binder.id, fresh);
     setBusy(false);
     setToast(
       error
         ? { message: "Ajout impossible", tone: "error" }
         : {
-            message: `${ids.length} carte${ids.length > 1 ? "s" : ""} ajoutée${
-              ids.length > 1 ? "s" : ""
+            message: `${fresh.length} carte${fresh.length > 1 ? "s" : ""} ajoutée${
+              fresh.length > 1 ? "s" : ""
             } à « ${binder.name} »`,
           }
     );
@@ -726,8 +742,23 @@ export function CollectionClient({
                   <p className="truncate text-sm font-medium leading-tight group-hover:text-accent-strong">
                     {item.card_name}
                   </p>
-                  <p className="mt-0.5 truncate text-xs text-muted">
-                    {item.set_name} <span className="num text-faint">· {item.local_id}</span>
+                  <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
+                    <span className="min-w-0 truncate">
+                      {item.set_name} <span className="num text-faint">· {item.local_id}</span>
+                    </span>
+                    {!binderContext && (memberships?.[item.id]?.length ?? 0) > 0 && (
+                      <span
+                        className="inline-flex shrink-0 items-center gap-0.5 text-faint"
+                        title={`Déjà dans ${memberships![item.id].length} classeur${
+                          memberships![item.id].length > 1 ? "s" : ""
+                        }`}
+                      >
+                        <NotebookTabs size={11} aria-hidden />
+                        {memberships![item.id].length > 1 && (
+                          <span className="num">{memberships![item.id].length}</span>
+                        )}
+                      </span>
+                    )}
                   </p>
                   {!hideValues && (
                     <p className="mt-1 flex items-baseline gap-1.5 text-xs">
@@ -939,18 +970,30 @@ export function CollectionClient({
       >
         {(binders ?? []).length > 0 && (
           <div className="mb-3 flex flex-col gap-1">
-            {(binders ?? []).map((b) => (
-              <button
-                key={b.id}
-                type="button"
-                disabled={busy}
-                onClick={() => addToBinder(b)}
-                className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] text-foreground transition active:bg-raised disabled:opacity-50"
-              >
-                <NotebookTabs size={18} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
-                <span className="flex-1 truncate">{b.name}</span>
-              </button>
-            ))}
+            {(binders ?? []).map((b) => {
+              const already = alreadyIn(b.id);
+              const full = already >= selected.size && selected.size > 0;
+              return (
+                <button
+                  key={b.id}
+                  type="button"
+                  disabled={busy || full}
+                  onClick={() => addToBinder(b)}
+                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] text-foreground transition active:bg-raised disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <NotebookTabs size={18} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
+                  <span className="flex-1 truncate">{b.name}</span>
+                  {full ? (
+                    <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted">
+                      <Check size={14} aria-hidden />
+                      Déjà dedans
+                    </span>
+                  ) : already > 0 ? (
+                    <span className="num shrink-0 text-xs text-faint">{already} déjà</span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         )}
 

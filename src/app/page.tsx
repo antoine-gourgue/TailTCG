@@ -55,6 +55,15 @@ export default async function Home({
         .order("created_at", { ascending: false }),
     ]);
 
+  // Appartenance des cartes aux classeurs : marquer/empêcher un double ajout
+  const { data: allLinks } = await supabase
+    .from("binder_items")
+    .select("item_id, binder_id");
+  const memberships: Record<string, string[]> = {};
+  for (const l of allLinks ?? []) {
+    (memberships[l.item_id] ??= []).push(l.binder_id);
+  }
+
   // Photos perso en secours de vignette (cartes sans scan officiel)
   const photoFallbacks = new Map<string, string>();
   {
@@ -158,6 +167,7 @@ export default async function Home({
           initialSource={initialSource ?? ""}
           initialSet={initialSet ?? ""}
           binders={binders ?? []}
+          memberships={memberships}
           initialSelect={select != null}
         />
         {deleted && <UndoDeleteToast itemId={deleted} />}
