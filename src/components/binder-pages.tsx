@@ -11,7 +11,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Book, ChevronLeft, ChevronRight, Minus, Plus, Search, X } from "lucide-react";
+import { Book, Check, ChevronLeft, ChevronRight, Minus, Plus, Search, X } from "lucide-react";
 import { useCleanView } from "@/components/binder-clean-view";
 import { Sheet } from "@/components/sheet";
 import { CardImage } from "@/components/card-image";
@@ -1471,18 +1471,32 @@ export function BinderPages({
               >
                 <div className="card-tile aspect-[63/88]">
                   <CardImage base={c.image} alt={c.name} />
-                  {owned ? (
-                    <span className="tile-badge left-1.5 top-1.5 !bg-accent !text-accent-ink">
+                  {owned && (
+                    <span className="tile-badge z-10 left-1.5 top-1.5 !bg-accent !text-accent-ink">
                       Collection
                     </span>
-                  ) : wanted ? (
-                    <span className="tile-badge num left-1.5 top-1.5">
-                      p. {Math.floor((wantedAt ?? 0) / perPage) + 1}
-                    </span>
+                  )}
+                  {wanted ? (
+                    <>
+                      {/* Déjà rangée (hors collection) : check central + page */}
+                      <span
+                        aria-hidden
+                        className="absolute inset-0 flex items-center justify-center bg-black/45 transition group-hover/c:bg-black/20"
+                      >
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white shadow-lg ring-2 ring-white/80 backdrop-blur-sm">
+                          <Check size={18} strokeWidth={3} aria-hidden />
+                        </span>
+                      </span>
+                      <span className="tile-badge num bottom-1.5 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap !bg-black/75 !text-white">
+                        Page {Math.floor((wantedAt ?? 0) / perPage) + 1} · Pochette {((wantedAt ?? 0) % perPage) + 1}
+                      </span>
+                    </>
                   ) : (
-                    <span className="tile-badge bottom-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px]">
-                      Hors collection
-                    </span>
+                    !owned && (
+                      <span className="tile-badge bottom-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px]">
+                        Hors collection
+                      </span>
+                    )
                   )}
                 </div>
                 <p className="mt-1.5 truncate text-xs font-medium transition group-hover/c:text-accent-strong">
@@ -1598,23 +1612,31 @@ export function BinderPages({
                             : "Ranger ici"
                         }
                       >
-                        <div
-                          className={`card-tile aspect-[63/88] ${
-                            at != null ? "opacity-60 group-hover/c:opacity-100" : ""
-                          }`}
-                        >
+                        <div className="card-tile aspect-[63/88]">
                           <CardImage
                             base={c.image_url || null}
                             alt={c.card_name}
                             fallback={c.photo_fallback ?? null}
                           />
                           {at != null && (
-                            <span className="tile-badge num left-1.5 top-1.5">
-                              p. {Math.floor(at / perPage) + 1}
-                            </span>
+                            <>
+                              {/* Déjà rangée : pastille check au centre + page,
+                                  le voile s'éclaircit au survol (déplacer ici) */}
+                              <span
+                                aria-hidden
+                                className="absolute inset-0 flex items-center justify-center bg-black/45 transition group-hover/c:bg-black/20"
+                              >
+                                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white shadow-lg ring-2 ring-white/80 backdrop-blur-sm">
+                                  <Check size={18} strokeWidth={3} aria-hidden />
+                                </span>
+                              </span>
+                              <span className="tile-badge num bottom-1.5 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap !bg-black/75 !text-white">
+                                Page {Math.floor(at / perPage) + 1} · Pochette {(at % perPage) + 1}
+                              </span>
+                            </>
                           )}
                           {c.quantity > 1 && (
-                            <span className="tile-badge num right-1.5 top-1.5">
+                            <span className="tile-badge num right-1.5 top-1.5 z-10">
                               ×{c.quantity}
                             </span>
                           )}
