@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Trash2, ListChecks, ChevronLeft } from "lucide-react";
+import { Trash2, ListChecks, ChevronLeft, Palette } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages, applyRectifiedImages } from "@/lib/images";
@@ -11,7 +11,6 @@ import { coverRenderFor } from "@/lib/binder-cover-server";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmAction } from "@/components/confirm-action";
 import { RenameBinderButton } from "@/components/rename-binder-button";
-import { BinderStyleButton } from "@/components/binder-style-button";
 import { BinderShareButton } from "@/components/binder-share-button";
 import { BinderPages, type PocketItem } from "@/components/binder-pages";
 import { ViewToggle } from "@/components/view-toggle";
@@ -234,21 +233,14 @@ export default async function ClasseurPage({
               binderId={binder.id}
               shareToken={settings?.share_token ?? null}
             />
-            <BinderStyleButton
-              binderId={binder.id}
-              name={binder.name}
-              color={binder.color}
-              styleCode={binder.style}
-              pageGridCode={binder.page_grid}
-              design={design}
-              coverRender={coverRender}
-              coverIds={binder.cover_item_ids ?? []}
-              items={signedItems.map((i) => ({
-                id: i.id,
-                card_name: i.card_name,
-                image_url: i.photo_fallback && !i.image_url ? i.photo_fallback : i.image_url,
-              }))}
-            />
+            <Link
+              href={`/classeurs/${binder.id}/editeur`}
+              title="Personnaliser le classeur"
+              aria-label="Personnaliser le classeur"
+              className="btn btn-ghost !px-2.5"
+            >
+              <Palette size={15} aria-hidden />
+            </Link>
             <RenameBinderButton binderId={binder.id} currentName={binder.name} />
             <ConfirmAction
               action={deleteBinder}

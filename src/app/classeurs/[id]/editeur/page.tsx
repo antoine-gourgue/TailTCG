@@ -3,20 +3,19 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { fetchSeriesWithSets } from "@/lib/tcgdex";
-import { binderColorHex } from "@/lib/binder-colors";
 import { binderDesign } from "@/lib/binder-design";
 import { coverLayout, coverStoragePaths } from "@/lib/binder-cover";
 import { AppShell } from "@/components/app-shell";
-import { CoverEditor } from "@/components/cover-editor";
+import { BinderEditor } from "@/components/binder-editor";
 
 export const metadata = {
-  title: "Couverture du classeur — TailTCG",
+  title: "Personnaliser le classeur — TailTCG",
 };
 
 type CardRow = { id: string; card_name: string; image_url: string };
 
-// Éditeur de couverture sur mesure : fond et neuf zones
-export default async function CouverturePage({
+// Éditeur unifié du classeur : couverture + intérieur, aperçu fermé/ouvert
+export default async function EditeurPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -30,7 +29,7 @@ export default async function CouverturePage({
 
   const { data: binder } = await supabase
     .from("binders")
-    .select("id, name, color, style, design, cover")
+    .select("id, name, color, style, page_grid, cover_item_ids, design, cover")
     .eq("id", id)
     .maybeSingle();
   if (!binder) notFound();
@@ -45,7 +44,7 @@ export default async function CouverturePage({
     fetchSeriesWithSets("fr").catch(() => []),
   ]);
 
-  // Cartes du classeur, utilisables en fond ou dans une zone
+  // Cartes du classeur : cartes de couverture, fond ou zones, aperçu ouvert
   const memberIds = (links ?? []).map((l) => l.item_id);
   const { data: items } =
     memberIds.length > 0
@@ -93,12 +92,15 @@ export default async function CouverturePage({
   return (
     <AppShell>
       <main className="mx-auto w-full max-w-6xl px-4 pb-8 pt-5">
-        <CoverEditor
+        <BinderEditor
           binderId={binder.id}
           name={binder.name}
-          colorHex={binderColorHex(binder.color)}
-          texture={binderDesign(binder.design).coverTexture}
-          initial={layout}
+          initialStyle={binder.style}
+          initialColor={binder.color}
+          initialCoverIds={binder.cover_item_ids ?? []}
+          initialGrid={binder.page_grid}
+          initialDesign={binderDesign(binder.design)}
+          initialLayout={layout}
           initialUrls={urls}
           cards={cards}
           sets={sets}

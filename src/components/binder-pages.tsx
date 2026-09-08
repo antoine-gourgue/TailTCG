@@ -25,7 +25,9 @@ import {
 } from "@/app/classeurs/actions";
 import { layoutPockets, pageGrid, pocketsPerPage } from "@/lib/binder-pages";
 import {
+  SHEETS,
   coverTextureClass,
+  pocketSheen,
   ringHex,
   ringPositions,
   type BinderDesign,
@@ -101,34 +103,6 @@ function subscribeSpread(onChange: () => void) {
 }
 const getSpread = () => (window.matchMedia(SPREAD_QUERY).matches ? 2 : 1);
 const getSpreadOnServer = () => 2;
-
-/** Rendu des feuilles selon leur couleur (design du classeur) */
-const SHEETS = {
-  black: {
-    page: "border-white/10 bg-[#17161a]",
-    pocketBg: "bg-black/30",
-    pocketRing: "ring-white/[0.06]",
-    number: "text-white/35",
-    holes: "bg-black/80",
-    gutter: "from-black/35",
-  },
-  white: {
-    page: "border-black/10 bg-[#f3f1ec]",
-    pocketBg: "bg-black/[0.08]",
-    pocketRing: "ring-black/10",
-    number: "text-black/40",
-    holes: "bg-black/40",
-    gutter: "from-black/15",
-  },
-  clear: {
-    page: "border-white/15 bg-white/[0.06] backdrop-blur-[2px]",
-    pocketBg: "bg-white/[0.05]",
-    pocketRing: "ring-white/10",
-    number: "text-foreground/40",
-    holes: "bg-black/60",
-    gutter: "from-black/25",
-  },
-} as const;
 
 type Dir = "next" | "prev";
 type Role = "left" | "right" | "single";
@@ -301,12 +275,7 @@ export function BinderPages({
   const ringPos = ringPositions(design.ringCount);
   const ringColor = ringHex(design.ringFinish);
   const textureClass = coverTextureClass(design.coverTexture);
-  const sheen =
-    design.pocketFinish === "glossy"
-      ? "from-white/[0.09] via-transparent to-black/10"
-      : design.pocketFinish === "matte"
-        ? "from-white/[0.03] via-transparent to-black/5"
-        : null;
+  const sheen = pocketSheen(design.pocketFinish);
 
   // Rangement : base serveur + surcharges optimistes liées à cet état serveur
   const serverKey = items.map((i) => `${i.id}:${i.position ?? ""}`).join("|");

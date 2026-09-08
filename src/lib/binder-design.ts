@@ -82,6 +82,41 @@ export function binderDesign(raw: unknown): BinderDesign {
   };
 }
 
+/** Rendu des feuilles selon leur couleur — classes Tailwind partagées */
+export const SHEETS = {
+  black: {
+    page: "border-white/10 bg-[#17161a]",
+    pocketBg: "bg-black/30",
+    pocketRing: "ring-white/[0.06]",
+    number: "text-white/35",
+    holes: "bg-black/80",
+    gutter: "from-black/35",
+  },
+  white: {
+    page: "border-black/10 bg-[#f3f1ec]",
+    pocketBg: "bg-black/[0.08]",
+    pocketRing: "ring-black/10",
+    number: "text-black/40",
+    holes: "bg-black/40",
+    gutter: "from-black/15",
+  },
+  clear: {
+    page: "border-white/15 bg-white/[0.06] backdrop-blur-[2px]",
+    pocketBg: "bg-white/[0.05]",
+    pocketRing: "ring-white/10",
+    number: "text-foreground/40",
+    holes: "bg-black/60",
+    gutter: "from-black/25",
+  },
+} as const;
+
+/** Dégradé de reflet d'une pochette selon sa finition (null = sans reflet) */
+export function pocketSheen(finish: PocketFinish): string | null {
+  if (finish === "glossy") return "from-white/[0.09] via-transparent to-black/10";
+  if (finish === "matte") return "from-white/[0.03] via-transparent to-black/5";
+  return null;
+}
+
 /** Hauteurs relatives des anneaux (et des perforations en face) */
 export function ringPositions(count: RingCount): number[] {
   if (count === 2) return [0.25, 0.75];

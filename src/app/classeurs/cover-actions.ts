@@ -60,35 +60,83 @@ export async function uploadCoverImage(formData: FormData): Promise<CoverUploadR
   return { ok: true, path, url: signed?.signedUrl ?? "" };
 }
 
-/** Enregistre la mise en page et passe le classeur en couverture sur mesure */
-export async function saveBinderCover(binderId: string, raw: unknown) {
+/**
+ * Éditeur unifié : enregistre tout le design du classeur en une fois —
+ * style, couleur, cartes de couverture, format des pages, options de design
+ * et composition de couverture sur mesure.
+ */
+export async function saveBinderEditor(
+  binderId: string,
+  input: {
+    style: string;
+    color: string | null;
+    coverIds: string[];
+    pageGrid: string;
+    design: unknown;
+    cover: unknown;
+  }
+) {
   if (!UUID_RE.test(binderId)) return { error: "Classeur invalide" };
+  const [{ BINDER_COLORS }, { binderStyle, binderStyleCovers }, { pageGrid }, { binderDesign }] =
+    await Promise.all([
+      import("@/lib/binder-colors"),
+      import("@/lib/binder-styles"),
+      import("@/lib/binder-pages"),
+      import("@/lib/binder-design"),
+    ]);
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Non connecté" };
 
-  const layout = coverLayout(raw);
-  // Seuls mes fichiers et mes exemplaires peuvent figurer sur la couverture
+  const style = binderStyle(input.style);
+  const color =
+    input.color && BINDER_COLORS.some((c) => c.code === input.color) ? input.color : null;
+  const design = binderDesign(input.design);
+  const grid = pageGrid(input.pageGrid).code;
+  const layout = coverLayout(input.cover);
+
+  // Couverture sur mesure : seuls mes fichiers et mes exemplaires sont admis
   const foreign = coverStoragePaths(layout).some(
     (p) => !p.startsWith(`${user.id}/covers/${binderId}/`)
   );
   if (foreign) return { error: "Image non autorisée" };
-  const itemIds = coverItemIds(layout);
-  if (itemIds.length > 0) {
-    const { data: mine } = await supabase.from("items").select("id").in("id", itemIds);
-    if ((mine ?? []).length !== itemIds.length) return { error: "Carte non autorisée" };
+  const coverCards = coverItemIds(layout);
+  if (coverCards.length > 0) {
+    const { data: mine } = await supabase.from("items").select("id").in("id", coverCards);
+    if ((mine ?? []).length !== coverCards.length) return { error: "Carte non autorisée" };
+  }
+
+  // Cartes de couverture (styles modèles) : bornées aux cartes du classeur
+  let cover_item_ids: string[] | null = null;
+  const maxCovers = binderStyleCovers(style);
+  if (maxCovers > 0 && input.coverIds.length > 0) {
+    const { data: links } = await supabase
+      .from("binder_items")
+      .select("item_id")
+      .eq("binder_id", binderId);
+    const members = new Set((links ?? []).map((l) => l.item_id));
+    const chosen = input.coverIds.filter((id) => members.has(id)).slice(0, maxCovers);
+    cover_item_ids = chosen.length > 0 ? chosen : null;
   }
 
   const { error } = await supabase
     .from("binders")
-    .update({ cover: layout, style: "custom" })
+    .update({
+      style,
+      color,
+      cover_item_ids,
+      page_grid: grid,
+      design,
+      cover: layout,
+    })
     .eq("id", binderId);
 
   revalidatePath("/classeurs");
   revalidatePath(`/classeurs/${binderId}`);
-  revalidatePath(`/classeurs/${binderId}/couverture`);
+  revalidatePath(`/classeurs/${binderId}/editeur`);
   return { error: error?.message ?? null };
 }
 
