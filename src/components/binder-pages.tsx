@@ -233,6 +233,8 @@ export function BinderPages({
   const [over, setOver] = useState<string | null>(null);
   /** Pochette en cours de remplissage (tiroir ouvert) */
   const [picker, setPicker] = useState<number | null>(null);
+  /** Le tiroir joue son animation de sortie avant de disparaître */
+  const [drawerClosing, setDrawerClosing] = useState(false);
   const [mode, setMode] = useState<"collection" | "catalogue">("collection");
   const [q, setQ] = useState("");
   const [fSet, setFSet] = useState("");
@@ -250,6 +252,8 @@ export function BinderPages({
   const hoverTimer = useRef<number | null>(null);
   const suppressClick = useRef(false);
   const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
+  /** Vue à afficher une fois la couverture ouverte (onglet cliqué fermé) */
+  const [pendingView, setPendingView] = useState(0);
 
   const itemById = new Map<string, PocketItem>(items.map((i) => [i.id, i]));
   if (live) for (const [id, it] of live.extra) itemById.set(id, it);
@@ -281,7 +285,7 @@ export function BinderPages({
   const visible = pagesOf(view);
   const dragItem = drag ? itemById.get(drag.id) : null;
   const dragging = drag != null;
-  const pickerOpen = picker != null;
+  const pickerOpen = picker != null && !drawerClosing;
 
   function go(v: number) {
     const target = Math.max(0, Math.min(totalViews - 1, v));
@@ -292,32 +296,67 @@ export function BinderPages({
   function finishOpening() {
     setOpening(false);
     setOpened(true);
-    setNav({ view: 0, dir: "next" });
+    setNav({
+      view: Math.max(0, Math.min(totalViews - 1, pendingView)),
+      dir: "next",
+    });
+  }
+  /** Ouvre le classeur (animation de la couverture) sur une vue donnée */
+  function openTo(v: number) {
+    if (opened) {
+      go(v);
+      return;
+    }
+    if (opening) return;
+    setPendingView(v);
+    setOpening(true);
   }
   function closeBinder() {
-    setPicker(null);
+    requestClosePicker();
     setOpened(false);
     setNav({ view: 0, dir: null });
   }
 
+  // ---- Tiroir : ouverture immédiate, fermeture animée ---------------------
+
+  function openPicker(pocket: number) {
+    setDrawerClosing(false);
+    setPicker(pocket);
+  }
+  function requestClosePicker() {
+    if (picker == null || drawerClosing) return;
+    setDrawerClosing(true);
+  }
+  function finishClosePicker() {
+    setDrawerClosing(false);
+    setPicker(null);
+  }
+  // Si l'animation de sortie n'aboutit pas, le tiroir disparaît quand même
+  useEffect(() => {
+    if (!drawerClosing) return;
+    const t = window.setTimeout(finishClosePicker, 300);
+    return () => window.clearTimeout(t);
+  }, [drawerClosing]);
+
   // Ouverture : l'animation de la couverture, ou le repli si elle n'aboutit pas
+  const onOpenFallback = useEffectEvent(() => finishOpening());
   useEffect(() => {
     if (!opening) return;
-    const t = window.setTimeout(finishOpening, OPEN_FALLBACK_MS);
+    const t = window.setTimeout(onOpenFallback, OPEN_FALLBACK_MS);
     return () => window.clearTimeout(t);
   }, [opening]);
 
   // Tiroir ouvert : un clic en dehors le referme — sans bloquer ce clic, pour
   // qu'une autre pochette vide prenne directement le relais
+  const onDocumentDown = useEffectEvent((e: PointerEvent) => {
+    const target = e.target as Element | null;
+    if (target?.closest("[data-drawer]")) return;
+    requestClosePicker();
+  });
   useEffect(() => {
     if (!pickerOpen) return;
-    const onDown = (e: PointerEvent) => {
-      const target = e.target as Element | null;
-      if (target?.closest("[data-drawer]")) return;
-      setPicker(null);
-    };
-    document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
+    document.addEventListener("pointerdown", onDocumentDown);
+    return () => document.removeEventListener("pointerdown", onDocumentDown);
   }, [pickerOpen]);
 
   // Catalogue TCGdex : recherche différée pendant la frappe
@@ -411,7 +450,9 @@ export function BinderPages({
 
   /** Vise la pochette vide suivante pour enchaîner les rangements */
   function advancePicker(fromPocket: number) {
-    setPicker(firstFreeIn(view, fromPocket) ?? firstFreeIn(view));
+    const next = firstFreeIn(view, fromPocket) ?? firstFreeIn(view);
+    if (next == null) requestClosePicker();
+    else setPicker(next);
   }
 
   /** Range un exemplaire de la collection dans la pochette ciblée */
@@ -560,7 +601,7 @@ export function BinderPages({
       window.clearTimeout(p.holdTimer);
       p.holdTimer = null;
     }
-    setPicker(null);
+    requestClosePicker();
     setDrag({ id: p.id, w: p.w, h: p.h });
   }
 
@@ -708,10 +749,17 @@ export function BinderPages({
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Escape" && pickerOpen) {
       e.preventDefault();
-      setPicker(null);
+      requestClosePicker();
       return;
     }
-    if (!opened || pickerOpen) return;
+    if (pickerOpen) return;
+    if (!opened) {
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        openTo(0);
+      }
+      return;
+    }
     if (e.key === "ArrowRight") {
       e.preventDefault();
       goNext();
@@ -880,7 +928,7 @@ export function BinderPages({
             const isSource = drag?.id === item?.id;
             const isOver =
               dragging && over === `pocket:${pocket}` && pockets.get(drag.id) !== pocket;
-            const isTarget = !phantom && picker === pocket;
+            const isTarget = !phantom && !drawerClosing && picker === pocket;
             const href =
               item && item.kind === "owned" && hrefBase
                 ? `${hrefBase}${refIdOf(item.id)}`
@@ -945,7 +993,7 @@ export function BinderPages({
                     ? () => {
                         // Le pointerdown a déjà fermé le tiroir : ce clic le
                         // rouvre sur cette pochette
-                        if (!swallowClick()) setPicker(pocket);
+                        if (!swallowClick()) openPicker(pocket);
                       }
                     : undefined
                 }
@@ -1047,15 +1095,34 @@ export function BinderPages({
             : "scrollbar-none mt-3 flex gap-1.5 overflow-x-auto pb-1"
         }
       >
+        {/* Couverture : le premier onglet referme le classeur */}
+        <button
+          type="button"
+          onClick={closeBinder}
+          aria-current={!opened ? "page" : undefined}
+          aria-label="Couverture"
+          title="Couverture"
+          className={`inline-flex shrink-0 items-center justify-center shadow-md transition ${
+            vertical
+              ? "h-9 min-w-[2.75rem] rounded-r-lg border border-l-0 px-2"
+              : "h-8 min-w-[2.5rem] rounded-lg border px-2"
+          } ${
+            !opened
+              ? "border-accent bg-accent text-accent-ink"
+              : "border-edge bg-raised text-muted hover:text-foreground"
+          }`}
+        >
+          <Book size={13} aria-hidden />
+        </button>
         {Array.from({ length: totalViews }, (_, v) => {
-          const active = v === view;
+          const active = opened && v === view;
           const target = dragging && over === `tab:${v}`;
           return (
             <button
               key={v}
               type="button"
               data-tab={v}
-              onClick={() => go(v)}
+              onClick={() => openTo(v)}
               aria-current={active ? "page" : undefined}
               title={dragging ? "Déposer sur cette page" : `Aller aux pages ${labelOf(v)}`}
               className={`num shrink-0 text-[11px] font-semibold shadow-md transition ${
@@ -1160,7 +1227,7 @@ export function BinderPages({
     const pocket = picker;
     const page = Math.floor(pocket / perPage) + 1;
     const slot = (pocket % perPage) + 1;
-    const close = () => setPicker(null);
+    const close = () => requestClosePicker();
     const modeBtn = (m: typeof mode, label: string) => (
       <button
         type="button"
@@ -1175,13 +1242,23 @@ export function BinderPages({
     );
     return (
       <>
-        <div data-drawer className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={close} aria-hidden />
+        <div
+          data-drawer
+          className={`fixed inset-0 z-40 bg-black/50 md:hidden ${drawerClosing ? "fade-out" : ""}`}
+          onClick={close}
+          aria-hidden
+        />
         <aside
           role="dialog"
           aria-modal="true"
           aria-label="Ranger une carte"
           data-drawer
-          className="drawer-in fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-edge bg-surface shadow-2xl sm:w-[460px] xl:w-[560px]"
+          className={`${
+            drawerClosing ? "drawer-out" : "drawer-in"
+          } fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-edge bg-surface shadow-2xl sm:w-[460px] xl:w-[560px]`}
+          onAnimationEnd={(e) => {
+            if (e.animationName === "drawer-out") finishClosePicker();
+          }}
         >
           <header className="flex items-start justify-between gap-3 border-b border-edge px-5 py-4">
             <div>
@@ -1316,88 +1393,103 @@ export function BinderPages({
     );
   }
 
+  /** Classeur fermé : la couverture à la place de la page de droite */
+  function renderCover() {
+    return (
+      <>
+        {perView === 2 && (
+          // La place de la page de gauche et de la tranche : la couverture
+          // se rabattra dessus en s'ouvrant
+          <>
+            <div className={`hidden md:block ${PAGE_W}`} aria-hidden />
+            <div className="hidden w-9 shrink-0 md:block" aria-hidden />
+          </>
+        )}
+        {/* La page fantôme donne à la couverture la taille exacte des pages */}
+        <div className={`relative ${PAGE_W}`}>
+          {renderPage(0, perView === 2 ? "right" : "single", true)}
+          <button
+            type="button"
+            onClick={() => openTo(0)}
+            disabled={opening}
+            aria-label="Ouvrir le classeur"
+            title="Ouvrir le classeur"
+            className="group absolute inset-0 [perspective:2000px]"
+          >
+            <div
+              className={`h-full w-full transition-transform duration-300 [transform-origin:left_center] group-hover:[transform:rotateY(-7deg)] ${
+                opening ? "cover-open" : ""
+              }`}
+              onAnimationEnd={(e) => {
+                if (e.animationName === "cover-open") finishOpening();
+              }}
+            >
+              <BinderCover
+                style={cover.style}
+                covers={cover.covers}
+                name={name}
+                colorHex={colorHex}
+                fill
+              />
+            </div>
+          </button>
+        </div>
+      </>
+    );
+  }
+
   return (
     <div className="outline-none" tabIndex={0} onKeyDown={onKeyDown}>
-      {!opened ? (
-        <div className="flex flex-col items-center py-2 md:pr-12">
-          {/* La page fantôme donne à la couverture la taille exacte des pages */}
-          <div className={`relative ${PAGE_W}`}>
-            {renderPage(0, perView === 2 ? "right" : "single", true)}
-            <button
-              type="button"
-              onClick={() => !opening && setOpening(true)}
-              disabled={opening}
-              aria-label="Ouvrir le classeur"
-              className="group absolute inset-0 [perspective:2000px]"
-            >
-              <div
-                className={`h-full w-full transition-transform duration-300 [transform-origin:left_center] group-hover:[transform:rotateY(-7deg)] ${
-                  opening ? "cover-open" : ""
-                }`}
-                onAnimationEnd={finishOpening}
-              >
-                <BinderCover
-                  style={cover.style}
-                  covers={cover.covers}
-                  name={name}
-                  colorHex={colorHex}
-                  fill
-                />
-              </div>
-            </button>
-          </div>
-          <p className="mt-5 text-sm text-muted">Clique pour ouvrir le classeur</p>
-          <p className="num mt-1 text-xs text-faint">
-            {count} carte{count > 1 ? "s" : ""} · {usedPages} page{usedPages > 1 ? "s" : ""} · {grid.cols}×{grid.rows}
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={closeBinder}
-                className="btn btn-ghost !px-2.5 text-[13px]"
-                title="Fermer le classeur"
-              >
-                <Book size={14} aria-hidden />
-                Couverture
-              </button>
-              <span className="num text-sm text-muted">
-                Page{labelOf(view).includes("–") ? "s" : ""} {labelOf(view)}
-                <span className="text-faint"> / {totalPages}</span>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <span className="num text-sm text-muted">
+          {opened ? (
+            <>
+              Page{labelOf(view).includes("–") ? "s" : ""} {labelOf(view)}
+              <span className="text-faint"> / {totalPages}</span>
+            </>
+          ) : (
+            <>
+              Couverture
+              <span className="text-faint">
+                {" "}
+                · {count} carte{count > 1 ? "s" : ""} · {usedPages} page
+                {usedPages > 1 ? "s" : ""}
               </span>
-            </div>
-            {!readOnly && (
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="hidden text-xs text-faint xl:inline">
-                  Glisse une carte vers une pochette, un onglet ou un bord · clique une pochette vide pour y ranger une carte
-                </span>
-                <select
-                  value={code}
-                  onChange={(e) => changeGrid(e.target.value)}
-                  disabled={savingGrid}
-                  className="field !w-auto text-[13px]"
-                  aria-label="Format des pages"
-                >
-                  {PAGE_GRIDS.map((g) => (
-                    <option key={g.code} value={g.code}>
-                      {g.cols}×{g.rows} · {g.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-
-          <div className="relative md:pr-12">
-            <div
-              className="flex items-stretch justify-center [perspective:2000px]"
-              onPointerDown={onSpreadDown}
-              onPointerUp={onSpreadUp}
+            </>
+          )}
+        </span>
+        {!readOnly && (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="hidden text-xs text-faint xl:inline">
+              {opened
+                ? "Glisse une carte vers une pochette, un onglet ou un bord · clique une pochette vide pour y ranger une carte"
+                : "Clique la couverture ou un onglet pour ouvrir le classeur"}
+            </span>
+            <select
+              value={code}
+              onChange={(e) => changeGrid(e.target.value)}
+              disabled={savingGrid}
+              className="field !w-auto text-[13px]"
+              aria-label="Format des pages"
             >
-              {visible.map((pg, i) => {
+              {PAGE_GRIDS.map((g) => (
+                <option key={g.code} value={g.code}>
+                  {g.cols}×{g.rows} · {g.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      <div className="relative md:pr-12">
+        <div
+          className="flex items-stretch justify-center [perspective:2000px]"
+          onPointerDown={opened ? onSpreadDown : undefined}
+          onPointerUp={opened ? onSpreadUp : undefined}
+        >
+          {opened
+            ? visible.map((pg, i) => {
                 const role: Role = perView === 1 ? "single" : i === 0 ? "left" : "right";
                 return (
                   <Fragment key={pg}>
@@ -1405,13 +1497,12 @@ export function BinderPages({
                     {pg === "blank" ? renderBlankPage() : renderPage(pg, role)}
                   </Fragment>
                 );
-              })}
-            </div>
-            {perView === 2 && renderTabs("vertical")}
-          </div>
-          {perView === 1 && renderTabs("horizontal")}
-        </>
-      )}
+              })
+            : renderCover()}
+        </div>
+        {perView === 2 && renderTabs("vertical")}
+      </div>
+      {perView === 1 && renderTabs("horizontal")}
 
       {dragItem && drag && (
         <div

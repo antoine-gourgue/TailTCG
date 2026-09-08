@@ -669,3 +669,22 @@ a:hover .card-tile,
 @media (prefers-reduced-motion: reduce) {
   .drawer-in { animation: none; }
 }
+
+/* Tiroir : sortie en glissant, voile en fondu */
+@keyframes drawer-out {
+  to { transform: translateX(28px); opacity: 0; }
+}
+.drawer-out {
+  animation: drawer-out 0.22s ease-in both;
+  pointer-events: none;
+}
+@keyframes fade-out {
+  to { opacity: 0; }
+}
+.fade-out {
+  animation: fade-out 0.22s ease-in both;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer-out, .fade-out { animation-duration: 0.01s; }
+}
