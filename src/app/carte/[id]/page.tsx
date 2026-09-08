@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Pencil, ExternalLink, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Pencil, ExternalLink, X, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCard } from "@/lib/tcgdex";
@@ -455,6 +455,18 @@ export default async function CartePage({
               </>
             ) : (
               <>
+                {item.needs_review && (
+                  <Link
+                    href={`/carte/${id}?edit`}
+                    className="mb-6 flex items-center gap-2 rounded-xl border border-[#f59e0b]/40 bg-[#f59e0b]/10 px-4 py-3 text-sm text-foreground transition hover:border-[#f59e0b]/70"
+                  >
+                    <AlertTriangle size={16} className="shrink-0 text-[#f59e0b]" aria-hidden />
+                    <span>
+                      Ajoutée en masse — <span className="font-medium">infos à compléter</span>{" "}
+                      (état, prix…). Clique pour les renseigner.
+                    </span>
+                  </Link>
+                )}
                 {/* Détails de l'exemplaire */}
                 <section className="panel p-5">
                   <h2 className="display mb-4 text-base font-semibold">

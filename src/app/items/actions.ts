@@ -170,9 +170,10 @@ export async function updateItem(
       : {};
 
   const supabase = await createClient();
+  // Éditer une carte lève le drapeau « à compléter » (ajout en masse)
   const { error: dbError } = await supabase
     .from("items")
-    .update({ ...fields, ...metaFields })
+    .update({ ...fields, ...metaFields, needs_review: false })
     .eq("id", id);
 
   if (dbError) {
@@ -187,6 +188,74 @@ export async function updateItem(
   revalidatePath("/");
   revalidatePath(`/carte/${id}`);
   redirect(`/carte/${id}`);
+}
+
+/** Carte d'un set pour l'ajout en masse (métadonnées catalogue) */
+export type BulkCard = {
+  tcgdex_id: string;
+  card_name: string;
+  set_id: string;
+  set_name: string;
+  local_id: string;
+  image_url: string;
+};
+
+/**
+ * Ajoute plusieurs cartes d'un coup depuis un set : chaque exemplaire est
+ * créé avec des valeurs minimales (quantité 1, langue du catalogue, état
+ * « quasi parfaite ») et marqué « à compléter » jusqu'à sa première édition.
+ */
+export async function bulkAddToCollection(cards: BulkCard[], language: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Non connecté", added: 0 };
+
+  const clean = cards
+    .filter(
+      (c) => c.tcgdex_id && c.card_name && c.set_id && c.set_name && c.local_id
+    )
+    .slice(0, 500);
+  if (clean.length === 0) return { error: null, added: 0 };
+
+  const { LANGUAGES } = await import("@/lib/domain");
+  const lang = (LANGUAGES as readonly string[]).includes(language)
+    ? language
+    : "FR";
+
+  const rows: ItemInsert[] = clean.map((c) => ({
+    tcgdex_id: c.tcgdex_id,
+    card_name: c.card_name,
+    set_id: c.set_id,
+    set_name: c.set_name,
+    local_id: c.local_id,
+    // On ne stocke jamais un chemin « storage: » par ce chemin en masse
+    image_url: c.image_url?.startsWith("storage:") ? "" : c.image_url ?? "",
+    condition: "NM",
+    language: lang,
+    quantity: 1,
+    needs_review: true,
+  }));
+
+  const { error } = await supabase.from("items").insert(rows);
+  if (error) {
+    console.error("bulkAddToCollection:", error.message);
+    return { error: "Ajout impossible, réessaie.", added: 0 };
+  }
+
+  // Ces cartes sortent des recherchées
+  await supabase
+    .from("wishlist")
+    .delete()
+    .in(
+      "tcgdex_id",
+      clean.map((c) => c.tcgdex_id)
+    );
+
+  revalidatePath("/");
+  revalidatePath("/wishlist");
+  return { error: null, added: clean.length };
 }
 
 export type QuickValueState = { ok: boolean; message?: string } | null;

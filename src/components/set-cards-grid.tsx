@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Star, X, Plus, Check } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Star, X, Plus, Check, ListChecks } from "lucide-react";
 import { toggleWishlist } from "@/app/wishlist/actions";
+import { bulkAddToCollection } from "@/app/items/actions";
 import { CardImage } from "@/components/card-image";
+import { Toast } from "@/components/toast";
 
 export type SetCard = {
   id: string;
@@ -86,6 +89,15 @@ export function SetCardsGrid({
   const total = officialCount ?? cards.length;
   const pct = total > 0 ? Math.round((100 * ownedCount) / total) : 0;
   const [ownFilter, setOwnFilter] = useState<"all" | "owned" | "missing">("all");
+  const router = useRouter();
+  const lang = langSuffix.includes("lang=ja") ? "JP" : "FR";
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState<{
+    message: string;
+    tone?: "success" | "error";
+  } | null>(null);
   const [selected, setSelected] = useState<SetCard | null>(null);
   const [wished, setWished] = useState<Set<string>>(() => new Set(wishedIds));
   const [pendingWish, startWish] = useTransition();
@@ -155,6 +167,54 @@ export function SetCardsGrid({
     { code: "missing" as const, label: "Manquantes", n: cards.length - ownedCount },
   ];
 
+  function togglePick(id: string) {
+    setPicked((p) => {
+      const n = new Set(p);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  }
+  function selectMissingVisible() {
+    setPicked((p) => {
+      const n = new Set(p);
+      for (const c of visible) if (!isOwned(c)) n.add(c.id);
+      return n;
+    });
+  }
+  function exitSelect() {
+    setSelecting(false);
+    setPicked(new Set());
+  }
+  async function addPicked() {
+    const chosen = cards.filter((c) => picked.has(c.id));
+    if (chosen.length === 0) return;
+    setBusy(true);
+    const res = await bulkAddToCollection(
+      chosen.map((c) => ({
+        tcgdex_id: c.id,
+        card_name: c.name,
+        set_id: setId,
+        set_name: setName,
+        local_id: c.localId,
+        image_url: c.image ?? "",
+      })),
+      lang
+    );
+    setBusy(false);
+    if (res.error) {
+      setToast({ message: res.error, tone: "error" });
+      return;
+    }
+    setToast({
+      message: `${res.added} carte${res.added > 1 ? "s" : ""} ajoutée${
+        res.added > 1 ? "s" : ""
+      } — à compléter`,
+    });
+    exitSelect();
+    router.refresh();
+  }
+
   return (
     <div>
       {/* Complétion du set */}
@@ -174,23 +234,44 @@ export function SetCardsGrid({
         </div>
       </div>
 
-      {/* Filtre possession */}
-      <div className="mb-6 inline-flex rounded-lg border border-edge bg-surface p-0.5">
-        {ownTabs.map((t) => (
+      {/* Filtre possession + ajout rapide */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex rounded-lg border border-edge bg-surface p-0.5">
+          {ownTabs.map((t) => (
+            <button
+              key={t.code}
+              type="button"
+              onClick={() => setOwnFilter(t.code)}
+              aria-pressed={ownFilter === t.code}
+              className={`rounded-md px-2.5 py-1.5 text-[13px] font-medium transition ${
+                ownFilter === t.code
+                  ? "bg-raised text-foreground shadow-sm"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              {t.label} <span className="num text-faint">{t.n}</span>
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          {selecting && (
+            <button
+              type="button"
+              onClick={selectMissingVisible}
+              className="btn btn-ghost !px-2.5 text-[13px]"
+            >
+              Cocher les manquantes
+            </button>
+          )}
           <button
-            key={t.code}
             type="button"
-            onClick={() => setOwnFilter(t.code)}
-            aria-pressed={ownFilter === t.code}
-            className={`rounded-md px-2.5 py-1.5 text-[13px] font-medium transition ${
-              ownFilter === t.code
-                ? "bg-raised text-foreground shadow-sm"
-                : "text-muted hover:text-foreground"
-            }`}
+            onClick={() => (selecting ? exitSelect() : setSelecting(true))}
+            className="btn btn-ghost !px-2.5 text-[13px]"
           >
-            {t.label} <span className="num text-faint">{t.n}</span>
+            <ListChecks size={14} aria-hidden />
+            {selecting ? "Annuler" : "Ajout rapide"}
           </button>
-        ))}
+        </div>
       </div>
 
       {/* Filtres de rareté, façon Pokécardex */}
@@ -227,15 +308,31 @@ export function SetCardsGrid({
             <li key={card.id}>
               <button
                 type="button"
-                onClick={() => setSelected(card)}
+                onClick={() => (selecting ? togglePick(card.id) : setSelected(card))}
                 className="group block w-full text-left"
               >
                 <div
                   className={`card-tile aspect-[63/88] ${
                     isOwned(card) ? "" : "opacity-85"
+                  } ${
+                    selecting && picked.has(card.id)
+                      ? "outline outline-2 outline-offset-2 outline-accent"
+                      : ""
                   }`}
                 >
                   <CardImage base={card.image} alt={card.name} />
+                  {selecting && (
+                    <span
+                      className={`absolute bottom-1.5 right-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border transition ${
+                        picked.has(card.id)
+                          ? "border-transparent bg-accent text-accent-ink"
+                          : "border-white/50 bg-black/40 text-transparent"
+                      }`}
+                      aria-hidden
+                    >
+                      <Check size={13} strokeWidth={3} />
+                    </span>
+                  )}
                   {isOwned(card) && (
                     <span className="tile-badge num left-1.5 top-1.5 flex items-center gap-0.5 !bg-gain !text-black">
                       <Check size={11} strokeWidth={3} aria-hidden />
@@ -341,6 +438,28 @@ export function SetCardsGrid({
             </Link>
           </div>
         </div>
+      )}
+
+      {/* Barre d'ajout en masse */}
+      {selecting && picked.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border border-edge bg-surface px-4 py-2.5 shadow-2xl">
+          <span className="num text-sm">
+            {picked.size} sélectionnée{picked.size > 1 ? "s" : ""}
+          </span>
+          <button
+            type="button"
+            onClick={addPicked}
+            disabled={busy}
+            className="btn btn-primary !py-1.5"
+          >
+            <Plus size={15} aria-hidden />
+            {busy ? "Ajout…" : "Ajouter à ma collection"}
+          </button>
+        </div>
+      )}
+
+      {toast && (
+        <Toast message={toast.message} tone={toast.tone} onDone={() => setToast(null)} />
       )}
     </div>
   );

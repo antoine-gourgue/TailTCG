@@ -11,6 +11,7 @@ import {
   ListChecks,
   Check,
   NotebookTabs,
+  AlertTriangle,
   X,
 } from "lucide-react";
 import { formatEur } from "@/lib/domain";
@@ -50,6 +51,8 @@ export type CollectionItem = {
   photo_fallback?: string | null;
   /** Ordre manuel dans un classeur */
   position?: number | null;
+  /** Ajoutée en masse, infos à compléter */
+  needs_review?: boolean | null;
 };
 
 /** minuscules sans accents, pour la recherche texte */
@@ -600,9 +603,19 @@ export function CollectionClient({
                       <Check size={13} />
                     </span>
                   )}
-                  <span className="tile-badge num left-1.5 top-1.5">
-                    {item.condition}
-                  </span>
+                  {item.needs_review ? (
+                    <span
+                      className="tile-badge left-1.5 top-1.5 flex items-center !bg-[#f59e0b] !text-black"
+                      title="Infos à compléter"
+                      aria-label="Infos à compléter"
+                    >
+                      <AlertTriangle size={12} strokeWidth={2.5} aria-hidden />
+                    </span>
+                  ) : (
+                    <span className="tile-badge num left-1.5 top-1.5">
+                      {item.condition}
+                    </span>
+                  )}
                   {item.quantity > 1 && (
                     <span className="tile-badge num right-1.5 top-1.5">
                       ×{item.quantity}

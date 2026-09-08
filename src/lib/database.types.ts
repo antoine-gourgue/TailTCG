@@ -420,6 +420,7 @@ export type Database = {
           language: string
           local_id: string
           manual_price: number | null
+          needs_review: boolean
           notes: string | null
           owner_id: string
           purchase_date: string | null
@@ -446,6 +447,7 @@ export type Database = {
           language?: string
           local_id: string
           manual_price?: number | null
+          needs_review?: boolean
           notes?: string | null
           owner_id?: string
           purchase_date?: string | null
@@ -472,6 +474,7 @@ export type Database = {
           language?: string
           local_id?: string
           manual_price?: number | null
+          needs_review?: boolean
           notes?: string | null
           owner_id?: string
           purchase_date?: string | null
@@ -643,6 +646,7 @@ export type Database = {
           local_id: string | null
           manual_price: number | null
           market_trend: number | null
+          needs_review: boolean | null
           notes: string | null
           owner_id: string | null
           purchase_date: string | null
