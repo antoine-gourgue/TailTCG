@@ -13,6 +13,7 @@ import { ConfirmAction } from "@/components/confirm-action";
 import { RenameBinderButton } from "@/components/rename-binder-button";
 import { BinderShareButton } from "@/components/binder-share-button";
 import { BinderPages, type PocketItem } from "@/components/binder-pages";
+import { CleanViewProvider, CleanViewToggle } from "@/components/binder-clean-view";
 import { ViewToggle } from "@/components/view-toggle";
 import { deleteBinder } from "@/app/classeurs/actions";
 import {
@@ -207,6 +208,7 @@ export default async function ClasseurPage({
           mode === "pages" ? "max-w-[1400px] pb-3 pt-5" : "max-w-6xl py-8"
         }`}
       >
+       <CleanViewProvider>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <Link
@@ -229,6 +231,7 @@ export default async function ClasseurPage({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <ViewToggle base={`/classeurs/${binder.id}`} current={mode} />
+            {mode === "pages" && <CleanViewToggle />}
             <BinderShareButton
               binderId={binder.id}
               shareToken={settings?.share_token ?? null}
@@ -288,6 +291,7 @@ export default async function ClasseurPage({
             binderContext={{ id: binder.id, name: binder.name }}
           />
         )}
+       </CleanViewProvider>
       </main>
     </AppShell>
   );

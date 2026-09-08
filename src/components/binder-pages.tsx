@@ -11,7 +11,8 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Book, ChevronLeft, ChevronRight, Eye, EyeOff, Minus, Plus, Search, X } from "lucide-react";
+import { Book, ChevronLeft, ChevronRight, Minus, Plus, Search, X } from "lucide-react";
+import { useCleanView } from "@/components/binder-clean-view";
 import { CardImage } from "@/components/card-image";
 import { BinderCover, type CoverItem } from "@/components/binder-cover";
 import type { CoverRender } from "@/lib/binder-cover";
@@ -342,8 +343,8 @@ export function BinderPages({
   const usedPages = Math.max(1, Math.ceil((maxPocket + 1) / perPage));
   /** Feuilles ajoutées à l'avance — état local optimiste */
   const [pageMin, setPageMin] = useState(pageCount);
-  /** Vue propre : masque le grisé et les libellés des cartes hors collection */
-  const [cleanView, setCleanView] = useState(false);
+  // Vue propre : partagée avec le bouton de l'en-tête (contexte)
+  const { clean: cleanView } = useCleanView();
   // Propriétaire : toujours une page vide à la suite pour y ranger des cartes
   const autoPages = readOnly ? usedPages : usedPages + 1;
   // Après la première page (face à une feuille vierge), les pages vont par
@@ -1695,24 +1696,6 @@ export function BinderPages({
 
   return (
     <div className="outline-none" tabIndex={0} onKeyDown={onKeyDown}>
-      {opened && (
-        <div className="mb-3 flex items-center justify-end">
-          <button
-            type="button"
-            onClick={() => setCleanView((v) => !v)}
-            aria-pressed={cleanView}
-            title={
-              cleanView
-                ? "Remettre en évidence les cartes manquantes"
-                : "Afficher le classeur complet, sans le grisé des manquantes"
-            }
-            className="btn btn-ghost !px-2.5 text-[13px]"
-          >
-            {cleanView ? <EyeOff size={14} aria-hidden /> : <Eye size={14} aria-hidden />}
-            {cleanView ? "Voir les manquantes" : "Vue propre"}
-          </button>
-        </div>
-      )}
       <div className="relative overflow-x-clip md:pr-12">
         <div
           ref={setSpreadEl}

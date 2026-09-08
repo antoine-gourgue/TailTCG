@@ -8,6 +8,7 @@ import { coverRenderFor } from "@/lib/binder-cover-server";
 import { Logo } from "@/components/logo";
 import { BinderPages, type PocketItem } from "@/components/binder-pages";
 import { ViewToggle } from "@/components/view-toggle";
+import { CleanViewProvider, CleanViewToggle } from "@/components/binder-clean-view";
 import {
   CollectionClient,
   type CollectionItem,
@@ -180,6 +181,7 @@ export default async function SharedBinderPage({
         mode === "pages" ? "max-w-[1400px] pb-3 pt-5" : "max-w-6xl py-8"
       }`}
     >
+     <CleanViewProvider>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <Logo variant="mark" size={36} />
@@ -198,6 +200,7 @@ export default async function SharedBinderPage({
           {signedItems.length > 0 && (
             <ViewToggle base={`/v/${token}/c/${binder.id}`} current={mode} />
           )}
+          {signedItems.length > 0 && mode === "pages" && <CleanViewToggle />}
           <Link href={`/v/${token}`} className="btn btn-ghost">
             ← Toute la collection
           </Link>
@@ -227,6 +230,7 @@ export default async function SharedBinderPage({
           binderContext={{ id: binder.id, name: binder.name }}
         />
       )}
+     </CleanViewProvider>
     </main>
   );
 }
