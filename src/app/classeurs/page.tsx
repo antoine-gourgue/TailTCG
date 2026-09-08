@@ -42,6 +42,15 @@ export default async function ClasseursPage() {
     .select("item_id, rectified_path")
     .order("created_at", { ascending: false });
 
+  // Cartes hors collection par classeur : comptées dans le total de la tuile
+  const { data: placeholders } = await supabase
+    .from("binder_placeholders")
+    .select("binder_id");
+  const placeholderCount = new Map<string, number>();
+  for (const p of placeholders ?? []) {
+    placeholderCount.set(p.binder_id, (placeholderCount.get(p.binder_id) ?? 0) + 1);
+  }
+
   // Sets pour l'assistant « à partir d'un set » (TCGdex, caché 24 h)
   const series = await fetchSeriesWithSets("fr").catch(() => []);
   const sets = series.flatMap((s) =>
@@ -73,6 +82,8 @@ export default async function ClasseursPage() {
       }
       if (covers.length < 4 && item.image_url) covers.push(item);
     }
+    // Total du classeur = possédées + cartes hors collection (manquantes)
+    count += placeholderCount.get(b.id) ?? 0;
     // Couverture choisie par l'utilisateur, sinon les 4 premières
     const chosen = (b.cover_item_ids ?? [])
       .map((id) => itemById.get(id))

@@ -200,6 +200,15 @@ export default async function SharedCollectionPage({
       localId: item.local_id,
     } satisfies GradingReportData,
   }));
+  // Cartes hors collection par classeur (comptées dans le total)
+  const { data: vPlaceholders } = await admin
+    .from("binder_placeholders")
+    .select("binder_id")
+    .eq("owner_id", settings.owner_id);
+  const vPhCount = new Map<string, number>();
+  for (const p of vPlaceholders ?? []) {
+    vPhCount.set(p.binder_id, (vPhCount.get(p.binder_id) ?? 0) + 1);
+  }
   const binderTiles = await Promise.all((binders ?? []).map(async (b) => {
     let count = 0;
     let value = 0;
@@ -215,6 +224,7 @@ export default async function SharedCollectionPage({
       }
       if (covers.length < 4 && item.image_url) covers.push(item);
     }
+    count += vPhCount.get(b.id) ?? 0;
     const chosen = (b.cover_item_ids ?? [])
       .map((id) => itemById.get(id))
       .filter((i): i is NonNullable<typeof i> => i != null && !!i.image_url);
