@@ -20,7 +20,8 @@ export async function createBinder(formData: FormData) {
   if (error || !data) throw new Error(error?.message ?? "Création impossible");
 
   revalidatePath("/classeurs");
-  redirect(`/classeurs/${data.id}`);
+  // Étape suivante de la création : choisir le design dans l'éditeur
+  redirect(`/classeurs/${data.id}/editeur`);
 }
 
 export async function renameBinder(formData: FormData) {
@@ -151,7 +152,8 @@ export async function createBinderFromSet(setId: string, lang: "fr" | "ja") {
   if (placeholders.length > 0) await supabase.from("binder_placeholders").insert(placeholders);
 
   revalidatePath("/classeurs");
-  redirect(`/classeurs/${binder.id}`);
+  // Étape suivante : choisir le design dans l'éditeur
+  redirect(`/classeurs/${binder.id}/editeur`);
 }
 
 export async function createBinderAndAdd(name: string, itemIds: string[]) {

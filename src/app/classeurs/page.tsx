@@ -7,6 +7,7 @@ import { AppShell } from "@/components/app-shell";
 import { BindersGrid } from "@/components/binders-grid";
 import { binderDesign } from "@/lib/binder-design";
 import { coverRenderFor } from "@/lib/binder-cover-server";
+import { fetchSeriesWithSets } from "@/lib/tcgdex";
 import { NewBinderButton } from "@/components/new-binder-button";
 
 export const metadata = {
@@ -40,6 +41,12 @@ export default async function ClasseursPage() {
     .from("item_gradings")
     .select("item_id, rectified_path")
     .order("created_at", { ascending: false });
+
+  // Sets pour l'assistant « à partir d'un set » (TCGdex, caché 24 h)
+  const series = await fetchSeriesWithSets("fr").catch(() => []);
+  const sets = series.flatMap((s) =>
+    s.sets.map((x) => ({ id: x.id, name: x.name, serie: s.name, logo: x.logo ?? null }))
+  );
 
   const signedItems = await signStorageImages(
     (items ?? []) as { id: string; image_url: string; quantity: number; current_price: number | null }[],
@@ -93,7 +100,7 @@ export default async function ClasseursPage() {
       <main className="mx-auto w-full max-w-6xl px-4 py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="display text-3xl font-bold tracking-tight">Classeurs</h1>
-          <NewBinderButton />
+          <NewBinderButton sets={sets} />
         </div>
 
         {enriched.length === 0 ? (
