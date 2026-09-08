@@ -118,7 +118,7 @@ export function NewBinderButton({
             <button
               type="button"
               onClick={() => setStep("empty")}
-              className="flex items-center gap-3 rounded-xl px-3 py-3 text-left transition active:bg-raised"
+              className="flex items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-raised active:bg-raised"
             >
               <Book size={20} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
               <span className="min-w-0">
@@ -129,7 +129,7 @@ export function NewBinderButton({
             <button
               type="button"
               onClick={() => setStep("set")}
-              className="flex items-center gap-3 rounded-xl px-3 py-3 text-left transition active:bg-raised"
+              className="flex items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-raised active:bg-raised"
             >
               <NotebookTabs size={20} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
               <span className="min-w-0">
@@ -201,7 +201,7 @@ export function NewBinderButton({
                     type="button"
                     disabled={pending}
                     onClick={() => createFromSet(s)}
-                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition active:bg-raised disabled:opacity-50"
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-raised active:bg-raised disabled:opacity-50"
                   >
                     <span className="flex h-8 w-12 shrink-0 items-center justify-center">
                       {s.logo ? (

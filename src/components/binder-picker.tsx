@@ -99,7 +99,9 @@ export function BinderPicker({
                   }
                   aria-pressed={on}
                   className={`flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] transition active:bg-raised ${
-                    on ? "bg-accent-soft font-medium text-accent-strong" : "text-foreground"
+                    on
+                      ? "bg-accent-soft font-medium text-accent-strong"
+                      : "text-foreground hover:bg-raised"
                   }`}
                 >
                   <NotebookTabs size={18} strokeWidth={1.9} className="shrink-0" aria-hidden />

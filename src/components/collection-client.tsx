@@ -979,7 +979,7 @@ export function CollectionClient({
                   type="button"
                   disabled={busy || full}
                   onClick={() => addToBinder(b)}
-                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] text-foreground transition active:bg-raised disabled:cursor-not-allowed disabled:opacity-45"
+                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] text-foreground transition hover:bg-raised active:bg-raised disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent"
                 >
                   <NotebookTabs size={18} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
                   <span className="flex-1 truncate">{b.name}</span>

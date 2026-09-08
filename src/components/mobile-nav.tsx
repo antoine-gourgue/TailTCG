@@ -140,7 +140,7 @@ export function MobileNav({
   }
 
   const row =
-    "flex items-center gap-3 rounded-xl px-3 py-3 text-[15px] transition active:bg-raised";
+    "flex items-center gap-3 rounded-xl px-3 py-3 text-[15px] transition hover:bg-raised active:bg-raised";
 
   return (
     <>
@@ -154,7 +154,7 @@ export function MobileNav({
             type="button"
             onClick={onOpenPalette}
             aria-label="Recherche rapide"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition active:bg-raised"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition hover:bg-raised hover:text-foreground active:bg-raised"
           >
             <SearchIcon size={18} strokeWidth={1.9} aria-hidden />
           </button>
