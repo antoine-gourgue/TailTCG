@@ -617,3 +617,55 @@ a:hover .card-tile,
     transform: none;
   }
 }
+
+/* Classeur en pages : la nouvelle page se rabat depuis la tranche */
+@keyframes page-turn-left {
+  from { transform: rotateY(75deg); opacity: 0.55; }
+  to   { transform: rotateY(0deg); opacity: 1; }
+}
+@keyframes page-turn-right {
+  from { transform: rotateY(-75deg); opacity: 0.55; }
+  to   { transform: rotateY(0deg); opacity: 1; }
+}
+@keyframes page-fade {
+  from { opacity: 0.35; }
+  to   { opacity: 1; }
+}
+.page-turn-left {
+  transform-origin: right center;
+  animation: page-turn-left 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.page-turn-right {
+  transform-origin: left center;
+  animation: page-turn-right 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.page-fade {
+  animation: page-fade 0.55s ease both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-turn-left, .page-turn-right, .page-fade { animation: none; }
+}
+
+/* Classeur en pages : la couverture s'ouvre avant de révéler les pages */
+@keyframes cover-open {
+  to { transform: rotateY(-105deg); opacity: 0.15; }
+}
+.cover-open {
+  transform-origin: left center;
+  animation: cover-open 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cover-open { animation-duration: 0.01s; }
+}
+
+/* Tiroir de choix d'une carte pour une pochette */
+@keyframes drawer-in {
+  from { transform: translateX(28px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+.drawer-in {
+  animation: drawer-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer-in { animation: none; }
+}

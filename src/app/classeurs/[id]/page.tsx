@@ -4,11 +4,14 @@ import { Trash2, ListChecks } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages, applyRectifiedImages } from "@/lib/images";
+import { binderColorHex } from "@/lib/binder-colors";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmAction } from "@/components/confirm-action";
 import { RenameBinderButton } from "@/components/rename-binder-button";
 import { BinderStyleButton } from "@/components/binder-style-button";
 import { BinderShareButton } from "@/components/binder-share-button";
+import { BinderPages } from "@/components/binder-pages";
+import { ViewToggle } from "@/components/view-toggle";
 import { deleteBinder } from "@/app/classeurs/actions";
 import {
   CollectionClient,
@@ -22,10 +25,14 @@ export const metadata = {
 
 export default async function ClasseurPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ vue?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, { vue }] = await Promise.all([params, searchParams]);
+  // Pages (classeur simulé) par défaut, grille classique sur demande
+  const mode = vue === "grille" ? "grille" : "pages";
   const supabase = await createClient();
   const {
     data: { user },
@@ -34,7 +41,7 @@ export default async function ClasseurPage({
 
   const { data: binder } = await supabase
     .from("binders")
-    .select("id, name, color, cover_item_ids, style")
+    .select("id, name, color, cover_item_ids, style, page_grid")
     .eq("id", id)
     .maybeSingle();
   if (!binder) notFound();
@@ -55,24 +62,26 @@ export default async function ClasseurPage({
     ]);
 
   const memberIds = (links ?? []).map((l) => l.item_id);
-  const { data: items } =
-    memberIds.length > 0
-      ? await supabase
-          .from("collection_value")
-          .select(
-            "id, tcgdex_id, card_name, set_name, set_id, local_id, image_url, card_type, language, condition, quantity, purchase_price, purchase_date, manual_price, source_id, graded, grade, created_at, current_price, gain, sold_price, sold_at"
-          )
-          .in("id", memberIds)
-          .order("created_at", { ascending: false })
-      : { data: [] };
+  const memberSet = new Set(memberIds);
+  // Toute la collection : les cartes du classeur, et les candidates pour
+  // remplir une pochette vide depuis les pages
+  const { data: items } = await supabase
+    .from("collection_value")
+    .select(
+      "id, tcgdex_id, card_name, set_name, set_id, local_id, image_url, card_type, language, condition, quantity, purchase_price, purchase_date, manual_price, source_id, graded, grade, created_at, current_price, gain, sold_price, sold_at"
+    )
+    .order("created_at", { ascending: false });
+  const allIds = (items ?? [])
+    .map((i) => i.id)
+    .filter((id): id is string => id != null);
 
   // Photos perso en secours de vignette (cartes sans scan officiel)
   const photoFallbacks = new Map<string, string>();
-  if (memberIds.length > 0) {
+  if (allIds.length > 0) {
     const { data: allPhotos } = await supabase
       .from("item_photos")
       .select("item_id, path, position")
-      .in("item_id", memberIds)
+      .in("item_id", allIds)
       .order("position");
     const firstByItem = new Map<string, string>();
     for (const p of allPhotos ?? []) {
@@ -100,7 +109,7 @@ export default async function ClasseurPage({
   const positionByItem = new Map(
     (links ?? []).map((l) => [l.item_id, l.position])
   );
-  const signedItems = (
+  const signedAll = (
     await applyRectifiedImages(
       gradings,
       await signStorageImages((items ?? []) as CollectionItem[], user.id),
@@ -111,10 +120,35 @@ export default async function ClasseurPage({
     photo_fallback: photoFallbacks.get(i.id) ?? null,
     position: positionByItem.get(i.id) ?? null,
   }));
+  const signedItems = signedAll.filter((i) => memberSet.has(i.id));
+  const candidates = signedAll
+    .filter((i) => i.sold_at == null)
+    .map((i) => ({
+      id: i.id,
+      card_name: i.card_name,
+      set_name: i.set_name,
+      local_id: i.local_id,
+      image_url: i.image_url,
+      photo_fallback: i.photo_fallback,
+      quantity: i.quantity,
+    }));
+  // Couverture fermée : cartes choisies, sinon les quatre premières avec image
+  const withImage = signedItems
+    .map((i) => ({ id: i.id, image_url: i.image_url || i.photo_fallback || "" }))
+    .filter((i) => i.image_url);
+  const chosen = (binder.cover_item_ids ?? [])
+    .map((id) => withImage.find((i) => i.id === id))
+    .filter((i): i is NonNullable<typeof i> => i != null);
+  const covers = chosen.length > 0 ? chosen : withImage.slice(0, 4);
 
   return (
     <AppShell>
-      <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8">
+      <main
+        className={`relative z-10 mx-auto w-full px-4 py-8 ${
+          // Les pages face à face ont besoin de largeur pour rester lisibles
+          mode === "pages" ? "max-w-[1400px]" : "max-w-6xl"
+        }`}
+      >
         <Link
           href="/classeurs"
           className="mb-4 inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground"
@@ -126,6 +160,7 @@ export default async function ClasseurPage({
             {binder.name}
           </h1>
           <div className="flex flex-wrap items-center gap-2">
+            <ViewToggle base={`/classeurs/${binder.id}`} current={mode} />
             <BinderShareButton
               binderId={binder.id}
               shareToken={settings?.share_token ?? null}
@@ -154,7 +189,18 @@ export default async function ClasseurPage({
           </div>
         </div>
 
-        {signedItems.length === 0 ? (
+        {mode === "pages" ? (
+          <BinderPages
+            binderId={binder.id}
+            name={binder.name}
+            items={signedItems}
+            candidates={candidates}
+            gridCode={binder.page_grid}
+            colorHex={binderColorHex(binder.color)}
+            cover={{ style: binder.style, covers }}
+            hrefBase="/carte/"
+          />
+        ) : signedItems.length === 0 ? (
           <div className="panel rise-in flex flex-col items-center gap-3 p-12 text-center">
             <ListChecks size={44} strokeWidth={1.3} className="text-faint" aria-hidden />
             <p className="display text-xl font-semibold">Ce classeur est vide</p>
@@ -167,12 +213,12 @@ export default async function ClasseurPage({
             </Link>
           </div>
         ) : (
+          // L'ordre des pochettes fait référence : la grille n'est plus réordonnable
           <CollectionClient
             items={signedItems}
             sources={(sources ?? []) as SourceRef[]}
             binders={(allBinders ?? []).filter((b) => b.id !== binder.id)}
             binderContext={{ id: binder.id, name: binder.name }}
-            orderable
           />
         )}
       </main>

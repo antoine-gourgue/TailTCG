@@ -2,7 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages, applyRectifiedImages } from "@/lib/images";
+import { binderColorHex } from "@/lib/binder-colors";
 import { Logo } from "@/components/logo";
+import { BinderPages } from "@/components/binder-pages";
+import { ViewToggle } from "@/components/view-toggle";
 import {
   CollectionClient,
   type CollectionItem,
@@ -49,11 +52,14 @@ export async function generateMetadata({
 // Un classeur de la vitrine publique, en lecture seule
 export default async function SharedBinderPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string; id: string }>;
+  searchParams: Promise<{ vue?: string }>;
 }) {
-  const { token, id } = await params;
+  const [{ token, id }, { vue }] = await Promise.all([params, searchParams]);
   if (!UUID_RE.test(token) || !UUID_RE.test(id)) notFound();
+  const mode = vue === "grille" ? "grille" : "pages";
 
   const admin = createAdminClient();
   const { data: settings } = await admin
@@ -65,7 +71,7 @@ export default async function SharedBinderPage({
 
   const { data: binder } = await admin
     .from("binders")
-    .select("id, name, owner_id")
+    .select("id, name, owner_id, color, page_grid, style, cover_item_ids")
     .eq("id", id)
     .maybeSingle();
   if (!binder || binder.owner_id !== settings.owner_id) notFound();
@@ -122,9 +128,21 @@ export default async function SharedBinderPage({
         sold_price: null,
         source_id: null,
       }));
+  // Couverture fermée : cartes choisies, sinon les quatre premières avec image
+  const withImage = signedItems
+    .map((i) => ({ id: i.id, image_url: i.image_url }))
+    .filter((i) => i.image_url);
+  const chosen = (binder.cover_item_ids ?? [])
+    .map((id) => withImage.find((i) => i.id === id))
+    .filter((i): i is NonNullable<typeof i> => i != null);
+  const covers = chosen.length > 0 ? chosen : withImage.slice(0, 4);
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8">
+    <main
+      className={`mx-auto w-full px-4 py-8 ${
+        mode === "pages" ? "max-w-[1400px]" : "max-w-6xl"
+      }`}
+    >
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Logo variant="mark" size={36} />
@@ -137,13 +155,28 @@ export default async function SharedBinderPage({
             </p>
           </div>
         </div>
-        <Link href={`/v/${token}`} className="btn btn-ghost">
-          ← Toute la collection
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {signedItems.length > 0 && (
+            <ViewToggle base={`/v/${token}/c/${binder.id}`} current={mode} />
+          )}
+          <Link href={`/v/${token}`} className="btn btn-ghost">
+            ← Toute la collection
+          </Link>
+        </div>
       </div>
 
       {signedItems.length === 0 ? (
         <p className="text-sm text-muted">Ce classeur est vide.</p>
+      ) : mode === "pages" ? (
+        <BinderPages
+          binderId={binder.id}
+          name={binder.name}
+          items={signedItems}
+          gridCode={binder.page_grid}
+          colorHex={binderColorHex(binder.color)}
+          cover={{ style: binder.style, covers }}
+          readOnly
+        />
       ) : (
         <CollectionClient
           items={signedItems}
