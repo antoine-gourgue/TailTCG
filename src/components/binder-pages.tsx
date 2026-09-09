@@ -11,7 +11,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Book, Check, ChevronLeft, ChevronRight, Minus, Plus, Search, X } from "lucide-react";
+import { Book, Check, ChevronLeft, ChevronRight, Minus, Pencil, Plus, Search, X } from "lucide-react";
 import { useCleanView } from "@/components/binder-clean-view";
 import { Sheet } from "@/components/sheet";
 import { CardImage } from "@/components/card-image";
@@ -588,26 +588,42 @@ export function BinderPages({
   /** Range un exemplaire de la collection dans la pochette ciblée */
   async function place(c: CandidateItem, pocket: number) {
     setToast({ message: `${c.card_name} · ${pocketLabel(pocket)}` });
-    advancePicker(pocket);
     const key = `i:${c.id}`;
     if (pockets.has(key)) {
+      // La carte est déjà dans le classeur : simple échange de pochettes
+      advancePicker(pocket);
       await commitMove(key, pocket);
       return;
     }
+    // Remplacement : l'ancienne carte de cette pochette est retirée
+    const occupant = byPocket.get(pocket);
+    advancePicker(pocket);
     const before = ov;
-    patchOv([[key, pocket]], {
-      id: key,
-      kind: "owned",
-      card_name: c.card_name,
-      set_name: c.set_name,
-      local_id: c.local_id,
-      tcgdex_id: c.tcgdex_id,
-      image_url: c.image_url,
-      photo_fallback: c.photo_fallback ?? null,
-      quantity: c.quantity,
-      position: pocket,
-      created_at: "",
-    });
+    patchOv(
+      [[key, pocket]],
+      {
+        id: key,
+        kind: "owned",
+        card_name: c.card_name,
+        set_name: c.set_name,
+        local_id: c.local_id,
+        tcgdex_id: c.tcgdex_id,
+        image_url: c.image_url,
+        photo_fallback: c.photo_fallback ?? null,
+        quantity: c.quantity,
+        position: pocket,
+        created_at: "",
+      },
+      occupant && occupant.id !== key ? occupant.id : undefined
+    );
+    if (occupant && occupant.id !== key) {
+      const r = await removeFromPocket(binderId, occupant.id);
+      if (r.error) {
+        setOv(before);
+        setToast({ message: "Remplacement impossible", tone: "error" });
+        return;
+      }
+    }
     const { error } = await placeItemInPocket(binderId, c.id, pocket);
     if (error) {
       setOv(before);
@@ -620,22 +636,36 @@ export function BinderPages({
   /** Range une carte du catalogue qu'on ne possède pas (hors collection) */
   async function placeWanted(c: CardSearchResult, pocket: number) {
     setToast({ message: `${c.name} · ${pocketLabel(pocket)}` });
+    // Remplacement : l'ancienne carte de cette pochette est retirée
+    const occupant = byPocket.get(pocket);
     advancePicker(pocket);
     const id = crypto.randomUUID();
     const key = `w:${id}`;
     const before = ov;
-    patchOv([[key, pocket]], {
-      id: key,
-      kind: "wanted",
-      card_name: c.name,
-      set_name: c.setName,
-      local_id: c.localId,
-      tcgdex_id: c.id,
-      image_url: c.image ?? "",
-      quantity: 1,
-      position: pocket,
-      created_at: "",
-    });
+    patchOv(
+      [[key, pocket]],
+      {
+        id: key,
+        kind: "wanted",
+        card_name: c.name,
+        set_name: c.setName,
+        local_id: c.localId,
+        tcgdex_id: c.id,
+        image_url: c.image ?? "",
+        quantity: 1,
+        position: pocket,
+        created_at: "",
+      },
+      occupant ? occupant.id : undefined
+    );
+    if (occupant) {
+      const r = await removeFromPocket(binderId, occupant.id);
+      if (r.error) {
+        setOv(before);
+        setToast({ message: "Remplacement impossible", tone: "error" });
+        return;
+      }
+    }
     const { error } = await placeWantedInPocket(
       binderId,
       {
@@ -1547,19 +1577,36 @@ export function BinderPages({
                 </p>
               )}
             </div>
-            {item.kind === "owned" && hrefBase ? (
-              <Link href={`${hrefBase}${refIdOf(item.id)}`} className="btn btn-primary mt-4 w-full">
-                Voir dans ma collection
-              </Link>
-            ) : item.kind === "wanted" && item.tcgdex_id && !readOnly ? (
-              <Link
-                href={`/ajouter?card=${encodeURIComponent(item.tcgdex_id)}`}
-                className="btn btn-primary mt-4 w-full"
-              >
-                <Plus size={15} aria-hidden />
-                Ajouter à ma collection
-              </Link>
-            ) : null}
+            <div className="mt-4 flex flex-col gap-2">
+              {item.kind === "owned" && hrefBase ? (
+                <Link href={`${hrefBase}${refIdOf(item.id)}`} className="btn btn-primary w-full">
+                  Voir dans ma collection
+                </Link>
+              ) : item.kind === "wanted" && item.tcgdex_id && !readOnly ? (
+                <Link
+                  href={`/ajouter?card=${encodeURIComponent(item.tcgdex_id)}`}
+                  className="btn btn-primary w-full"
+                >
+                  <Plus size={15} aria-hidden />
+                  Ajouter à ma collection
+                </Link>
+              ) : null}
+              {/* Changer la carte rangée à cette pochette */}
+              {!readOnly && item.position != null && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const p = item.position!;
+                    setDetail(null);
+                    openPicker(p);
+                  }}
+                  className="btn btn-ghost w-full"
+                >
+                  <Pencil size={15} aria-hidden />
+                  Changer la carte de cette pochette
+                </button>
+              )}
+            </div>
           </div>
         )}
       </Sheet>
