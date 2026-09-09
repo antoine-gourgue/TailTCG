@@ -7,6 +7,7 @@ import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { binderColorHex } from "@/lib/binder-colors";
 import { binderDesign } from "@/lib/binder-design";
 import { pageGrid, pocketsPerPage } from "@/lib/binder-pages";
+import { fetchSetsIndex } from "@/lib/tcgdex";
 import { coverRenderFor } from "@/lib/binder-cover-server";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmAction } from "@/components/confirm-action";
@@ -163,6 +164,24 @@ export default async function ClasseurPage({
       created_at: w.created_at ?? "",
     })),
   ];
+  // Total officiel de cartes par set présent dans le classeur (« 12 / 102 »)
+  const setCounts: Record<string, number> = {};
+  {
+    const setIds = new Set(
+      pocketItems
+        .map((p) => p.tcgdex_id)
+        .filter((t): t is string => !!t && t.includes("-"))
+        .map((t) => t.slice(0, t.lastIndexOf("-")))
+    );
+    if (setIds.size > 0) {
+      const index = await fetchSetsIndex().catch(() => new Map());
+      for (const id of setIds) {
+        const n = index.get(id)?.cardCount?.official ?? index.get(id)?.cardCount?.total;
+        if (n) setCounts[id] = n;
+      }
+    }
+  }
+
   // Résumé d'en-tête : pages réellement occupées selon le format
   const grid = pageGrid(binder.page_grid);
   const lastPocket = Math.max(-1, ...pocketItems.map((p) => p.position ?? -1));
@@ -269,6 +288,7 @@ export default async function ClasseurPage({
             design={design}
             pageCount={binder.page_count}
             hrefBase="/carte/"
+            setCounts={setCounts}
           />
         ) : signedItems.length === 0 ? (
           <div className="panel rise-in flex flex-col items-center gap-3 p-12 text-center">

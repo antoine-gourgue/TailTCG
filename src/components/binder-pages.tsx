@@ -246,6 +246,7 @@ export function BinderPages({
   pageCount,
   readOnly = false,
   hrefBase,
+  setCounts,
 }: {
   binderId: string;
   name: string;
@@ -262,6 +263,8 @@ export function BinderPages({
   readOnly?: boolean;
   /** Préfixe du lien de la fiche d'un exemplaire (`/carte/`) — absent en vitrine */
   hrefBase?: string;
+  /** Total officiel de cartes par set (setId → n), pour « 12 / 102 » */
+  setCounts?: Record<string, number>;
 }) {
   const router = useRouter();
   const perView = useSyncExternalStore(
@@ -311,6 +314,8 @@ export function BinderPages({
   const [over, setOver] = useState<string | null>(null);
   /** Pochette en cours de remplissage (dialogue ouvert) */
   const [picker, setPicker] = useState<number | null>(null);
+  /** Carte dont on affiche le détail (clic sur une carte du classeur) */
+  const [detail, setDetail] = useState<PocketItem | null>(null);
   const [mode, setMode] = useState<"collection" | "catalogue">("collection");
   const [q, setQ] = useState("");
   const [fSet, setFSet] = useState("");
@@ -1045,10 +1050,6 @@ export function BinderPages({
             const isOver =
               dragging && over === `pocket:${pocket}` && pockets.get(drag.id) !== pocket;
             const isTarget = picker === pocket;
-            const href =
-              item && item.kind === "owned" && hrefBase
-                ? `${hrefBase}${refIdOf(item.id)}`
-                : null;
             const handlers =
               item && !readOnly
                 ? {
@@ -1060,31 +1061,16 @@ export function BinderPages({
                     onDragStart: (e: React.DragEvent) => e.preventDefault(),
                   }
                 : {};
-            const cardCls = `block h-full w-full select-none [-webkit-touch-callout:none] ${
-              readOnly ? "" : "touch-manipulation cursor-grab active:cursor-grabbing"
+            const cardCls = `block h-full w-full cursor-pointer select-none [-webkit-touch-callout:none] ${
+              readOnly ? "" : "touch-manipulation active:cursor-grabbing"
             }`;
             // Vue propre : les manquantes s'affichent normalement, sans grisé
             // ni libellé
-            const wantedLabel =
-              item?.kind === "wanted" &&
-              !cleanView &&
-              (readOnly || !item.tcgdex_id ? (
-                <span className="tile-badge bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px]">
-                  Hors collection
-                </span>
-              ) : (
-                <Link
-                  href={`/ajouter?card=${encodeURIComponent(item.tcgdex_id)}`}
-                  title="Ajouter cette carte à ma collection"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (swallowClick()) e.preventDefault();
-                  }}
-                  className="tile-badge bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] transition hover:!bg-accent hover:!text-accent-ink"
-                >
-                  Hors collection
-                </Link>
-              ));
+            const wantedLabel = item?.kind === "wanted" && !cleanView && (
+              <span className="tile-badge bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px]">
+                Hors collection
+              </span>
+            );
             const card = item && (
               <div
                 className={`card-tile h-full w-full transition ${
@@ -1128,23 +1114,19 @@ export function BinderPages({
                 {/* Re-clé par carte : l'image ne doit pas survivre à un échange */}
                 {item && (
                   <div key={item.id} className="absolute inset-[3%]">
-                    {href ? (
-                      <Link
-                        href={href}
-                        draggable={false}
-                        className={cardCls}
-                        onClick={(e) => {
-                          if (swallowClick()) e.preventDefault();
-                        }}
-                        {...handlers}
-                      >
-                        {card}
-                      </Link>
-                    ) : (
-                      <div className={cardCls} {...handlers}>
-                        {card}
-                      </div>
-                    )}
+                    {/* Clic = détail de la carte (pas de redirection) ;
+                        le glisser est absorbé par swallowClick */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      className={cardCls}
+                      onClick={() => {
+                        if (!swallowClick()) setDetail(item);
+                      }}
+                      {...handlers}
+                    >
+                      {card}
+                    </div>
                   </div>
                 )}
                 {item && !readOnly && (
@@ -1519,6 +1501,71 @@ export function BinderPages({
     );
   }
 
+  function renderDetail() {
+    const item = detail;
+    // Numéro classique « 12 / 102 » : total officiel du set si connu
+    const setId = item?.tcgdex_id
+      ? item.tcgdex_id.slice(0, item.tcgdex_id.lastIndexOf("-"))
+      : null;
+    const setTotal = setId ? setCounts?.[setId] : undefined;
+    return (
+      <Sheet
+        open={detail != null}
+        onClose={() => setDetail(null)}
+        size="sm"
+        label={item?.card_name ?? "Carte"}
+      >
+        {item && (
+          <div>
+            <div className="mx-auto w-full max-w-[300px]">
+              <div className="card-tile aspect-[63/88]">
+                <CardImage
+                  base={item.image_url || null}
+                  alt={item.card_name}
+                  quality="high"
+                  fallback={item.photo_fallback ?? null}
+                />
+              </div>
+            </div>
+            <div className="mt-4">
+              <p className="display text-xl font-semibold leading-tight">
+                {item.card_name}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                {item.set_name}
+                {item.local_id && (
+                  <span className="num text-faint">
+                    {" "}
+                    · {item.local_id}
+                    {setTotal ? ` / ${setTotal}` : ""}
+                  </span>
+                )}
+              </p>
+              {item.kind === "wanted" && (
+                <p className="mt-2 inline-block rounded-md bg-raised px-2 py-0.5 text-xs text-muted">
+                  Hors collection
+                </p>
+              )}
+            </div>
+            {item.kind === "owned" && hrefBase ? (
+              <Link href={`${hrefBase}${refIdOf(item.id)}`} className="btn btn-primary mt-4 w-full">
+                Voir dans ma collection
+              </Link>
+            ) : item.kind === "wanted" && item.tcgdex_id && !readOnly ? (
+              <Link
+                href={`/ajouter?card=${encodeURIComponent(item.tcgdex_id)}`}
+                className="btn btn-primary mt-4 w-full"
+              >
+                <Plus size={15} aria-hidden />
+                Ajouter à ma collection
+              </Link>
+            ) : null}
+          </div>
+        )}
+      </Sheet>
+    );
+  }
+
   function renderPicker() {
     const pocket = picker ?? 0;
     const page = Math.floor(pocket / perPage) + 1;
@@ -1712,6 +1759,7 @@ export function BinderPages({
       )}
 
       {renderPicker()}
+      {renderDetail()}
 
       {toast && (
         <Toast

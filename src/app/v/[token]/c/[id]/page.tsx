@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { binderColorHex } from "@/lib/binder-colors";
 import { binderDesign } from "@/lib/binder-design";
+import { fetchSetsIndex } from "@/lib/tcgdex";
 import { coverRenderFor } from "@/lib/binder-cover-server";
 import { Logo } from "@/components/logo";
 import { BinderPages, type PocketItem } from "@/components/binder-pages";
@@ -175,6 +176,24 @@ export default async function SharedBinderPage({
     })),
   ];
 
+  // Total officiel de cartes par set (« 12 / 102 » dans le détail)
+  const setCounts: Record<string, number> = {};
+  {
+    const setIds = new Set(
+      pocketItems
+        .map((p) => p.tcgdex_id)
+        .filter((t): t is string => !!t && t.includes("-"))
+        .map((t) => t.slice(0, t.lastIndexOf("-")))
+    );
+    if (setIds.size > 0) {
+      const index = await fetchSetsIndex().catch(() => new Map());
+      for (const id of setIds) {
+        const n = index.get(id)?.cardCount?.official ?? index.get(id)?.cardCount?.total;
+        if (n) setCounts[id] = n;
+      }
+    }
+  }
+
   return (
     <main
       className={`mx-auto w-full px-4 ${
@@ -219,6 +238,7 @@ export default async function SharedBinderPage({
           cover={{ style: binder.style, covers, layout: coverRender }}
           design={binderDesign(binder.design)}
           pageCount={binder.page_count}
+          setCounts={setCounts}
           readOnly
         />
       ) : (
