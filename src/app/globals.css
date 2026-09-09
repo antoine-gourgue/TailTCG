@@ -93,6 +93,9 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans-var), system-ui, sans-serif;
   transition: background-color 0.2s ease, color 0.2s ease;
+  /* Jamais de défilement horizontal de la page : un débordement ponctuel
+     (infobulle, valeur longue) est rogné, sans casser sticky/fixed */
+  overflow-x: clip;
 }
 
 /* ————— Coquille : sidebar repliable ————— */

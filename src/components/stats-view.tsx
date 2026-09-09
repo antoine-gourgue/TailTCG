@@ -87,7 +87,7 @@ export function StatsView({ d }: { d: StatsData }) {
   return (
     <div className="flex flex-col gap-5">
       {/* ——— Chiffres clés ——— */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatTile
           icon={Layers}
           label="Cartes"
@@ -132,7 +132,7 @@ export function StatsView({ d }: { d: StatsData }) {
       </div>
 
       {/* ——— Courbe + vue d'ensemble ——— */}
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Panel
           icon={LineChart}
           title="Évolution de la valeur"
@@ -211,7 +211,7 @@ export function StatsView({ d }: { d: StatsData }) {
       </Panel>
 
       {/* ——— Sets + sources ——— */}
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Panel
           icon={Award}
           title="Progression par set"
@@ -266,7 +266,7 @@ export function StatsView({ d }: { d: StatsData }) {
       </div>
 
       {/* ——— Répartitions ——— */}
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <Panel icon={Sparkles} title="Par état">
           <Donut slices={d.conditionSlices} label="Répartition par état" />
         </Panel>
@@ -280,7 +280,7 @@ export function StatsView({ d }: { d: StatsData }) {
 
       {/* ——— Classements ——— */}
       {d.hasGain && (
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <Panel
             icon={TrendingUp}
             title="Meilleures plus-values"
@@ -312,7 +312,7 @@ export function StatsView({ d }: { d: StatsData }) {
 /** Sur mobile, les graphiques gardent une largeur lisible et défilent */
 function Scrollable({ children }: { children: React.ReactNode }) {
   return (
-    <div className="-mx-1 overflow-x-auto px-1">
+    <div className="-mx-1 min-w-0 overflow-x-auto px-1">
       <div className="min-w-[540px] sm:min-w-0">{children}</div>
     </div>
   );

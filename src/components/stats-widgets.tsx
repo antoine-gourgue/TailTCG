@@ -65,7 +65,7 @@ export function StatTile({
         <Icon size={15} className="text-faint" aria-hidden />
       </div>
       <p
-        className={`num display text-2xl font-bold leading-none ${
+        className={`num display min-w-0 text-xl font-bold leading-none md:text-2xl ${
           tone === "up" ? "text-gain" : tone === "down" ? "text-loss" : ""
         }`}
       >
@@ -151,7 +151,7 @@ export function Donut({ slices, unit = "cartes", label }: { slices: Slice[]; uni
   }
 
   return (
-    <div className="flex items-center gap-5">
+    <div className="flex items-center gap-5 md:flex-col md:items-start md:gap-4 lg:flex-row lg:items-center lg:gap-5">
       <svg viewBox="0 0 100 100" className="h-28 w-28 shrink-0" role="img" aria-label={label}>
         <circle cx={50} cy={50} r={R} fill="none" stroke="currentColor" strokeOpacity={0.06} strokeWidth={12} />
         {segs.map((s) => (
@@ -185,7 +185,7 @@ export function Donut({ slices, unit = "cartes", label }: { slices: Slice[]; uni
           {unit}
         </text>
       </svg>
-      <ul className="flex min-w-0 flex-1 flex-col gap-1.5">
+      <ul className="flex w-full min-w-0 flex-1 flex-col gap-1.5">
         {segs.map((s) => (
           <li key={s.code} className="flex items-center gap-2 text-[13px]">
             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: s.color }} />
