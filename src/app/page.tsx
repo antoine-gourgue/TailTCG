@@ -7,6 +7,7 @@ import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
 import { ShareButton } from "@/components/share-button";
 import { UndoDeleteToast } from "@/components/undo-delete-toast";
+import { AddedToast } from "@/components/added-toast";
 import { Landing } from "@/components/landing";
 import {
   CollectionClient,
@@ -22,6 +23,7 @@ export default async function Home({
     set?: string;
     select?: string;
     deleted?: string;
+    added?: string;
   }>;
 }) {
   const {
@@ -29,6 +31,7 @@ export default async function Home({
     set: initialSet,
     select,
     deleted,
+    added,
   } = await searchParams;
   const supabase = await createClient();
   const {
@@ -171,6 +174,7 @@ export default async function Home({
           initialSelect={select != null}
         />
         {deleted && <UndoDeleteToast itemId={deleted} />}
+        {added && Number(added) > 0 && <AddedToast count={Number(added)} />}
       </main>
       </AppShell>
     </>
