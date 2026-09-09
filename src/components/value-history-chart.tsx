@@ -7,7 +7,7 @@ export type ValuePoint = { recorded_at: string; value: number };
 
 const W = 640;
 const H = 180;
-const PAD = { top: 16, right: 60, bottom: 24, left: 8 };
+const PAD = { top: 16, right: 70, bottom: 24, left: 8 };
 
 function fmtDate(iso: string): string {
   const [, m, d] = iso.split("-");
