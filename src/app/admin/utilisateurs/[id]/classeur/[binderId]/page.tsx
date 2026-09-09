@@ -7,6 +7,7 @@ import { binderDesign } from "@/lib/binder-design";
 import { coverRenderFor } from "@/lib/binder-cover-server";
 import { fetchSetsIndex } from "@/lib/tcgdex";
 import { BinderPages, type PocketItem } from "@/components/binder-pages";
+import { CleanViewProvider, CleanViewToggle } from "@/components/binder-clean-view";
 import { AdminBinderRename } from "@/components/admin/admin-binder-rename";
 import { AdminBinderCards, type BinderCard } from "@/components/admin/admin-binder-cards";
 
@@ -153,20 +154,25 @@ export default async function AdminBinderDetail({
 
       {/* Le classeur tel que l'utilisateur le voit (lecture seule) */}
       {pocketItems.length > 0 && (
-        <div className="max-w-[1000px]">
-          <BinderPages
-            binderId={binder.id}
-            name={binder.name}
-            items={pocketItems}
-            gridCode={binder.page_grid}
-            colorHex={binderColorHex(binder.color)}
-            cover={{ style: binder.style, covers, layout: coverRender }}
-            design={binderDesign(binder.design)}
-            pageCount={binder.page_count}
-            setCounts={setCounts}
-            readOnly
-          />
-        </div>
+        <CleanViewProvider>
+          <div className="max-w-[1000px]">
+            <div className="mb-3 flex justify-end">
+              <CleanViewToggle />
+            </div>
+            <BinderPages
+              binderId={binder.id}
+              name={binder.name}
+              items={pocketItems}
+              gridCode={binder.page_grid}
+              colorHex={binderColorHex(binder.color)}
+              cover={{ style: binder.style, covers, layout: coverRender }}
+              design={binderDesign(binder.design)}
+              pageCount={binder.page_count}
+              setCounts={setCounts}
+              readOnly
+            />
+          </div>
+        </CleanViewProvider>
       )}
 
       <AdminBinderRename binderId={binderId} ownerId={id} initialName={binder.name} />
