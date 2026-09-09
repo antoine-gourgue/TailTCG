@@ -82,12 +82,20 @@ export type CoverLogo = {
   url: string;
   size: ElementSize;
 };
+/** Forme d'une image : carrée rognée, ronde, ou libre (aspect d'origine) */
+export type ImageShape = "square" | "round" | "free";
+export const IMAGE_SHAPES = [
+  { code: "square", label: "Carrée" },
+  { code: "round", label: "Ronde" },
+  { code: "free", label: "Libre" },
+] as const;
+
 export type CoverImage = {
   type: "image";
   /** Chemin dans le bucket privé, préfixé de l'UUID du propriétaire */
   path: string;
   size: ElementSize;
-  round: boolean;
+  shape: ImageShape;
 };
 export type CoverCard = { type: "card"; itemId: string; size: ElementSize };
 export type CoverElement = CoverText | CoverLogo | CoverImage | CoverCard;
@@ -152,7 +160,9 @@ function element(raw: unknown): CoverElement | null {
     case "image": {
       const path = str(e.path, 300);
       if (!path) return null;
-      return { type: "image", path, size: pick(e.size, sizes3, "md"), round: e.round === true };
+      // Rétrocompat : ancien booléen `round`
+      const shape: ImageShape = e.round === true ? "round" : pick(e.shape, ["square", "round", "free"] as const, "square");
+      return { type: "image", path, size: pick(e.size, sizes3, "md"), shape };
     }
     case "card": {
       const itemId = str(e.itemId, 40);
@@ -216,7 +226,7 @@ export function coverItemIds(layout: CoverLayout): string[] {
 export type RenderElement =
   | CoverText
   | { type: "logo"; url: string; size: ElementSize }
-  | { type: "image"; url: string; size: ElementSize; round: boolean }
+  | { type: "image"; url: string; size: ElementSize; shape: ImageShape }
   | { type: "card"; url: string; size: ElementSize };
 
 export type CoverRender = {
@@ -247,7 +257,7 @@ export function renderCover(
     else if (el.type === "logo") zones[key] = { type: "logo", url: el.url, size: el.size };
     else if (el.type === "image") {
       const url = imageUrl(el.path);
-      if (url) zones[key] = { type: "image", url, size: el.size, round: el.round };
+      if (url) zones[key] = { type: "image", url, size: el.size, shape: el.shape };
     } else {
       const url = cardUrl(el.itemId);
       if (url) zones[key] = { type: "card", url, size: el.size };

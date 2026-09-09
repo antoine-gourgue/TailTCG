@@ -15,6 +15,7 @@ import {
   BG_COLORS,
   ELEMENT_SIZES,
   FONTS,
+  IMAGE_SHAPES,
   TEXT_COLORS,
   TEXT_MAX,
   TEXT_SIZES,
@@ -375,7 +376,7 @@ export function BinderEditor({
     const up = await upload(file);
     if (!up) return;
     if (target === "bg") setBg({ kind: "image", image: up.path });
-    else setZoneEl(target, { type: "image", path: up.path, size: "md", round: false });
+    else setZoneEl(target, { type: "image", path: up.path, size: "md", shape: "square" });
   }
   function forget(path: string, next: CoverLayout) {
     const stillUsed =
@@ -797,7 +798,7 @@ export function BinderEditor({
                   <div className="mt-4 flex flex-col gap-3">
                     <div className="flex items-center gap-3">
                       {urls[el.path] && (
-                        <div className={`h-14 w-14 overflow-hidden border border-edge ${el.round ? "rounded-full" : "rounded-md"}`}>
+                        <div className={`h-14 w-14 overflow-hidden border border-edge ${el.shape === "round" ? "rounded-full" : "rounded-md"}`}>
                           <CardImage base={urls[el.path]} alt="" direct />
                         </div>
                       )}
@@ -813,7 +814,7 @@ export function BinderEditor({
                       </div>
                       <div>
                         <p className="mb-1.5 text-xs text-muted">Forme</p>
-                        <Chips label="Forme" options={[{ code: "square", label: "Carrée" }, { code: "round", label: "Ronde" }] as const} value={el.round ? "round" : "square"} onPick={(v) => setZoneEl(zone, { ...el, round: v === "round" })} />
+                        <Chips label="Forme" options={IMAGE_SHAPES} value={el.shape} onPick={(shape) => setZoneEl(zone, { ...el, shape })} />
                       </div>
                     </div>
                   </div>

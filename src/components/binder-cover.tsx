@@ -66,8 +66,9 @@ const TEXT_SIZE_CLASS = {
   xl: "text-[13cqw]",
 } as const;
 const FONT_CLASS = { display: "display", sans: "", mono: "font-mono" } as const;
-const MEDIA_WIDTH = { sm: "w-[22cqw]", md: "w-[34cqw]", lg: "w-[48cqw]" } as const;
-const CARD_WIDTH = { sm: "w-[22cqw]", md: "w-[32cqw]", lg: "w-[44cqw]" } as const;
+// Largeurs relatives à la couverture, bornées pour tenir dans une zone (~1/3)
+const MEDIA_WIDTH = { sm: "w-[16cqw]", md: "w-[22cqw]", lg: "w-[28cqw]" } as const;
+const CARD_WIDTH = { sm: "w-[16cqw]", md: "w-[22cqw]", lg: "w-[28cqw]" } as const;
 
 function CoverElementView({ el }: { el: RenderElement }) {
   if (el.type === "text") {
@@ -94,15 +95,20 @@ function CoverElementView({ el }: { el: RenderElement }) {
     );
   }
   if (el.type === "image") {
+    // Carrée / ronde : rognée en carré ; libre : aspect d'origine conservé
+    const shapeCls =
+      el.shape === "round"
+        ? "aspect-square object-cover rounded-full"
+        : el.shape === "free"
+          ? "h-auto max-h-[42cqw] object-contain rounded-[2cqw]"
+          : "aspect-square object-cover rounded-[2cqw]";
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={el.url}
         alt=""
         loading="lazy"
-        className={`${MEDIA_WIDTH[el.size]} aspect-square shrink-0 object-cover shadow-lg ${
-          el.round ? "rounded-full" : "rounded-[2cqw]"
-        }`}
+        className={`${MEDIA_WIDTH[el.size]} shrink-0 shadow-lg ${shapeCls}`}
       />
     );
   }
