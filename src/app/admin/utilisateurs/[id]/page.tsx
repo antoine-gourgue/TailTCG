@@ -60,6 +60,7 @@ export default async function AdminUserDetail({
     { data: gradings },
     { data: binders },
     { data: binderLinks },
+    { data: binderPlaceholders },
     { data: sources },
     { data: wishlist },
     { data: photos },
@@ -69,6 +70,7 @@ export default async function AdminUserDetail({
     db.from("item_gradings").select("item_id, grade, centering, corners, edges, surface, created_at, rectified_path, rectified_verso_path, ratios, details").eq("owner_id", id).order("created_at", { ascending: false }),
     db.from("binders").select("id, name").eq("owner_id", id).order("created_at"),
     db.from("binder_items").select("binder_id").eq("owner_id", id),
+    db.from("binder_placeholders").select("binder_id").eq("owner_id", id),
     db.from("sources").select("id, name, kind, city").eq("owner_id", id).order("name"),
     db.from("wishlist").select("id").eq("owner_id", id),
     db.from("item_photos").select("id").eq("owner_id", id),
@@ -117,8 +119,10 @@ export default async function AdminUserDetail({
       } satisfies GradingReportData,
     }));
 
+  // Total = cartes possédées (binder_items) + hors collection (placeholders)
   const binderCount = new Map<string, number>();
   for (const l of binderLinks ?? []) binderCount.set(l.binder_id, (binderCount.get(l.binder_id) ?? 0) + 1);
+  for (const p of binderPlaceholders ?? []) binderCount.set(p.binder_id, (binderCount.get(p.binder_id) ?? 0) + 1);
   const bindersWithCount = (binders ?? []).map((b) => ({
     id: b.id,
     name: b.name,
