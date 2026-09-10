@@ -1,11 +1,16 @@
 import Link from "next/link";
 
 /** Onglets de la section Boosters, à part du reste du site */
-export function GameNav({ current }: { current: "boosters" | "collection" | "gradation" }) {
+export function GameNav({
+  current,
+}: {
+  current: "boosters" | "collection" | "gradation" | "echanges";
+}) {
   const tabs = [
     { key: "boosters" as const, href: "/boosters", label: "Ouvrir" },
     { key: "collection" as const, href: "/boosters/collection", label: "Collection" },
     { key: "gradation" as const, href: "/boosters/gradation", label: "Gradation" },
+    { key: "echanges" as const, href: "/boosters/echanges", label: "Échanges" },
   ];
   return (
     <div className="inline-flex rounded-lg border border-edge bg-surface p-0.5">

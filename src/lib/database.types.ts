@@ -375,6 +375,57 @@ export type Database = {
         }
         Relationships: []
       }
+      game_trades: {
+        Row: {
+          created_at: string
+          from_card_id: string
+          from_owner: string
+          id: string
+          resolved_at: string | null
+          status: string
+          tier: string
+          to_card_id: string
+          to_owner: string
+        }
+        Insert: {
+          created_at?: string
+          from_card_id: string
+          from_owner: string
+          id?: string
+          resolved_at?: string | null
+          status?: string
+          tier: string
+          to_card_id: string
+          to_owner: string
+        }
+        Update: {
+          created_at?: string
+          from_card_id?: string
+          from_owner?: string
+          id?: string
+          resolved_at?: string | null
+          status?: string
+          tier?: string
+          to_card_id?: string
+          to_owner?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_trades_from_card_id_fkey"
+            columns: ["from_card_id"]
+            isOneToOne: false
+            referencedRelation: "game_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "game_trades_to_card_id_fkey"
+            columns: ["to_card_id"]
+            isOneToOne: false
+            referencedRelation: "game_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       item_gradings: {
         Row: {
           centering: number
@@ -815,7 +866,10 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      accept_game_trade: {
+        Args: { p_trade: string; p_user: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
