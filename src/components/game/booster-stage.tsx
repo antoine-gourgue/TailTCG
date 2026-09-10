@@ -118,17 +118,18 @@ export function BoosterStage({
     const r = el.getBoundingClientRect();
     const dx = (e.clientX - (r.left + r.width / 2)) / r.width;
     const dy = (e.clientY - (r.top + r.height / 2)) / r.height;
-    el.style.transform = `perspective(1400px) rotateY(${dx * 14}deg) rotateX(${-dy * 10}deg)`;
+    // Inclinaison légère : l'emballage ne doit pas fuir sous le pointeur
+    el.style.transform = `perspective(1400px) rotateY(${dx * 7}deg) rotateX(${-dy * 5}deg)`;
   }
   function untilt() {
     const el = packRef.current;
     if (el) el.style.transform = "";
   }
 
-  // ——— Déchirure de la bande ———
+  // ——— Déchirure : on attrape l'emballage n'importe où et on tire vers la droite ———
   function onStripDown(e: ReactPointerEvent<HTMLDivElement>) {
-    if (stage !== "sealed" || !canOpen) return;
-    const r = stripRef.current?.getBoundingClientRect();
+    if (stage !== "sealed" || !canOpen || e.button !== 0) return;
+    const r = packRef.current?.getBoundingClientRect();
     if (!r) return;
     tear.current = { id: e.pointerId, startX: e.clientX, width: r.width };
     try {
@@ -262,9 +263,13 @@ export function BoosterStage({
           <div className={`relative ${stage === "opened" ? "animate-[pack-drop_.6s_ease-in_forwards]" : ""}`}>
             <div
               ref={packRef}
-              className={`relative h-[360px] w-[228px] transition-transform duration-200 ease-out sm:h-[420px] sm:w-[266px] ${
-                stage === "tearing" ? "animate-[pack-shake_.5s_ease-in-out_1]" : ""
-              }`}
+              onPointerDown={onStripDown}
+              onPointerMove={onStripMove}
+              onPointerUp={onStripUp}
+              onPointerCancel={onStripUp}
+              className={`relative h-[360px] w-[228px] touch-none select-none transition-transform duration-200 ease-out sm:h-[420px] sm:w-[266px] ${
+                stage === "sealed" && canOpen ? "cursor-grab active:cursor-grabbing" : ""
+              } ${stage === "tearing" ? "animate-[pack-shake_.5s_ease-in-out_1]" : ""}`}
               style={{ transformStyle: "preserve-3d" } as CSSProperties}
             >
               {/* Corps de l'emballage */}
@@ -329,13 +334,9 @@ export function BoosterStage({
               {/* Bande à déchirer */}
               <div
                 ref={stripRef}
-                onPointerDown={onStripDown}
-                onPointerMove={onStripMove}
-                onPointerUp={onStripUp}
-                onPointerCancel={onStripUp}
-                className={`absolute inset-x-0 -top-px h-11 touch-none select-none ${
-                  stage === "sealed" && canOpen ? "cursor-grab active:cursor-grabbing" : ""
-                } ${stage !== "sealed" ? "animate-[pack-strip-off_.6s_ease-in_forwards]" : ""}`}
+                className={`absolute inset-x-0 -top-px h-11 ${
+                  stage !== "sealed" ? "animate-[pack-strip-off_.6s_ease-in_forwards]" : ""
+                }`}
                 style={
                   stage === "sealed"
                     ? { transform: `translateY(${-progress * 10}px) rotate(${-progress * 5}deg)` }
@@ -445,7 +446,7 @@ export function BoosterStage({
             <div className="flex flex-col items-center gap-1.5">
               <p className="flex items-center gap-2 text-sm text-muted">
                 <ArrowRight size={16} aria-hidden className="animate-[hint-slide_1.6s_ease-in-out_infinite]" />
-                Fais glisser le long du bord pour déchirer l&apos;emballage
+                Attrape l&apos;emballage et tire vers la droite pour le déchirer
               </p>
               <button
                 type="button"
