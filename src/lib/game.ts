@@ -122,39 +122,54 @@ export const GRADE_AXES: { key: keyof Omit<Grade, "overall">; label: string }[] 
   { key: "surface", label: "Surface" },
 ];
 
-/** Une sous-note 1–10, biaisée vers le haut (le neuf et le dix restent rares) */
-function rollAxis(rand: () => number): number {
-  const table: [number, number][] = [
-    [10, 12],
-    [9, 22],
-    [8, 24],
-    [7, 16],
-    [6, 9],
-    [5, 6],
-    [4, 4],
-    [3, 3],
-    [2, 2],
-    [1, 2],
-  ];
+/**
+ * Distribution de la note GLOBALE (jouable) : le 10 est rare mais atteignable,
+ * la masse est autour de 8, pas de gros tas sur le 7. Moyenne ≈ 7,7.
+ */
+const OVERALL_TABLE: [number, number][] = [
+  [10, 5],
+  [9, 15],
+  [8, 27],
+  [7, 22],
+  [6, 13],
+  [5, 8],
+  [4, 5],
+  [3, 3],
+  [2, 1.5],
+  [1, 0.5],
+];
+
+function pick(rand: () => number, table: [number, number][]): number {
   const total = table.reduce((a, [, w]) => a + w, 0);
   let x = rand() * total;
   for (const [v, w] of table) {
     x -= w;
     if (x < 0) return v;
   }
-  return 8;
+  return table[0][0];
 }
 
-/** Potentiel de gradation d'une carte : 4 sous-notes + note globale (façon
- * PSA : la globale suit la plus basse, tolère un point faible isolé). */
+/**
+ * Potentiel de gradation : on tire d'abord la note globale (distribution
+ * maîtrisée), puis 4 sous-notes cohérentes — la plus basse vaut la globale
+ * (façon PSA, la note suit le maillon faible), les autres sont ≥, plutôt
+ * proches. Un 10 global implique 4 sous-notes à 10.
+ */
 export function rollGrade(rand: () => number): Grade {
-  const centering = rollAxis(rand);
-  const corners = rollAxis(rand);
-  const edges = rollAxis(rand);
-  const surface = rollAxis(rand);
-  const s = [centering, corners, edges, surface].sort((a, b) => a - b);
-  const overall = s[0] < s[1] - 1 ? s[1] - 1 : s[0];
-  return { centering, corners, edges, surface, overall };
+  const overall = pick(rand, OVERALL_TABLE);
+  const subs: number[] = [overall];
+  for (let i = 0; i < 3; i++) {
+    // Bonus au-dessus de la globale, décroissant (souvent 0–2)
+    const room = 10 - overall;
+    const bonus = room === 0 ? 0 : pick(rand, [[0, 40], [1, 34], [2, 18], [3, 8]].filter(([b]) => b <= room) as [number, number][]);
+    subs.push(Math.min(10, overall + bonus));
+  }
+  // Mélange pour ne pas fixer l'axe faible
+  for (let i = subs.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [subs[i], subs[j]] = [subs[j], subs[i]];
+  }
+  return { centering: subs[0], corners: subs[1], edges: subs[2], surface: subs[3], overall };
 }
 
 /** Libellé d'une note globale, façon maisons de gradation */

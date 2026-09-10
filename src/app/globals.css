@@ -966,3 +966,8 @@ input:disabled,
   60% { opacity: 1; }
   100% { transform: perspective(1000px) rotateY(0deg) scale(1); opacity: 1; }
 }
+@keyframes slab-pop {
+  0% { transform: perspective(900px) rotateY(-75deg) scale(.85); opacity: 0; }
+  60% { opacity: 1; }
+  100% { transform: perspective(900px) rotateY(0deg) scale(1); opacity: 1; }
+}

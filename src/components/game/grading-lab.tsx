@@ -9,8 +9,8 @@ import { FloatingBar } from "@/components/floating-bar";
 import { GameCardDetail, type GameCardView } from "@/components/game/card-detail";
 import { GradingReveal, type RevealItem } from "@/components/game/grading-reveal";
 import type { OwnedCard } from "@/components/game/game-cards-grid";
+import { Toast } from "@/components/toast";
 import { TIER_LABEL, TIERS, type Tier } from "@/lib/game";
-import { play } from "@/lib/sfx";
 
 const normalize = (s: string) =>
   s
@@ -31,8 +31,10 @@ export function GradingLab({ cards, gradedCount }: { cards: OwnedCard[]; gradedC
   const [tierFilter, setTierFilter] = useState<"all" | Tier>("all");
   const [phase, setPhase] = useState<"idle" | "scanning" | "results">("idle");
   const [count, setCount] = useState(0);
+  const [runId, setRunId] = useState(0);
   const [results, setResults] = useState<RevealItem[]>([]);
   const [detail, setDetail] = useState<OwnedCard | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const tiers = useMemo(() => {
@@ -70,11 +72,12 @@ export function GradingLab({ cards, gradedCount }: { cards: OwnedCard[]; gradedC
     setResults([]);
     setPhase("scanning");
     const started = Date.now();
-    const res = await gradeGameCards(ids);
+    const res = await gradeGameCards(ids).catch(() => ({ error: "Gradation impossible, réessaie." }));
     const wait = Math.max(0, SCAN_MS - (Date.now() - started));
     window.setTimeout(() => {
       if ("error" in res) {
         setPhase("idle");
+        setToast(res.error);
         return;
       }
       const sorted = [...res.graded]
@@ -82,9 +85,8 @@ export function GradingLab({ cards, gradedCount }: { cards: OwnedCard[]; gradedC
         .map((r) => ({ card: byId.get(r.id)!, grade: r.grade }))
         .filter((r) => r.card);
       setResults(sorted);
+      setRunId((v) => v + 1);
       setPhase("results");
-      const best = sorted[0]?.grade.overall ?? 0;
-      play(best >= 9 ? "ultra" : best >= 7 ? "rare" : "flip");
     }, wait);
   }
 
@@ -232,11 +234,13 @@ export function GradingLab({ cards, gradedCount }: { cards: OwnedCard[]; gradedC
         scanning={phase === "scanning"}
         count={count}
         results={results}
+        runId={runId}
         onClose={closeResults}
         onCard={(c) => setDetail(c)}
       />
 
       <GameCardDetail card={detailView} onClose={() => setDetail(null)} z="z-[90]" />
+      {toast && <Toast message={toast} tone="error" onDone={() => setToast(null)} />}
     </>
   );
 }
