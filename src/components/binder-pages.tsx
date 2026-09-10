@@ -1630,9 +1630,10 @@ export function BinderPages({
       return <p className="text-sm text-loss">Pokédex indisponible pour le moment.</p>;
     }
     const gen = fGen ? Number(fGen) : null;
-    const list = dex
-      .filter((p) => (gen == null || p.generation === gen) && matchPokemon(p, q))
-      .slice(0, PICKER_MAX);
+    // Une génération choisie s'affiche en entier ; sans filtre, on plafonne
+    const matches = dex.filter((p) => (gen == null || p.generation === gen) && matchPokemon(p, q));
+    const capped = gen == null && matches.length > PICKER_MAX;
+    const list = capped ? matches.slice(0, PICKER_MAX) : matches;
     if (list.length === 0) return <p className="text-sm text-muted">Aucun Pokémon ne correspond.</p>;
     return (
       <>
@@ -1683,9 +1684,10 @@ export function BinderPages({
             );
           })}
         </ul>
-        {list.length >= PICKER_MAX && (
+        {capped && (
           <p className="mt-3 text-xs text-faint">
-            Affine ta recherche ou choisis une génération pour voir les autres.
+            {matches.length - PICKER_MAX} autres Pokémon : choisis une génération ou affine ta
+            recherche.
           </p>
         )}
       </>
