@@ -21,6 +21,8 @@ export type PlayableSet = {
   /** Cartes avec visuel */
   total: number;
   releaseDate: string;
+  /** Base d'image d'une carte du set, pour illustrer l'emballage */
+  cover: string | null;
 };
 
 /** Fiche brute d'un set : les cartes y ont `image` seulement si l'asset existe */
@@ -57,8 +59,12 @@ export async function fetchPlayableSets(): Promise<PlayableSet[]> {
     for (const { b, raw } of raws) {
       if (!raw) continue;
       const cards = raw.cards ?? [];
-      const withImage = cards.filter((c) => c.image).length;
+      const imaged = cards.filter((c) => c.image);
+      const withImage = imaged.length;
       if (withImage < MIN_CARDS || withImage / Math.max(cards.length, 1) < MIN_RATIO) continue;
+      // Illustration de l'emballage : une carte des trois derniers quarts du
+      // set, là où vivent les rares
+      const cover = imaged[Math.floor(withImage * 0.72)]?.image ?? null;
       out.push({
         id: raw.id,
         name: raw.name,
@@ -66,6 +72,7 @@ export async function fetchPlayableSets(): Promise<PlayableSet[]> {
         logo: raw.logo ?? null,
         total: withImage,
         releaseDate: raw.releaseDate ?? "",
+        cover,
       });
     }
   }

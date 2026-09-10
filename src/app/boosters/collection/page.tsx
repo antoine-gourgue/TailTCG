@@ -3,10 +3,10 @@ import { redirect } from "next/navigation";
 import { ChevronLeft, Package } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { fetchSetsIndex, getSet } from "@/lib/tcgdex";
-import { TIER_LABEL, type Tier } from "@/lib/game";
+import { TIER_LABEL, tierOf, type Tier } from "@/lib/game";
 import { AppShell } from "@/components/app-shell";
-import { CardImage } from "@/components/card-image";
 import { GameNav } from "@/components/game/game-nav";
+import { CollectionSetGrid, type SetGridCard } from "@/components/game/collection-set-grid";
 
 export const metadata = {
   title: "Collection virtuelle — TailTCG",
@@ -42,6 +42,14 @@ export default async function GameCollectionPage({
     const list = set.cards ?? [];
     const owned = list.filter((c) => qty.has(c.id)).length;
     const pct = list.length > 0 ? Math.round((owned / list.length) * 100) : 0;
+    const gridCards: SetGridCard[] = list.map((c) => ({
+      id: c.id,
+      name: c.name,
+      localId: c.localId,
+      image: c.image ?? null,
+      tier: tierOf(c.rarity),
+      qty: qty.get(c.id) ?? 0,
+    }));
     return (
       <AppShell>
         <main className="mx-auto w-full max-w-6xl px-4 py-8">
@@ -66,21 +74,7 @@ export default async function GameCollectionPage({
           <div className="mb-6 h-2 overflow-hidden rounded-full bg-raised">
             <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
           </div>
-          <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-            {list.map((c) => {
-              const n = qty.get(c.id) ?? 0;
-              return (
-                <li key={c.id}>
-                  <div className={`card-tile aspect-[63/88] ${n === 0 ? "opacity-35 grayscale" : ""}`}>
-                    <CardImage base={c.image ?? null} alt={c.name} />
-                    {n > 1 && <span className="tile-badge num right-1.5 top-1.5">×{n}</span>}
-                  </div>
-                  <p className="mt-1.5 truncate text-xs font-medium">{c.name}</p>
-                  <p className="num text-[11px] text-faint">{c.localId}</p>
-                </li>
-              );
-            })}
-          </ul>
+          <CollectionSetGrid cards={gridCards} setName={set.name} />
         </main>
       </AppShell>
     );
