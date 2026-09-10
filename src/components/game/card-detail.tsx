@@ -232,13 +232,16 @@ function DetailBody({
         <ScanView card={card} />
         <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5">
           {GRADE_AXES.map((a, i) => (
-            <div key={a.key} className="animate-pulse" style={{ animationDelay: `${i * 200}ms` }}>
+            <div key={a.key}>
               <div className="mb-1 flex items-baseline justify-between">
                 <span className="text-xs text-muted">{a.label}</span>
                 <span className="num text-xs text-faint">···</span>
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-foreground/[0.08]">
-                <div className="h-full w-1/3 animate-[scan-beam_1s_ease-in-out_infinite] rounded-full bg-accent/60" />
+                <div
+                  className="h-full w-1/3 rounded-full bg-accent/70"
+                  style={{ animation: `bar-indet 1s linear ${i * 150}ms infinite` }}
+                />
               </div>
             </div>
           ))}
