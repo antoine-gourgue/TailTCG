@@ -262,6 +262,13 @@ export type Database = {
         Row: {
           card_name: string
           for_trade: boolean
+          grade_centering: number | null
+          grade_corners: number | null
+          grade_edges: number | null
+          grade_overall: number | null
+          grade_surface: number | null
+          graded: boolean
+          graded_at: string | null
           id: string
           image_url: string | null
           local_id: string
@@ -277,6 +284,13 @@ export type Database = {
         Insert: {
           card_name: string
           for_trade?: boolean
+          grade_centering?: number | null
+          grade_corners?: number | null
+          grade_edges?: number | null
+          grade_overall?: number | null
+          grade_surface?: number | null
+          graded?: boolean
+          graded_at?: string | null
           id?: string
           image_url?: string | null
           local_id: string
@@ -292,6 +306,13 @@ export type Database = {
         Update: {
           card_name?: string
           for_trade?: boolean
+          grade_centering?: number | null
+          grade_corners?: number | null
+          grade_edges?: number | null
+          grade_overall?: number | null
+          grade_surface?: number | null
+          graded?: boolean
+          graded_at?: string | null
           id?: string
           image_url?: string | null
           local_id?: string

@@ -943,3 +943,17 @@ input:disabled,
 @keyframes pack-away {
   to { transform: translateY(110%) scale(0.85); opacity: 0; }
 }
+@keyframes scan-beam {
+  0% { transform: translateY(-130%); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateY(130%); opacity: 0; }
+}
+@keyframes slab-in {
+  from { transform: perspective(900px) rotateX(22deg) scale(.72); opacity: 0; }
+  to { transform: perspective(900px) rotateX(0deg) scale(1); opacity: 1; }
+}
+@keyframes grade-tick {
+  from { transform: translateY(6px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}

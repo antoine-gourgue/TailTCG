@@ -601,7 +601,20 @@ export function BoosterStage({
       </div>
 
       <GameCardDetail
-        card={detail ? { ...detail, set_name: set.name } : null}
+        card={
+          detail
+            ? {
+                id: detail.id,
+                image: detail.image,
+                name: detail.name,
+                set_name: set.name,
+                local_id: detail.local_id,
+                tier: detail.tier,
+                isNew: detail.isNew,
+                gradable: true,
+              }
+            : null
+        }
         onClose={() => setDetail(null)}
         z="z-[80]"
       />

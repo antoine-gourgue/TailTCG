@@ -105,6 +105,78 @@ export function settleStock(p: Profile, now: number) {
   return { stock, refillAt, nextAt: refillAt + PERIOD_MS };
 }
 
+/* ————— Gradation (jeu) ————— */
+
+export type Grade = {
+  centering: number;
+  corners: number;
+  edges: number;
+  surface: number;
+  overall: number;
+};
+
+export const GRADE_AXES: { key: keyof Omit<Grade, "overall">; label: string }[] = [
+  { key: "centering", label: "Centrage" },
+  { key: "corners", label: "Coins" },
+  { key: "edges", label: "Bords" },
+  { key: "surface", label: "Surface" },
+];
+
+/** Une sous-note 1–10, biaisée vers le haut (le neuf et le dix restent rares) */
+function rollAxis(rand: () => number): number {
+  const table: [number, number][] = [
+    [10, 12],
+    [9, 22],
+    [8, 24],
+    [7, 16],
+    [6, 9],
+    [5, 6],
+    [4, 4],
+    [3, 3],
+    [2, 2],
+    [1, 2],
+  ];
+  const total = table.reduce((a, [, w]) => a + w, 0);
+  let x = rand() * total;
+  for (const [v, w] of table) {
+    x -= w;
+    if (x < 0) return v;
+  }
+  return 8;
+}
+
+/** Potentiel de gradation d'une carte : 4 sous-notes + note globale (façon
+ * PSA : la globale suit la plus basse, tolère un point faible isolé). */
+export function rollGrade(rand: () => number): Grade {
+  const centering = rollAxis(rand);
+  const corners = rollAxis(rand);
+  const edges = rollAxis(rand);
+  const surface = rollAxis(rand);
+  const s = [centering, corners, edges, surface].sort((a, b) => a - b);
+  const overall = s[0] < s[1] - 1 ? s[1] - 1 : s[0];
+  return { centering, corners, edges, surface, overall };
+}
+
+/** Libellé d'une note globale, façon maisons de gradation */
+export function gradeLabel(overall: number): string {
+  if (overall >= 10) return "Gem Mint";
+  if (overall === 9) return "Mint";
+  if (overall === 8) return "NM-Mint";
+  if (overall === 7) return "Near Mint";
+  if (overall === 6) return "Excellent+";
+  if (overall === 5) return "Excellent";
+  if (overall >= 3) return "Bon";
+  return "Correct";
+}
+
+/** Couleur d'un boîtier selon la note (or, argent, bronze, neutre) */
+export function gradeTone(overall: number): { ring: string; text: string; glow: string } {
+  if (overall >= 10) return { ring: "#f6c945", text: "#3a2a00", glow: "rgba(246,201,69,.6)" };
+  if (overall >= 9) return { ring: "#d7dbe3", text: "#1b1b1f", glow: "rgba(215,219,227,.5)" };
+  if (overall >= 7) return { ring: "#cd7f4b", text: "#2a1400", glow: "rgba(205,127,75,.45)" };
+  return { ring: "#8b8f9a", text: "#f2f1f4", glow: "rgba(139,143,154,.35)" };
+}
+
 /** « 7 h 12 », « 42 min », « moins d'une minute » */
 export function formatCountdown(ms: number): string {
   const m = Math.ceil(ms / 60_000);

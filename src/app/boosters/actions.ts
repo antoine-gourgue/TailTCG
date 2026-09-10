@@ -10,9 +10,11 @@ import {
   formatCountdown,
   MAX_STOCK,
   PACK_SIZE,
+  rollGrade,
   settleStock,
   tierOf,
   UNLIMITED_BOOSTERS,
+  type Grade,
   type Profile,
   type Tier,
 } from "@/lib/game";
@@ -81,18 +83,27 @@ export async function openBooster(setId: string): Promise<OpenResult> {
   const { data: inserted, error } = await admin
     .from("game_cards")
     .insert(
-      drawn.map((c) => ({
-        owner_id: user.id,
-        tcgdex_id: c.id,
-        set_id: set.id,
-        set_name: set.name,
-        card_name: c.name,
-        local_id: c.localId,
-        image_url: c.image ?? null,
-        rarity: c.rarity ?? null,
-        tier: c.tier,
-        source: "booster",
-      }))
+      drawn.map((c) => {
+        // Potentiel de gradation caché, figé au tirage
+        const g = rollGrade(Math.random);
+        return {
+          owner_id: user.id,
+          tcgdex_id: c.id,
+          set_id: set.id,
+          set_name: set.name,
+          card_name: c.name,
+          local_id: c.localId,
+          image_url: c.image ?? null,
+          rarity: c.rarity ?? null,
+          tier: c.tier,
+          source: "booster",
+          grade_centering: g.centering,
+          grade_corners: g.corners,
+          grade_edges: g.edges,
+          grade_surface: g.surface,
+          grade_overall: g.overall,
+        };
+      })
     )
     .select("id");
   if (error || !inserted) return { error: "Ouverture impossible, réessaie." };
@@ -129,5 +140,47 @@ export async function openBooster(setId: string): Promise<OpenResult> {
       tier: c.tier,
       isNew: !ownedIds.has(c.id) && drawn.findIndex((d) => d.id === c.id) === i,
     })),
+  };
+}
+
+/**
+ * Fait « grader » une carte du jeu : révèle son potentiel caché (déjà figé au
+ * tirage) et la marque comme gradée. Renvoie les notes.
+ */
+export async function gradeGameCard(
+  cardId: string
+): Promise<{ error: string } | { grade: Grade }> {
+  if (!cardId) return { error: "Carte invalide" };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Non connecté" };
+
+  const admin = createAdminClient();
+  const { data: card } = await admin
+    .from("game_cards")
+    .select("owner_id, graded, grade_centering, grade_corners, grade_edges, grade_surface, grade_overall")
+    .eq("id", cardId)
+    .maybeSingle();
+  if (!card || card.owner_id !== user.id) return { error: "Carte introuvable" };
+  if (card.grade_overall == null) return { error: "Cette carte ne peut pas être gradée." };
+
+  if (!card.graded) {
+    const { error } = await admin
+      .from("game_cards")
+      .update({ graded: true, graded_at: new Date().toISOString() })
+      .eq("id", cardId);
+    if (error) return { error: "Gradation impossible, réessaie." };
+  }
+  revalidatePath("/boosters/collection");
+  return {
+    grade: {
+      centering: card.grade_centering ?? 0,
+      corners: card.grade_corners ?? 0,
+      edges: card.grade_edges ?? 0,
+      surface: card.grade_surface ?? 0,
+      overall: card.grade_overall,
+    },
   };
 }
