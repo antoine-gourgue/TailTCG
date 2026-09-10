@@ -1,10 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, NotebookTabs, Search, ChevronLeft, Book } from "lucide-react";
-import { createBinder, createBinderFromSet } from "@/app/classeurs/actions";
+import { Plus, NotebookTabs, Search, ChevronLeft, Book, Sparkles } from "lucide-react";
+import {
+  createBinder,
+  createBinderFromPokedex,
+  createBinderFromSet,
+} from "@/app/classeurs/actions";
 import { CardImage } from "@/components/card-image";
 import { Sheet } from "@/components/sheet";
+import { GENERATIONS } from "@/lib/pokedex";
 
 export type BinderSet = {
   id: string;
@@ -14,19 +19,22 @@ export type BinderSet = {
 };
 
 /**
- * Assistant de création d'un classeur : étape 1 = vide (nom) ou à partir d'un
- * set ; puis le classeur est créé et on arrive dans l'éditeur pour choisir le
- * design (couverture, pages, anneaux).
+ * Assistant de création d'un classeur : étape 1 = vide (nom), à partir d'un
+ * set, ou une génération du Pokédex ; puis le classeur est créé et on arrive
+ * dans l'éditeur pour choisir le design (couverture, pages, anneaux).
  */
 export function NewBinderButton({
   label = "Nouveau classeur",
   sets = [],
+  generations = [],
 }: {
   label?: string;
   sets?: BinderSet[];
+  /** Nombre de Pokémon par génération (Pokédex en base) */
+  generations?: { gen: number; count: number }[];
 }) {
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<"choose" | "empty" | "set">("choose");
+  const [step, setStep] = useState<"choose" | "empty" | "set" | "pokedex">("choose");
   const [name, setName] = useState("");
   const [q, setQ] = useState("");
   const [pending, start] = useTransition();
@@ -56,6 +64,13 @@ export function NewBinderButton({
       await createBinderFromSet(set.id, "fr"); // redirige vers l'éditeur
     });
   }
+  function createFromPokedex(gen: number) {
+    if (pending) return;
+    start(async () => {
+      await createBinderFromPokedex(gen); // redirige vers l'éditeur
+    });
+  }
+  const genCount = new Map(generations.map((g) => [g.gen, g.count]));
 
   const needle = q
     .trim()
@@ -78,6 +93,10 @@ export function NewBinderButton({
     choose: ["Nouveau classeur", "Ensuite, tu choisiras son design dans l'éditeur."],
     empty: ["Classeur vide", "Toutes tes Pikachu, tes primes, tes gradées…"],
     set: ["À partir d'un set", "Choisis une extension — le classeur reprendra toutes ses cartes."],
+    pokedex: [
+      "À partir du Pokédex",
+      "Une génération complète en cartes Pokédex — rangées dans le classeur, pas dans ta collection.",
+    ],
   } as const;
   const [title, description] = titles[step];
 
@@ -139,7 +158,48 @@ export function NewBinderButton({
                 </span>
               </span>
             </button>
+            {generations.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setStep("pokedex")}
+                className="flex items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-raised active:bg-raised"
+              >
+                <Sparkles size={20} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
+                <span className="min-w-0">
+                  <span className="block text-[15px] font-medium">Une génération du Pokédex</span>
+                  <span className="block text-xs text-muted">
+                    Tous les Pokémon d&apos;une région, en cartes dessinées
+                  </span>
+                </span>
+              </button>
+            )}
           </div>
+        )}
+
+        {step === "pokedex" && (
+          <>
+            <div className="flex flex-col gap-1">
+              {GENERATIONS.filter((g) => (genCount.get(g.gen) ?? 0) > 0).map((g) => (
+                <button
+                  key={g.gen}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => createFromPokedex(g.gen)}
+                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-raised active:bg-raised disabled:opacity-50"
+                >
+                  <span className="num flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-raised text-xs font-semibold text-muted">
+                    {g.gen}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-medium">{g.region}</span>
+                    <span className="block truncate text-xs text-muted">Génération {g.gen}</span>
+                  </span>
+                  <span className="num shrink-0 text-xs text-muted">{genCount.get(g.gen)} Pokémon</span>
+                </button>
+              ))}
+            </div>
+            {pending && <p className="mt-3 text-sm text-muted">Création du classeur…</p>}
+          </>
         )}
 
         {step === "empty" && (

@@ -6,6 +6,7 @@ import { binderColorHex } from "@/lib/binder-colors";
 import { binderDesign } from "@/lib/binder-design";
 import { coverRenderFor } from "@/lib/binder-cover-server";
 import { fetchSetsIndex } from "@/lib/tcgdex";
+import { placeholderPockets } from "@/lib/pokedex-server";
 import { BinderPages, type PocketItem } from "@/components/binder-pages";
 import { CleanViewProvider, CleanViewToggle } from "@/components/binder-clean-view";
 import { AdminBinderRename } from "@/components/admin/admin-binder-rename";
@@ -92,18 +93,7 @@ export default async function AdminBinderDetail({
       position: positionByItem.get(i.id) ?? null,
       created_at: i.created_at,
     })),
-    ...(placeholders ?? []).map((w) => ({
-      id: `w:${w.id}`,
-      kind: "wanted" as const,
-      card_name: w.card_name,
-      set_name: w.set_name,
-      local_id: w.local_id,
-      tcgdex_id: w.tcgdex_id,
-      image_url: w.image_url ?? "",
-      quantity: 1,
-      position: w.position,
-      created_at: w.created_at ?? "",
-    })),
+    ...(await placeholderPockets(db, placeholders ?? [])),
   ];
 
   // Couverture (cartes choisies, sinon premières possédées) + rendu sur mesure

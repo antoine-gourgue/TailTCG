@@ -13,10 +13,12 @@ export function SearchClient({
   series,
   lang,
   customCount = 0,
+  pokedexCount = 0,
 }: {
   series: SerieWithSets[];
   lang: CatalogLang;
   customCount?: number;
+  pokedexCount?: number;
 }) {
   const [query, setQuery] = useState("");
   const [cards, setCards] = useState<CardSearchResult[]>([]);
@@ -92,6 +94,7 @@ export function SearchClient({
           series={series}
           lang={lang}
           customCount={customCount}
+          pokedexCount={pokedexCount}
         />
       )}
 

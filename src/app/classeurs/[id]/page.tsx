@@ -9,6 +9,7 @@ import { binderDesign } from "@/lib/binder-design";
 import { pageGrid, pocketsPerPage } from "@/lib/binder-pages";
 import { fetchSetsIndex } from "@/lib/tcgdex";
 import { coverRenderFor } from "@/lib/binder-cover-server";
+import { placeholderPockets } from "@/lib/pokedex-server";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmAction } from "@/components/confirm-action";
 import { RenameBinderButton } from "@/components/rename-binder-button";
@@ -136,7 +137,8 @@ export default async function ClasseurPage({
     position: positionByItem.get(i.id) ?? null,
   }));
   const signedItems = signedAll.filter((i) => memberSet.has(i.id));
-  // Pochettes : exemplaires possédés et cartes hors collection
+  // Pochettes : exemplaires possédés, cartes hors collection et Pokémon
+  const wantedPockets = await placeholderPockets(supabase, wanted ?? []);
   const pocketItems: PocketItem[] = [
     ...signedItems.map((i) => ({
       id: `i:${i.id}`,
@@ -151,18 +153,7 @@ export default async function ClasseurPage({
       position: i.position,
       created_at: i.created_at,
     })),
-    ...(wanted ?? []).map((w) => ({
-      id: `w:${w.id}`,
-      kind: "wanted" as const,
-      card_name: w.card_name,
-      set_name: w.set_name,
-      local_id: w.local_id,
-      tcgdex_id: w.tcgdex_id,
-      image_url: w.image_url ?? "",
-      quantity: 1,
-      position: w.position,
-      created_at: w.created_at ?? "",
-    })),
+    ...wantedPockets,
   ];
   // Total officiel de cartes par set présent dans le classeur (« 12 / 102 »)
   const setCounts: Record<string, number> = {};

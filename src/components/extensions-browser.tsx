@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Layers } from "lucide-react";
 import type { SerieWithSets, CatalogLang } from "@/lib/tcgdex";
+import { artworkUrl } from "@/lib/pokedex";
 import { Logo } from "@/components/logo";
 
 function SetLogo({
@@ -54,10 +55,12 @@ export function ExtensionsBrowser({
   series,
   lang,
   customCount = 0,
+  pokedexCount = 0,
 }: {
   series: SerieWithSets[];
   lang: CatalogLang;
   customCount?: number;
+  pokedexCount?: number;
 }) {
   const [q, setQ] = useState("");
 
@@ -132,33 +135,61 @@ export function ExtensionsBrowser({
         </p>
       ) : (
         <div className="flex flex-col gap-10">
-          {customCount > 0 && !q.trim() && (
+          {!q.trim() && (
             <section>
               <div className="mb-4 flex items-baseline gap-3">
                 <h2 className="display text-xl font-semibold">Mon catalogue</h2>
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {/* Pokédex : des cartes à ranger dans les classeurs, hors collection */}
                 <Link
-                  href="/extensions/perso"
+                  href="/extensions/pokedex"
                   className="panel group flex flex-col gap-3 p-4 transition hover:border-accent hover:shadow-lg"
                 >
                   <div className="flex h-14 items-center justify-center">
-                    <Logo variant="mark" size={44} interactive={false} />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={artworkUrl(25)}
+                      alt=""
+                      loading="lazy"
+                      className="h-14 w-14 object-contain drop-shadow-[0_6px_8px_rgba(0,0,0,.5)] transition group-hover:scale-110"
+                    />
                   </div>
                   <div className="mt-auto">
                     <p className="truncate text-sm font-medium leading-tight group-hover:text-accent-strong">
-                      Cartes hors catalogue
+                      Pokédex
                     </p>
                     <p className="mt-1 flex items-center gap-2 text-xs text-muted">
-                      <span className="num rounded bg-raised px-1.5 py-0.5 uppercase">
-                        perso
-                      </span>
+                      <span className="num rounded bg-raised px-1.5 py-0.5 uppercase">dex</span>
                       <span className="num">
-                        {customCount} carte{customCount > 1 ? "s" : ""}
+                        {pokedexCount > 0 ? `${pokedexCount} Pokémon` : "Cartes pour classeurs"}
                       </span>
                     </p>
                   </div>
                 </Link>
+                {customCount > 0 && (
+                  <Link
+                    href="/extensions/perso"
+                    className="panel group flex flex-col gap-3 p-4 transition hover:border-accent hover:shadow-lg"
+                  >
+                    <div className="flex h-14 items-center justify-center">
+                      <Logo variant="mark" size={44} interactive={false} />
+                    </div>
+                    <div className="mt-auto">
+                      <p className="truncate text-sm font-medium leading-tight group-hover:text-accent-strong">
+                        Cartes hors catalogue
+                      </p>
+                      <p className="mt-1 flex items-center gap-2 text-xs text-muted">
+                        <span className="num rounded bg-raised px-1.5 py-0.5 uppercase">
+                          perso
+                        </span>
+                        <span className="num">
+                          {customCount} carte{customCount > 1 ? "s" : ""}
+                        </span>
+                      </p>
+                    </div>
+                  </Link>
+                )}
               </div>
             </section>
           )}

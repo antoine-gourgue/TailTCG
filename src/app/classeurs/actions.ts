@@ -4,6 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/database.types";
+import {
+  dexNumber,
+  generationLabel,
+  GENERATIONS,
+  POKEDEX_PREFIX,
+  POKEDEX_SET_NAME,
+} from "@/lib/pokedex";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -531,4 +538,130 @@ export async function removeFromPocket(binderId: string, key: string) {
   revalidatePath(`/classeurs/${binderId}`);
   if (ref.kind === "i") revalidatePath(`/carte/${ref.id}`);
   return { error: error?.message ?? null };
+}
+
+// ---- Pokédex --------------------------------------------------------------
+// Un Pokémon rangé dans un classeur est une carte hors collection
+// (binder_placeholders) avec tcgdex_id `pokedex:<n>` : il occupe une
+// pochette, n'entre jamais dans la collection ni dans les totaux.
+
+const pokemonRow = (binderId: string, id: number, name: string, position: number) => ({
+  binder_id: binderId,
+  tcgdex_id: `${POKEDEX_PREFIX}${id}`,
+  card_name: name,
+  set_name: POKEDEX_SET_NAME,
+  local_id: dexNumber(id),
+  image_url: null,
+  position,
+});
+
+const validDex = (n: unknown): n is number => Number.isInteger(n) && (n as number) > 0 && (n as number) < 10_000;
+
+/** Pages : range un Pokémon du Pokédex dans une pochette libre */
+export async function placePokemonInPocket(
+  binderId: string,
+  id: string,
+  pokemonId: number,
+  pocket: number
+) {
+  if (!UUID_RE.test(binderId) || !UUID_RE.test(id) || !validDex(pokemonId)) {
+    return { error: "Classeur ou Pokémon invalide" };
+  }
+  if (!Number.isInteger(pocket) || pocket < 0) return { error: "Pochette invalide" };
+
+  const db = await createClient();
+  const { data: p } = await db.from("pokedex").select("id, name_fr").eq("id", pokemonId).maybeSingle();
+  if (!p) return { error: "Pokémon inconnu" };
+  if (await occupantOf(db, binderId, pocket)) return { error: "Pochette occupée" };
+  const { error } = await db
+    .from("binder_placeholders")
+    .insert({ id, ...pokemonRow(binderId, p.id, p.name_fr, pocket) });
+
+  revalidatePath("/classeurs");
+  revalidatePath(`/classeurs/${binderId}`);
+  return { error: error?.message ?? null };
+}
+
+/** Page Pokédex : ajoute des Pokémon à la suite d'un classeur (ceux déjà rangés sont ignorés) */
+export async function addPokemonToBinder(binderId: string, pokemonIds: number[]) {
+  const ids = [...new Set(pokemonIds.filter(validDex))];
+  if (!UUID_RE.test(binderId) || ids.length === 0) return { error: "Classeur ou Pokémon invalide", added: 0 };
+
+  const db = await createClient();
+  const [{ data: binder }, { data: links }, { data: wanted }, { data: dex }] = await Promise.all([
+    db.from("binders").select("id, name").eq("id", binderId).maybeSingle(),
+    db.from("binder_items").select("position").eq("binder_id", binderId),
+    db.from("binder_placeholders").select("tcgdex_id, position").eq("binder_id", binderId),
+    db.from("pokedex").select("id, name_fr").in("id", ids).order("id"),
+  ]);
+  if (!binder) return { error: "Classeur introuvable", added: 0 };
+
+  const present = new Set((wanted ?? []).map((w) => w.tcgdex_id));
+  let pocket =
+    Math.max(
+      -1,
+      ...(links ?? []).map((l) => l.position ?? -1),
+      ...(wanted ?? []).map((w) => w.position)
+    ) + 1;
+  const fresh = (dex ?? []).filter((p) => !present.has(`${POKEDEX_PREFIX}${p.id}`));
+  if (fresh.length === 0) return { error: null, added: 0, binderName: binder.name };
+
+  const { error } = await db
+    .from("binder_placeholders")
+    .insert(fresh.map((p) => pokemonRow(binderId, p.id, p.name_fr, pocket++)));
+
+  revalidatePath("/classeurs");
+  revalidatePath(`/classeurs/${binderId}`);
+  revalidatePath("/extensions/pokedex");
+  return { error: error?.message ?? null, added: error ? 0 : fresh.length, binderName: binder.name };
+}
+
+/**
+ * Crée un classeur avec toute une génération du Pokédex, dans l'ordre
+ * national, puis ouvre l'éditeur (comme pour un set).
+ */
+export async function createBinderFromPokedex(generation: number) {
+  const gen = GENERATIONS.find((g) => g.gen === generation);
+  if (!gen) return { error: "Génération inconnue" };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Non connecté" };
+
+  const { data: dex } = await supabase
+    .from("pokedex")
+    .select("id, name_fr")
+    .eq("generation", gen.gen)
+    .order("id");
+  if (!dex || dex.length === 0) return { error: "Pokédex indisponible" };
+
+  const cover: Json = {
+    bg: { kind: "color", color: "#1f1f23", image: null, card: null, dim: 35 },
+    zones: {
+      mc: { type: "text", text: gen.region, size: "lg", weight: "bold", color: "#ffffff" },
+      bl: {
+        type: "text",
+        text: `Pokédex · Gén. ${gen.gen}`,
+        size: "sm",
+        weight: "bold",
+        color: "#ffffff",
+        font: "mono",
+      },
+    },
+  };
+  const { data: binder, error: bErr } = await supabase
+    .from("binders")
+    .insert({ name: generationLabel(gen.gen), page_grid: "3x3", style: "custom", color: null, cover })
+    .select("id")
+    .single();
+  if (bErr || !binder) return { error: bErr?.message ?? "Création impossible" };
+
+  const { error } = await supabase
+    .from("binder_placeholders")
+    .insert(dex.map((p, i) => pokemonRow(binder.id, p.id, p.name_fr, i)));
+  if (error) return { error: error.message };
+
+  revalidatePath("/classeurs");
+  redirect(`/classeurs/${binder.id}/editeur`);
 }

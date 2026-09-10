@@ -24,11 +24,12 @@ export default async function RecherchePage({
   const { lang: langParam } = await searchParams;
   const lang: CatalogLang = langParam === "ja" ? "ja" : "fr";
 
-  const [series, { count: customCount }] = await Promise.all([
+  const [series, { count: customCount }, { count: pokedexCount }] = await Promise.all([
     fetchSeriesWithSets(lang),
     supabase
       .from("custom_cards")
       .select("id", { count: "exact", head: true }),
+    supabase.from("pokedex").select("id", { count: "exact", head: true }),
   ]);
 
   return (
@@ -53,6 +54,7 @@ export default async function RecherchePage({
           series={series}
           lang={lang}
           customCount={customCount ?? 0}
+          pokedexCount={pokedexCount ?? 0}
         />
       </main>
     </AppShell>

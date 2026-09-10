@@ -6,6 +6,7 @@ import { binderColorHex } from "@/lib/binder-colors";
 import { binderDesign } from "@/lib/binder-design";
 import { fetchSetsIndex } from "@/lib/tcgdex";
 import { coverRenderFor } from "@/lib/binder-cover-server";
+import { placeholderPockets } from "@/lib/pokedex-server";
 import { Logo } from "@/components/logo";
 import { BinderPages, type PocketItem } from "@/components/binder-pages";
 import { ViewToggle } from "@/components/view-toggle";
@@ -151,7 +152,7 @@ export default async function SharedBinderPage({
     settings.owner_id,
     (itemId) => signedItems.find((i) => i.id === itemId)?.image_url || null
   );
-  // Pochettes : exemplaires et cartes hors collection (visibles en vitrine)
+  // Pochettes : exemplaires, cartes hors collection et Pokémon (visibles en vitrine)
   const pocketItems: PocketItem[] = [
     ...signedItems.map((i) => ({
       id: `i:${i.id}`,
@@ -162,18 +163,7 @@ export default async function SharedBinderPage({
       position: i.position,
       created_at: i.created_at,
     })),
-    ...(wanted ?? []).map((w) => ({
-      id: `w:${w.id}`,
-      kind: "wanted" as const,
-      card_name: w.card_name,
-      set_name: w.set_name,
-      local_id: w.local_id,
-      tcgdex_id: w.tcgdex_id,
-      image_url: w.image_url ?? "",
-      quantity: 1,
-      position: w.position,
-      created_at: w.created_at ?? "",
-    })),
+    ...(await placeholderPockets(admin, wanted ?? [])),
   ];
 
   // Total officiel de cartes par set (« 12 / 102 » dans le détail)

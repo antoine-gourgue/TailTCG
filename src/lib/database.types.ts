@@ -497,6 +497,33 @@ export type Database = {
           },
         ]
       }
+      pokedex: {
+        Row: {
+          generation: number
+          id: number
+          name_en: string | null
+          name_fr: string
+          types: string[]
+          updated_at: string | null
+        }
+        Insert: {
+          generation: number
+          id: number
+          name_en?: string | null
+          name_fr: string
+          types?: string[]
+          updated_at?: string | null
+        }
+        Update: {
+          generation?: number
+          id?: number
+          name_en?: string | null
+          name_fr?: string
+          types?: string[]
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       price_snapshots: {
         Row: {
           avg30: number | null

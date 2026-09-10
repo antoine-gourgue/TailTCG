@@ -8,6 +8,7 @@ import { BindersGrid } from "@/components/binders-grid";
 import { binderDesign } from "@/lib/binder-design";
 import { coverRenderFor } from "@/lib/binder-cover-server";
 import { fetchSeriesWithSets } from "@/lib/tcgdex";
+import { loadPokedex } from "@/lib/pokedex-server";
 import { NewBinderButton } from "@/components/new-binder-button";
 
 export const metadata = {
@@ -51,11 +52,20 @@ export default async function ClasseursPage() {
     placeholderCount.set(p.binder_id, (placeholderCount.get(p.binder_id) ?? 0) + 1);
   }
 
-  // Sets pour l'assistant « à partir d'un set » (TCGdex, caché 24 h)
-  const series = await fetchSeriesWithSets("fr").catch(() => []);
+  // Sets pour l'assistant « à partir d'un set » (TCGdex, caché 24 h) et
+  // générations du Pokédex (« une génération du Pokédex »)
+  const [series, dex] = await Promise.all([
+    fetchSeriesWithSets("fr").catch(() => []),
+    loadPokedex(supabase),
+  ]);
   const sets = series.flatMap((s) =>
     s.sets.map((x) => ({ id: x.id, name: x.name, serie: s.name, logo: x.logo ?? null }))
   );
+  const genCounts = new Map<number, number>();
+  for (const r of dex) genCounts.set(r.generation, (genCounts.get(r.generation) ?? 0) + 1);
+  const generations = [...genCounts.entries()]
+    .map(([gen, count]) => ({ gen, count }))
+    .sort((a, b) => a.gen - b.gen);
 
   const signedItems = await signStorageImages(
     (items ?? []) as { id: string; image_url: string; quantity: number; current_price: number | null }[],
@@ -111,7 +121,7 @@ export default async function ClasseursPage() {
       <main className="mx-auto w-full max-w-6xl px-4 py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="display text-3xl font-bold tracking-tight">Classeurs</h1>
-          <NewBinderButton sets={sets} />
+          <NewBinderButton sets={sets} generations={generations} />
         </div>
 
         {enriched.length === 0 ? (

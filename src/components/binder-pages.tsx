@@ -21,10 +21,22 @@ import { Toast } from "@/components/toast";
 import {
   movePocket,
   placeItemInPocket,
+  placePokemonInPocket,
   placeWantedInPocket,
   removeFromPocket,
   setBinderPageCount,
 } from "@/app/classeurs/actions";
+import { PokemonCard } from "@/components/pokemon-card";
+import {
+  artworkUrl,
+  dexNumber,
+  GENERATIONS,
+  matchPokemon,
+  POKEDEX_PREFIX,
+  POKEDEX_SET_NAME,
+  TYPE_FR,
+  type PokedexEntry,
+} from "@/lib/pokedex";
 import { layoutPockets, pageGrid, pocketsPerPage } from "@/lib/binder-pages";
 import {
   SHEETS,
@@ -44,10 +56,13 @@ import type { CardSearchResult } from "@/lib/tcgdex";
 // pochette vide ouvre un tiroir pour y ranger une carte de la collection, ou
 // une carte du catalogue qu'on ne possède pas.
 
-/** Une carte rangée : exemplaire possédé (`i:<item>`) ou hors collection (`w:<id>`) */
+/**
+ * Une carte rangée : exemplaire possédé (`i:<item>`), carte hors collection
+ * (`w:<id>`) ou Pokémon du Pokédex (`w:<id>`, tcgdex_id `pokedex:<n>`)
+ */
 export type PocketItem = {
   id: string;
-  kind: "owned" | "wanted";
+  kind: "owned" | "wanted" | "pokemon";
   card_name: string;
   set_name?: string;
   local_id?: string;
@@ -57,6 +72,8 @@ export type PocketItem = {
   quantity: number;
   position: number | null;
   created_at: string;
+  /** Pokémon du Pokédex : numéro et types, pour dessiner sa carte */
+  pokemon?: { id: number; types: string[] };
 };
 
 /** Carte de la collection proposée pour remplir une pochette vide */
@@ -316,11 +333,14 @@ export function BinderPages({
   const [picker, setPicker] = useState<number | null>(null);
   /** Carte dont on affiche le détail (clic sur une carte du classeur) */
   const [detail, setDetail] = useState<PocketItem | null>(null);
-  const [mode, setMode] = useState<"collection" | "catalogue">("collection");
+  const [mode, setMode] = useState<"collection" | "catalogue" | "pokedex">("collection");
   const [q, setQ] = useState("");
   const [fSet, setFSet] = useState("");
+  const [fGen, setFGen] = useState("");
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(false);
+  /** Pokédex complet, chargé à la première ouverture de l'onglet */
+  const [dex, setDex] = useState<PokedexEntry[] | null>(null);
   const [toast, setToast] = useState<{
     message: string;
     tone?: "success" | "error";
@@ -516,6 +536,23 @@ export function BinderPages({
     };
   }, [pickerOpen, mode, q]);
 
+  // Pokédex : une seule requête, gardée pour la session
+  useEffect(() => {
+    if (!pickerOpen || mode !== "pokedex" || dex != null) return;
+    let on = true;
+    fetch("/api/pokedex")
+      .then((r) => (r.ok ? r.json() : { list: [] }))
+      .then((d: { list?: PokedexEntry[] }) => {
+        if (on) setDex(d.list ?? []);
+      })
+      .catch(() => {
+        if (on) setDex([]);
+      });
+    return () => {
+      on = false;
+    };
+  }, [pickerOpen, mode, dex]);
+
   function patchOv(
     entries: [string, number][],
     extra?: PocketItem,
@@ -686,6 +723,48 @@ export function BinderPages({
     router.refresh();
   }
 
+  /** Range un Pokémon du Pokédex (hors collection, carte dessinée) */
+  async function placePokemon(p: PokedexEntry, pocket: number) {
+    setToast({ message: `${p.name} · ${pocketLabel(pocket)}` });
+    const occupant = byPocket.get(pocket);
+    advancePicker(pocket);
+    const id = crypto.randomUUID();
+    const key = `w:${id}`;
+    const before = ov;
+    patchOv(
+      [[key, pocket]],
+      {
+        id: key,
+        kind: "pokemon",
+        card_name: p.name,
+        set_name: POKEDEX_SET_NAME,
+        local_id: dexNumber(p.id),
+        tcgdex_id: `${POKEDEX_PREFIX}${p.id}`,
+        image_url: artworkUrl(p.id),
+        quantity: 1,
+        position: pocket,
+        created_at: "",
+        pokemon: { id: p.id, types: p.types },
+      },
+      occupant ? occupant.id : undefined
+    );
+    if (occupant) {
+      const r = await removeFromPocket(binderId, occupant.id);
+      if (r.error) {
+        setOv(before);
+        setToast({ message: "Remplacement impossible", tone: "error" });
+        return;
+      }
+    }
+    const { error } = await placePokemonInPocket(binderId, id, p.id, pocket);
+    if (error) {
+      setOv(before);
+      setToast({ message: "Pokémon non rangé", tone: "error" });
+      return;
+    }
+    router.refresh();
+  }
+
   /** Ajoute ou retire une feuille (deux pages) — la dernière, si elle est vide */
   async function changePageCount(next: number) {
     const before = pageMin;
@@ -713,9 +792,11 @@ export function BinderPages({
     }
     setToast({
       message:
-        item?.kind === "wanted"
-          ? "Carte hors collection retirée du classeur"
-          : "Retirée du classeur — elle reste dans ta collection",
+        item?.kind === "pokemon"
+          ? "Pokémon retiré du classeur"
+          : item?.kind === "wanted"
+            ? "Carte hors collection retirée du classeur"
+            : "Retirée du classeur — elle reste dans ta collection",
     });
     router.refresh();
   }
@@ -973,8 +1054,12 @@ export function BinderPages({
   const ownedByTcgdex = new Map<string, CandidateItem>();
   for (const c of candidates) if (!ownedByTcgdex.has(c.tcgdex_id)) ownedByTcgdex.set(c.tcgdex_id, c);
   const wantedByTcgdex = new Map<string, PocketItem>();
+  /** Pokémon déjà rangés, par numéro national */
+  const pokemonPlaced = new Map<number, PocketItem>();
   for (const it of itemById.values()) {
-    if (it.kind === "wanted" && it.tcgdex_id && pockets.has(it.id)) wantedByTcgdex.set(it.tcgdex_id, it);
+    if (!pockets.has(it.id)) continue;
+    if (it.kind === "wanted" && it.tcgdex_id) wantedByTcgdex.set(it.tcgdex_id, it);
+    if (it.kind === "pokemon" && it.pokemon) pokemonPlaced.set(it.pokemon.id, it);
   }
   const catalogFresh = catalog != null && catalog.q === q.trim();
 
@@ -1111,11 +1196,17 @@ export function BinderPages({
                     : ""
                 }`}
               >
-                <CardImage
-                  base={item.image_url || null}
-                  alt={item.card_name}
-                  fallback={item.photo_fallback ?? null}
-                />
+                {item.kind === "pokemon" && item.pokemon ? (
+                  <PokemonCard
+                    p={{ id: item.pokemon.id, name: item.card_name, types: item.pokemon.types }}
+                  />
+                ) : (
+                  <CardImage
+                    base={item.image_url || null}
+                    alt={item.card_name}
+                    fallback={item.photo_fallback ?? null}
+                  />
+                )}
                 {item.quantity > 1 && (
                   <span className="tile-badge num right-1 top-1">×{item.quantity}</span>
                 )}
@@ -1166,7 +1257,9 @@ export function BinderPages({
                     title={
                       item.kind === "owned"
                         ? "Retirer de ce classeur (la carte reste dans ta collection)"
-                        : "Retirer cette carte hors collection du classeur"
+                        : item.kind === "pokemon"
+                          ? "Retirer ce Pokémon du classeur"
+                          : "Retirer cette carte hors collection du classeur"
                     }
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
@@ -1531,6 +1624,74 @@ export function BinderPages({
     );
   }
 
+  function renderPokedexResults(pocket: number) {
+    if (dex == null) return <p className="text-sm text-muted">Chargement du Pokédex…</p>;
+    if (dex.length === 0) {
+      return <p className="text-sm text-loss">Pokédex indisponible pour le moment.</p>;
+    }
+    const gen = fGen ? Number(fGen) : null;
+    const list = dex
+      .filter((p) => (gen == null || p.generation === gen) && matchPokemon(p, q))
+      .slice(0, PICKER_MAX);
+    if (list.length === 0) return <p className="text-sm text-muted">Aucun Pokémon ne correspond.</p>;
+    return (
+      <>
+        <ul className="grid grid-cols-3 gap-3 xl:grid-cols-4">
+          {list.map((p) => {
+            const placed = pokemonPlaced.get(p.id);
+            const at = placed ? pockets.get(placed.id) : undefined;
+            return (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    placed ? void commitMove(placed.id, pocket) : void placePokemon(p, pocket)
+                  }
+                  className="group/c block w-full text-left"
+                  title={
+                    placed
+                      ? `Déjà page ${Math.floor((at ?? 0) / perPage) + 1} — déplacer ici`
+                      : "Ranger ici (hors collection)"
+                  }
+                >
+                  <div className="card-tile aspect-[63/88]">
+                    <PokemonCard p={p} />
+                    {placed && (
+                      <>
+                        <span
+                          aria-hidden
+                          className="absolute inset-0 z-10 flex items-center justify-center bg-black/45 transition group-hover/c:bg-black/20"
+                        >
+                          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white shadow-lg ring-2 ring-white/80 backdrop-blur-sm">
+                            <Check size={18} strokeWidth={3} aria-hidden />
+                          </span>
+                        </span>
+                        <span className="tile-badge num bottom-1.5 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap !bg-black/75 !text-white">
+                          Page {Math.floor((at ?? 0) / perPage) + 1} · Pochette {((at ?? 0) % perPage) + 1}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <p className="mt-1.5 truncate text-xs font-medium transition group-hover/c:text-accent-strong">
+                    {p.name}
+                  </p>
+                  <p className="truncate text-[11px] text-faint">
+                    N° <span className="num">{dexNumber(p.id)}</span>
+                  </p>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        {list.length >= PICKER_MAX && (
+          <p className="mt-3 text-xs text-faint">
+            Affine ta recherche ou choisis une génération pour voir les autres.
+          </p>
+        )}
+      </>
+    );
+  }
+
   function renderDetail() {
     const item = detail;
     // Numéro classique « 12 / 102 » : total officiel du set si connu
@@ -1549,12 +1710,19 @@ export function BinderPages({
           <div>
             <div className="mx-auto w-full max-w-[300px]">
               <div className="card-tile aspect-[63/88]">
-                <CardImage
-                  base={item.image_url || null}
-                  alt={item.card_name}
-                  quality="high"
-                  fallback={item.photo_fallback ?? null}
-                />
+                {item.kind === "pokemon" && item.pokemon ? (
+                  <PokemonCard
+                    p={{ id: item.pokemon.id, name: item.card_name, types: item.pokemon.types }}
+                    priority
+                  />
+                ) : (
+                  <CardImage
+                    base={item.image_url || null}
+                    alt={item.card_name}
+                    quality="high"
+                    fallback={item.photo_fallback ?? null}
+                  />
+                )}
               </div>
             </div>
             <div className="mt-4">
@@ -1566,8 +1734,15 @@ export function BinderPages({
                 {item.local_id && (
                   <span className="num text-faint">
                     {" "}
-                    · {item.local_id}
+                    · {item.kind === "pokemon" ? "N° " : ""}
+                    {item.local_id}
                     {setTotal ? ` / ${setTotal}` : ""}
+                  </span>
+                )}
+                {item.kind === "pokemon" && item.pokemon && item.pokemon.types.length > 0 && (
+                  <span className="text-faint">
+                    {" "}
+                    · {item.pokemon.types.map((t) => TYPE_FR[t] ?? t).join(" / ")}
                   </span>
                 )}
               </p>
@@ -1652,6 +1827,7 @@ export function BinderPages({
             <div className="inline-flex self-start rounded-lg border border-edge bg-surface p-0.5">
               {modeBtn("collection", "Ma collection")}
               {modeBtn("catalogue", "Catalogue TCGdex")}
+              {modeBtn("pokedex", "Pokédex")}
             </div>
             <div className="flex gap-2">
               <div className="relative flex-1">
@@ -1666,11 +1842,30 @@ export function BinderPages({
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder={
-                    mode === "collection" ? "Nom, numéro…" : "Nom de la carte, numéro…"
+                    mode === "collection"
+                      ? "Nom, numéro…"
+                      : mode === "pokedex"
+                        ? "Nom ou numéro du Pokémon…"
+                        : "Nom de la carte, numéro…"
                   }
                   className="field !pl-9 text-[13px]"
                 />
               </div>
+              {mode === "pokedex" && (
+                <select
+                  value={fGen}
+                  onChange={(e) => setFGen(e.target.value)}
+                  className="field !w-auto max-w-[45%] text-[13px]"
+                  aria-label="Génération"
+                >
+                  <option value="">Toutes les générations</option>
+                  {GENERATIONS.map((g) => (
+                    <option key={g.gen} value={g.gen}>
+                      Gén. {g.gen} · {g.region}
+                    </option>
+                  ))}
+                </select>
+              )}
               {mode === "collection" && sets.length > 1 && (
                 <select
                   value={fSet}
@@ -1692,6 +1887,8 @@ export function BinderPages({
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 [padding-bottom:calc(1rem+env(safe-area-inset-bottom))]">
             {mode === "catalogue" ? (
               renderCatalogResults(pocket)
+            ) : mode === "pokedex" ? (
+              renderPokedexResults(pocket)
             ) : candidates.length === 0 ? (
               <p className="text-sm text-muted">
                 Ta collection est vide — cherche une carte dans le catalogue.
@@ -1796,11 +1993,17 @@ export function BinderPages({
           aria-hidden
         >
           <div className="card-tile h-full w-full rotate-2 scale-105 !shadow-2xl">
-            <CardImage
-              base={dragItem.image_url || null}
-              alt=""
-              fallback={dragItem.photo_fallback ?? null}
-            />
+            {dragItem.kind === "pokemon" && dragItem.pokemon ? (
+              <PokemonCard
+                p={{ id: dragItem.pokemon.id, name: dragItem.card_name, types: dragItem.pokemon.types }}
+              />
+            ) : (
+              <CardImage
+                base={dragItem.image_url || null}
+                alt=""
+                fallback={dragItem.photo_fallback ?? null}
+              />
+            )}
           </div>
         </div>
       )}
