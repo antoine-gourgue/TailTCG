@@ -32,6 +32,23 @@ export async function setForTrade(cardId: string, on: boolean): Promise<Result> 
   return { ok: true };
 }
 
+/** Met (ou retire) plusieurs cartes sur la place d'échange d'un coup */
+export async function setForTradeMany(cardIds: string[], on: boolean): Promise<Result> {
+  const ids = [...new Set(cardIds)].filter((id) => UUID.test(id)).slice(0, 500);
+  if (ids.length === 0) return { error: "Aucune carte" };
+  const uid = await me();
+  if (!uid) return { error: "Non connecté" };
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("game_cards")
+    .update({ for_trade: on })
+    .in("id", ids)
+    .eq("owner_id", uid);
+  if (error) return { error: "Enregistrement impossible" };
+  revalidatePath("/boosters/echanges");
+  return { ok: true };
+}
+
 /** Propose sa carte (from) contre une carte à échanger d'un autre (to) */
 export async function proposeTrade(fromCardId: string, toCardId: string): Promise<Result> {
   if (!UUID.test(fromCardId) || !UUID.test(toCardId) || fromCardId === toCardId) {

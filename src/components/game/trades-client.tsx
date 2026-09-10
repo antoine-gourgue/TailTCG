@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Repeat2, Search, Tag, User, X } from "lucide-react";
-import { cancelTrade, proposeTrade, respondTrade, setForTrade } from "@/app/boosters/trade-actions";
+import { cancelTrade, proposeTrade, respondTrade, setForTradeMany } from "@/app/boosters/trade-actions";
 import { CardImage } from "@/components/card-image";
+import { FloatingBar } from "@/components/floating-bar";
 import { Sheet } from "@/components/sheet";
 import { Toast } from "@/components/toast";
 import { TIER_LABEL, gradeTone, type Tier } from "@/lib/game";
@@ -67,8 +68,10 @@ export function TradesClient({
   const [target, setTarget] = useState<MarketCard | null>(null);
   const [offer, setOffer] = useState<string | null>(null);
   const [q, setQ] = useState("");
-
-  const forTrade = useMemo(() => new Set(myForTrade), [myForTrade]);
+  // État « à échanger » local, mis à jour tout de suite (retour visuel)
+  const [forTrade, setForTradeState] = useState<Set<string>>(() => new Set(myForTrade));
+  // Sélection multiple dans « Mes cartes », comme partout sur le site
+  const [sel, setSel] = useState<Set<string>>(new Set());
 
   function run(fn: () => Promise<{ error: string } | { ok: true }>, okMsg: string) {
     startBusy(async () => {
@@ -102,6 +105,42 @@ export function TradesClient({
     setTarget(null);
   }
 
+  function toggleSel(id: string) {
+    setSel((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  }
+  function applyTrade(on: boolean) {
+    const ids = [...sel];
+    if (ids.length === 0) return;
+    // Retour visuel immédiat
+    setForTradeState((prev) => {
+      const n = new Set(prev);
+      for (const id of ids) {
+        if (on) n.add(id);
+        else n.delete(id);
+      }
+      return n;
+    });
+    setSel(new Set());
+    startBusy(async () => {
+      const res = await setForTradeMany(ids, on);
+      if ("error" in res) setToast({ message: res.error, tone: "error" });
+      else
+        setToast({
+          message: on
+            ? `${ids.length} carte${ids.length > 1 ? "s" : ""} à échanger`
+            : `${ids.length} carte${ids.length > 1 ? "s" : ""} retirée${ids.length > 1 ? "s" : ""}`,
+        });
+      router.refresh();
+    });
+  }
+  const selAllOnTrade = sel.size > 0 && [...sel].every((id) => forTrade.has(id));
+  const selSomeOnTrade = [...sel].some((id) => forTrade.has(id));
+
   const needle = normalize(q.trim());
   const mineFiltered = needle
     ? myCards.filter((c) => normalize(`${c.name} ${c.setName}`).includes(needle))
@@ -115,7 +154,10 @@ export function TradesClient({
           <button
             key={t.key}
             type="button"
-            onClick={() => setView(t.key)}
+            onClick={() => {
+              setView(t.key);
+              setSel(new Set());
+            }}
             aria-current={view === t.key ? "page" : undefined}
             className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
               view === t.key ? "bg-accent text-accent-ink" : "border border-edge text-muted hover:text-foreground"
@@ -190,40 +232,95 @@ export function TradesClient({
           </ul>
         ))}
 
-      {/* Mes cartes */}
+      {/* Mes cartes : sélection multiple, action groupée */}
       {view === "mine" && (
         <>
-          <div className="relative mb-4">
+          <div className="relative mb-3">
             <Search size={15} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
             <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher une carte…" className="field !pl-9" />
           </div>
           {myCards.length === 0 ? (
-            <Empty icon={<Tag size={40} strokeWidth={1.3} aria-hidden />}>Tu n&apos;as encore aucune carte à échanger.</Empty>
+            <Empty icon={<Tag size={40} strokeWidth={1.3} aria-hidden />}>
+              Ouvre des boosters : tes cartes apparaîtront ici, prêtes à mettre à échanger.
+            </Empty>
           ) : (
-            <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-              {mineFiltered.map((c) => {
-                const on = forTrade.has(c.id);
-                return (
-                  <li key={c.id}>
-                    <button type="button" disabled={busy} onClick={() => run(() => setForTrade(c.id, !on), on ? "Retirée de la place" : "Mise à échanger")} className="group block w-full text-left" aria-pressed={on}>
-                      <div className="relative">
-                        <CardTile card={c} className={on ? "" : "opacity-85"} />
-                        {on && (
-                          <span className="absolute right-1 top-1 z-10 flex items-center gap-0.5 rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-bold text-accent-ink shadow">
-                            <Tag size={9} aria-hidden />
-                            À échanger
+            <>
+              <p className="mb-3 text-[13px] text-muted">
+                Coche des cartes, puis mets-les à échanger.{" "}
+                <span className="num text-faint">{forTrade.size} sur la place</span>
+              </p>
+              <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+                {mineFiltered.map((c) => {
+                  const on = forTrade.has(c.id);
+                  const picked = sel.has(c.id);
+                  return (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() => toggleSel(c.id)}
+                        aria-pressed={picked}
+                        aria-label={`Sélectionner ${c.name}`}
+                        className="group block w-full text-left"
+                      >
+                        <div className="relative">
+                          <CardTile card={c} className={picked ? "outline outline-2 outline-offset-2 outline-accent" : on ? "" : "opacity-90"} />
+                          {on && (
+                            <span className="absolute left-1 top-1 z-10 flex items-center gap-0.5 rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-bold text-accent-ink shadow">
+                              <Tag size={9} aria-hidden />
+                              À échanger
+                            </span>
+                          )}
+                          <span
+                            className={`absolute bottom-1.5 right-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border transition ${
+                              picked ? "border-transparent bg-accent text-accent-ink" : "border-white/50 bg-black/40 text-transparent"
+                            }`}
+                            aria-hidden
+                          >
+                            <Check size={13} strokeWidth={3} />
                           </span>
-                        )}
-                      </div>
-                      <p className="mt-1.5 truncate text-xs font-medium">{c.name}</p>
-                      <p className="truncate text-[11px] text-faint">{on ? "Sur la place" : "Toucher pour échanger"}</p>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+                        </div>
+                        <p className="mt-1.5 truncate text-xs font-medium">{c.name}</p>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
         </>
+      )}
+
+      {/* Barre d'action de « Mes cartes » */}
+      {view === "mine" && sel.size > 0 && (
+        <FloatingBar>
+          <button
+            type="button"
+            onClick={() => setSel(new Set())}
+            aria-label="Tout désélectionner"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-raised hover:text-foreground"
+          >
+            <X size={16} aria-hidden />
+          </button>
+          <span className="num shrink-0 whitespace-nowrap text-sm font-semibold">{sel.size}</span>
+          {selAllOnTrade ? (
+            <button type="button" disabled={busy} onClick={() => applyTrade(false)} className="btn btn-ghost shrink-0 !rounded-full !py-2 text-[13px]">
+              Retirer
+            </button>
+          ) : (
+            <>
+              {selSomeOnTrade && (
+                <button type="button" disabled={busy} onClick={() => applyTrade(false)} className="btn btn-ghost shrink-0 !rounded-full !py-2 text-[13px]">
+                  Retirer
+                </button>
+              )}
+              <button type="button" disabled={busy} onClick={() => applyTrade(true)} className="btn btn-primary shrink-0 !rounded-full !py-2 text-[13px]">
+                <Tag size={15} aria-hidden />
+                <span className="hidden min-[400px]:inline">Mettre à échanger</span>
+                <span className="min-[400px]:hidden">Échanger</span>
+              </button>
+            </>
+          )}
+        </FloatingBar>
       )}
 
       {/* Proposer un échange */}
