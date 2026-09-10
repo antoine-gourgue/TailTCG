@@ -1,30 +1,41 @@
+import type { CSSProperties } from "react";
 import { artworkUrl, dexNumber, TYPE_COLOR } from "@/lib/pokedex";
 
 export type PokemonCardData = { id: number; name: string; types: string[] };
+
+/** Mélange de deux couleurs hex (t = part de `a`), sans color-mix() : les
+ * couleurs opaques restent vectorielles dans un PDF */
+function mix(a: string, b: string, t: number): string {
+  const ch = (h: string, i: number) => parseInt(h.slice(i, i + 2), 16);
+  const c = (i: number) => Math.round(ch(a, i) * t + ch(b, i) * (1 - t));
+  return `#${[1, 3, 5].map((i) => c(i).toString(16).padStart(2, "0")).join("")}`;
+}
 
 /**
  * Carte Pokédex au format carte à jouer : nom en haut, artwork au centre,
  * numéro en bas. Halo et liseré aux couleurs du type. Tout est en unités de
  * conteneur : la carte se met à l'échelle de la largeur qu'on lui donne.
+ * À l'impression, le fond passe sur un seul dégradé circulaire opaque que
+ * le PDF décrit en vectoriel (le halo elliptique serait pixellisé).
  */
 export function PokemonCard({ p, priority = false }: { p: PokemonCardData; priority?: boolean }) {
   const main = TYPE_COLOR[p.types[0]] ?? "#8b8f9a";
   const second = TYPE_COLOR[p.types[1]] ?? main;
+  const vars = {
+    "--bg-screen": `radial-gradient(70% 55% at 50% 52%, ${mix(main, "#17161a", 0.45)}b0, transparent 100%), linear-gradient(160deg, ${mix(main, "#17161a", 0.26)}, ${mix(second, "#101013", 0.14)} 60%, #0e0d10)`,
+    "--bg-print": `radial-gradient(circle at 50% 50%, ${mix(main, "#17161a", 0.42)} 0%, ${mix(main, "#141317", 0.2)} 55%, #0e0d10 100%)`,
+  } as CSSProperties;
   return (
     <div className="@container h-full w-full">
       <div
-        className="relative flex aspect-[63/88] w-full flex-col overflow-hidden rounded-[4.5%/3.5%] border border-white/10 text-white"
-        style={{
-          background: `
-            radial-gradient(70% 55% at 50% 52%, color-mix(in srgb, ${main} 45%, transparent), transparent 100%),
-            linear-gradient(160deg, color-mix(in srgb, ${main} 26%, #17161a), color-mix(in srgb, ${second} 14%, #101013) 60%, #0e0d10)`,
-        }}
+        className="relative flex aspect-[63/88] w-full flex-col overflow-hidden rounded-[4.5%/3.5%] border border-white/10 text-white [background:var(--bg-screen)] print:[background:var(--bg-print)]"
+        style={vars}
       >
         {/* Liseré intérieur */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-[3.5cqw] rounded-[4cqw] border-[0.5cqw]"
-          style={{ borderColor: `color-mix(in srgb, ${main} 55%, transparent)` }}
+          style={{ borderColor: mix(main, "#17161a", 0.55) }}
         />
 
         {/* Nom */}
@@ -42,7 +53,9 @@ export function PokemonCard({ p, priority = false }: { p: PokemonCardData; prior
             alt={p.name}
             loading={priority ? "eager" : "lazy"}
             draggable={false}
-            className="max-h-full max-w-full object-contain drop-shadow-[0_12cqw_16cqw_rgba(0,0,0,.55)]"
+            // L'ombre portée est un filtre : à l'impression il pixellise tout
+            // le PDF, on s'en passe
+            className="max-h-full max-w-full object-contain drop-shadow-[0_12cqw_16cqw_rgba(0,0,0,.55)] print:drop-shadow-none print:[filter:none]"
           />
         </div>
 

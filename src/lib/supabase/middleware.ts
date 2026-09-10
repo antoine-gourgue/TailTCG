@@ -16,6 +16,8 @@ const PUBLIC_PATHS = [
   // Métadonnées récupérées par des robots non connectés
   "/opengraph-image",
   "/manifest.webmanifest",
+  // Fonds de carte Pokédex pour l'impression : artworks publics, rien de personnel
+  "/api/pokedex/print/",
 ];
 
 export async function updateSession(request: NextRequest) {

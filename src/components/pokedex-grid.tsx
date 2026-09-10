@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, CheckCheck, ListChecks, NotebookTabs, Plus, Search, X } from "lucide-react";
+import { Check, CheckCheck, ListChecks, NotebookTabs, Plus, Printer, Search, X } from "lucide-react";
 import { addPokemonToBinder, createBinderAndAdd, createBinderFromPokedex } from "@/app/classeurs/actions";
 import { PokemonCard } from "@/components/pokemon-card";
 import { Sheet } from "@/components/sheet";
@@ -165,6 +166,17 @@ export function PokedexGrid({
             />
           </div>
           <div className="ml-auto flex items-center gap-2">
+            {gen > 0 && !needle && (
+              <Link
+                href={`/extensions/pokedex/impression?gen=${gen}`}
+                target="_blank"
+                title="Planches à imprimer : cartes à taille réelle, repères de coupe"
+                className="btn btn-ghost !px-2.5 text-[13px]"
+              >
+                <Printer size={14} aria-hidden />
+                <span className="hidden sm:inline">Imprimer</span>
+              </Link>
+            )}
             <button
               type="button"
               onClick={createGenerationBinder}
