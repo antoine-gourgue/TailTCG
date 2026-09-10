@@ -18,6 +18,7 @@ import {
   History,
   Award,
   ShieldCheck,
+  Package,
 } from "lucide-react";
 import { signOut } from "@/app/actions";
 import { formatEur } from "@/lib/domain";
@@ -52,6 +53,7 @@ const NAV = [
   { href: "/classeurs", label: "Classeurs", Icon: NotebookTabs },
   { href: "/recherche", label: "Ajouter", Icon: SearchIcon },
   { href: "/wishlist", label: "Recherchées", Icon: Star },
+  { href: "/boosters", label: "Boosters", Icon: Package },
   { href: "/pregrades", label: "Pré-gradées", Icon: Award },
   { href: "/boutiques", label: "Boutiques", Icon: MapPin },
   { href: "/stats", label: "Stats", Icon: BarChart3 },

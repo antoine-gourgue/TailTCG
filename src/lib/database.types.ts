@@ -258,6 +258,102 @@ export type Database = {
         }
         Relationships: []
       }
+      game_cards: {
+        Row: {
+          card_name: string
+          for_trade: boolean
+          id: string
+          image_url: string | null
+          local_id: string
+          obtained_at: string
+          owner_id: string
+          rarity: string | null
+          set_id: string
+          set_name: string
+          source: string
+          tcgdex_id: string
+          tier: string
+        }
+        Insert: {
+          card_name: string
+          for_trade?: boolean
+          id?: string
+          image_url?: string | null
+          local_id: string
+          obtained_at?: string
+          owner_id: string
+          rarity?: string | null
+          set_id: string
+          set_name: string
+          source?: string
+          tcgdex_id: string
+          tier: string
+        }
+        Update: {
+          card_name?: string
+          for_trade?: boolean
+          id?: string
+          image_url?: string | null
+          local_id?: string
+          obtained_at?: string
+          owner_id?: string
+          rarity?: string | null
+          set_id?: string
+          set_name?: string
+          source?: string
+          tcgdex_id?: string
+          tier?: string
+        }
+        Relationships: []
+      }
+      game_openings: {
+        Row: {
+          id: string
+          opened_at: string
+          owner_id: string
+          set_id: string
+          tcgdex_ids: string[]
+        }
+        Insert: {
+          id?: string
+          opened_at?: string
+          owner_id: string
+          set_id: string
+          tcgdex_ids: string[]
+        }
+        Update: {
+          id?: string
+          opened_at?: string
+          owner_id?: string
+          set_id?: string
+          tcgdex_ids?: string[]
+        }
+        Relationships: []
+      }
+      game_profiles: {
+        Row: {
+          boosters: number
+          created_at: string | null
+          opened: number
+          owner_id: string
+          refill_at: string
+        }
+        Insert: {
+          boosters?: number
+          created_at?: string | null
+          opened?: number
+          owner_id: string
+          refill_at?: string
+        }
+        Update: {
+          boosters?: number
+          created_at?: string | null
+          opened?: number
+          owner_id?: string
+          refill_at?: string
+        }
+        Relationships: []
+      }
       item_gradings: {
         Row: {
           centering: number

@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   UserRound,
   ChevronRight,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 import { signOut } from "@/app/actions";
@@ -40,6 +41,7 @@ const TABS: Tab[] = [
 
 /** Pages accessibles depuis la sheet Profil */
 const MORE: Tab[] = [
+  { href: "/boosters", label: "Boosters", Icon: Package },
   { href: "/stats", label: "Stats", Icon: BarChart3 },
   { href: "/pregrades", label: "Pré-gradées", Icon: Award },
   { href: "/boutiques", label: "Boutiques", Icon: MapPin },
