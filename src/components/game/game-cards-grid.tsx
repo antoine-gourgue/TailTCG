@@ -29,14 +29,23 @@ const normalize = (s: string) =>
  * Toutes les cartes possédées (une tuile par exemplaire) : recherche par nom,
  * filtres set / rareté / gradées, tri, puis détail au clic (grader, notes).
  */
-export function GameCardsGrid({ cards }: { cards: OwnedCard[] }) {
+export function GameCardsGrid({
+  cards,
+  initialSort = "recent",
+  hideGradedFilter = false,
+}: {
+  cards: OwnedCard[];
+  initialSort?: Sort;
+  /** Masque le filtre « Gradées » (ex. liste déjà 100 % gradée) */
+  hideGradedFilter?: boolean;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState<OwnedCard | null>(null);
   const [q, setQ] = useState("");
   const [setFilter, setSetFilter] = useState("all");
   const [tierFilter, setTierFilter] = useState<"all" | Tier>("all");
   const [gradedOnly, setGradedOnly] = useState(false);
-  const [sort, setSort] = useState<Sort>("recent");
+  const [sort, setSort] = useState<Sort>(initialSort);
 
   const sets = useMemo(
     () => [...new Set(cards.map((c) => c.setName))].sort((a, b) => a.localeCompare(b, "fr")),
@@ -92,17 +101,19 @@ export function GameCardsGrid({ cards }: { cards: OwnedCard[] }) {
 
       {/* Filtres */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setGradedOnly((v) => !v)}
-          aria-pressed={gradedOnly}
-          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
-            gradedOnly ? "bg-accent text-accent-ink" : "border border-edge text-muted hover:text-foreground"
-          }`}
-        >
-          <BadgeCheck size={14} aria-hidden />
-          Gradées <span className="num opacity-70">{gradedCount}</span>
-        </button>
+        {!hideGradedFilter && (
+          <button
+            type="button"
+            onClick={() => setGradedOnly((v) => !v)}
+            aria-pressed={gradedOnly}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
+              gradedOnly ? "bg-accent text-accent-ink" : "border border-edge text-muted hover:text-foreground"
+            }`}
+          >
+            <BadgeCheck size={14} aria-hidden />
+            Gradées <span className="num opacity-70">{gradedCount}</span>
+          </button>
+        )}
 
         {sets.length > 1 && (
           <select
