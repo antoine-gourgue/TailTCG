@@ -3,9 +3,8 @@
 import { useState } from "react";
 
 /**
- * Dos de carte du jeu : l'image `/card-back.png` (à déposer dans public/)
- * si elle existe, sinon un dos dessiné en CSS — sombre, pokéball stylisée,
- * reflet discret.
+ * Dos de carte du jeu : le dos officiel (`/card-back.webp`, remake 4K de
+ * Jasowke redimensionné), sinon un dos dessiné en CSS en secours.
  */
 export function CardBack() {
   const [missing, setMissing] = useState(false);
@@ -17,7 +16,7 @@ export function CardBack() {
       {!missing ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src="/card-back.png"
+          src="/card-back.webp"
           alt=""
           draggable={false}
           onError={() => setMissing(true)}
