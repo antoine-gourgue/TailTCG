@@ -295,7 +295,7 @@ export function BoosterStage({
           <p className="truncate text-xs text-muted">
             {set.serie} · 5 cartes
             {unlimited
-              ? " · boosters illimités (test)"
+              ? " · boosters illimités"
               : ` · ${stock} booster${stock > 1 ? "s" : ""} restant${stock > 1 ? "s" : ""}`}
           </p>
         </div>

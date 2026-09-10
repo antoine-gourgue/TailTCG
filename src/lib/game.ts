@@ -8,7 +8,7 @@ export const PACK_SIZE = 5;
 export const MAX_STOCK = 2;
 /** Un booster crédité toutes les 12 h, tant que la réserve n'est pas pleine */
 export const PERIOD_MS = 12 * 3_600_000;
-/** TEMPORAIRE — phase de test : boosters illimités, pas de compte à rebours */
+/** Boosters illimités pour tout le monde : ni réserve ni compte à rebours */
 export const UNLIMITED_BOOSTERS = true;
 
 /** Horloge isolée (lint react-compiler : pas de Date.now() dans un composant) */

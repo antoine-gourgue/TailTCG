@@ -49,7 +49,7 @@ export default async function BoostersPage() {
             <h1 className="display mb-1 text-3xl font-bold tracking-tight">Boosters</h1>
             <p className="text-sm text-muted">
               {UNLIMITED_BOOSTERS
-                ? "Phase de test : boosters illimités. "
+                ? "Ouvre autant de boosters que tu veux. "
                 : "Un booster toutes les 12 heures. "}
               5 cartes du set de ton choix, un jeu à part : rien n&apos;entre dans ta vraie
               collection.

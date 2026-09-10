@@ -100,10 +100,7 @@ export function BoosterOpener({
           {UNLIMITED_BOOSTERS ? <InfinityIcon size={15} aria-hidden /> : <Package size={15} aria-hidden />}
         </span>
         {UNLIMITED_BOOSTERS ? (
-          <span>
-            <span className="font-medium">Boosters illimités</span>
-            <span className="text-muted"> · test</span>
-          </span>
+          <span className="font-medium">Boosters illimités</span>
         ) : (
           <span>
             <span className="num font-semibold">{stock}</span>
