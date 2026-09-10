@@ -961,3 +961,8 @@ input:disabled,
   0% { transform: translateX(-120%); }
   100% { transform: translateX(360%); }
 }
+@keyframes reveal-flip {
+  0% { transform: perspective(1000px) rotateY(90deg) scale(.9); opacity: 0; }
+  60% { opacity: 1; }
+  100% { transform: perspective(1000px) rotateY(0deg) scale(1); opacity: 1; }
+}

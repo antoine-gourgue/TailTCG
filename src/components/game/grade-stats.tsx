@@ -25,25 +25,24 @@ export function GradeStats({ overalls }: { overalls: number[] }) {
         <Tile label="Gem Mint 10" value={String(gems)} />
       </div>
       <p className="label-xs mb-2">Répartition des notes</p>
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         {notes.map((n) => {
           const count = dist.get(n) ?? 0;
           const tone = gradeTone(n);
           return (
-            <div key={n} className="grid grid-cols-[2.75rem_1fr_auto] items-center gap-3">
-              <span className="flex items-center gap-1.5">
-                <span className="num text-sm font-bold" style={{ color: tone.ring }}>
-                  {n}
-                </span>
+            <div key={n} className="flex items-center gap-3">
+              <span className="num w-4 shrink-0 text-sm font-bold" style={{ color: tone.ring }}>
+                {n}
               </span>
-              <span className="h-3 overflow-hidden rounded-full bg-foreground/[0.07]">
+              <span className="h-3 flex-1 overflow-hidden rounded-full bg-foreground/[0.07]">
                 <span
                   className="block h-full rounded-full"
                   style={{ width: `${Math.max((count / max) * 100, 4)}%`, background: tone.ring }}
                 />
               </span>
-              <span className="num w-16 text-right text-xs text-muted">
-                {count} · {gradeLabel(n)}
+              <span className="flex w-28 shrink-0 items-baseline gap-1 whitespace-nowrap text-xs text-muted">
+                <span className="num font-semibold text-foreground">{count}</span>
+                <span>{gradeLabel(n)}</span>
               </span>
             </div>
           );

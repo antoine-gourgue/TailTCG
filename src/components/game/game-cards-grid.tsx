@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { BadgeCheck, Search } from "lucide-react";
 import { CardImage } from "@/components/card-image";
 import { GameCardDetail, type GameCardView } from "@/components/game/card-detail";
-import { TIER_LABEL, TIERS, gradeTone, type Grade, type Tier } from "@/lib/game";
+import { GradedSlab } from "@/components/graded-slab";
+import { TIER_LABEL, TIERS, type Grade, type Tier } from "@/lib/game";
 
 export type OwnedCard = {
   id: string;
@@ -81,7 +82,7 @@ export function GameCardsGrid({
         local_id: open.localId,
         tier: open.tier,
         grade: open.grade,
-        gradable: true,
+        gradable: false,
       }
     : null;
 
@@ -165,36 +166,38 @@ export function GameCardsGrid({
         </p>
       ) : (
         <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-          {list.map((c) => {
-            const tone = c.grade ? gradeTone(c.grade.overall) : null;
-            return (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  onClick={() => setOpen(c)}
-                  aria-label={`Voir ${c.name}`}
-                  className="group block w-full text-left"
-                >
-                  <div
-                    className="card-tile aspect-[63/88]"
-                    style={tone ? { outline: `2px solid ${tone.ring}`, outlineOffset: "-2px" } : undefined}
-                  >
-                    <CardImage base={c.image} alt={c.name} />
-                    {c.grade && tone && (
-                      <span
-                        className="absolute left-1/2 top-1.5 flex -translate-x-1/2 items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold shadow"
-                        style={{ background: tone.ring, color: tone.text }}
-                      >
-                        <span className="num">{c.grade.overall}</span>
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-1.5 truncate text-xs font-medium">{c.name}</p>
-                  <p className="truncate text-[11px] text-faint">{c.setName}</p>
-                </button>
-              </li>
-            );
-          })}
+          {list.map((c) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                onClick={() => setOpen(c)}
+                aria-label={`Voir ${c.name}`}
+                className="group block w-full text-left"
+              >
+                {c.grade ? (
+                  <GradedSlab
+                    name={c.name}
+                    setName={c.setName}
+                    localId={c.localId}
+                    imageUrl={c.image}
+                    grade={c.grade.overall}
+                    centering={c.grade.centering}
+                    corners={c.grade.corners}
+                    edges={c.grade.edges}
+                    surface={c.grade.surface}
+                  />
+                ) : (
+                  <>
+                    <div className="card-tile aspect-[63/88]">
+                      <CardImage base={c.image} alt={c.name} />
+                    </div>
+                    <p className="mt-1.5 truncate text-xs font-medium">{c.name}</p>
+                    <p className="truncate text-[11px] text-faint">{c.setName}</p>
+                  </>
+                )}
+              </button>
+            </li>
+          ))}
         </ul>
       )}
 
