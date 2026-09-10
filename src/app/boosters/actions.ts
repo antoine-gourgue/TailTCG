@@ -174,6 +174,7 @@ export async function gradeGameCard(
     if (error) return { error: "Gradation impossible, réessaie." };
   }
   revalidatePath("/boosters/collection");
+  revalidatePath("/boosters/gradation");
   return {
     grade: {
       centering: card.grade_centering ?? 0,
@@ -182,5 +183,54 @@ export async function gradeGameCard(
       surface: card.grade_surface ?? 0,
       overall: card.grade_overall,
     },
+  };
+}
+
+export type GradedResult = { id: string; grade: Grade };
+
+/** Grade plusieurs cartes d'un coup : révèle leur potentiel caché et les
+ * marque gradées. Renvoie les notes par carte. */
+export async function gradeGameCards(
+  ids: string[]
+): Promise<{ error: string } | { graded: GradedResult[] }> {
+  const clean = [...new Set(ids)].filter(Boolean).slice(0, 200);
+  if (clean.length === 0) return { error: "Aucune carte sélectionnée." };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Non connecté" };
+
+  const admin = createAdminClient();
+  const { data: rows } = await admin
+    .from("game_cards")
+    .select("id, graded, grade_centering, grade_corners, grade_edges, grade_surface, grade_overall")
+    .in("id", clean)
+    .eq("owner_id", user.id);
+  const valid = (rows ?? []).filter((r) => r.grade_overall != null);
+  if (valid.length === 0) return { error: "Ces cartes ne peuvent pas être gradées." };
+
+  const toMark = valid.filter((r) => !r.graded).map((r) => r.id);
+  if (toMark.length > 0) {
+    const { error } = await admin
+      .from("game_cards")
+      .update({ graded: true, graded_at: new Date().toISOString() })
+      .in("id", toMark);
+    if (error) return { error: "Gradation impossible, réessaie." };
+  }
+
+  revalidatePath("/boosters/collection");
+  revalidatePath("/boosters/gradation");
+  return {
+    graded: valid.map((r) => ({
+      id: r.id,
+      grade: {
+        centering: r.grade_centering ?? 0,
+        corners: r.grade_corners ?? 0,
+        edges: r.grade_edges ?? 0,
+        surface: r.grade_surface ?? 0,
+        overall: r.grade_overall!,
+      },
+    })),
   };
 }

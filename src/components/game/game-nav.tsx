@@ -1,10 +1,11 @@
 import Link from "next/link";
 
 /** Onglets de la section Boosters, à part du reste du site */
-export function GameNav({ current }: { current: "boosters" | "collection" }) {
+export function GameNav({ current }: { current: "boosters" | "collection" | "gradation" }) {
   const tabs = [
     { key: "boosters" as const, href: "/boosters", label: "Ouvrir" },
-    { key: "collection" as const, href: "/boosters/collection", label: "Ma collection virtuelle" },
+    { key: "collection" as const, href: "/boosters/collection", label: "Collection" },
+    { key: "gradation" as const, href: "/boosters/gradation", label: "Gradation" },
   ];
   return (
     <div className="inline-flex rounded-lg border border-edge bg-surface p-0.5">
