@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSet } from "@/lib/tcgdex";
+import { imagedCardIds } from "@/lib/game-sets";
 import {
   drawPack,
   formatCountdown,
@@ -11,6 +12,7 @@ import {
   PACK_SIZE,
   settleStock,
   tierOf,
+  UNLIMITED_BOOSTERS,
   type Profile,
   type Tier,
 } from "@/lib/game";
@@ -55,14 +57,15 @@ export async function openBooster(setId: string): Promise<OpenResult> {
   const now = Date.now();
   const profile: Profile = prof ?? { boosters: MAX_STOCK, refill_at: new Date(now).toISOString() };
   const s = settleStock(profile, now);
-  if (s.stock < 1) {
+  if (!UNLIMITED_BOOSTERS && s.stock < 1) {
     return { error: `Plus de booster : le prochain arrive dans ${formatCountdown((s.nextAt ?? now) - now)}.` };
   }
 
-  const set = await getSet(setId, "fr");
+  const [set, imaged] = await Promise.all([getSet(setId, "fr"), imagedCardIds(setId)]);
   if (!set) return { error: "Set introuvable" };
+  // Seules les cartes dont le visuel existe vraiment sur le CDN
   const pool = (set.cards ?? [])
-    .filter((c) => !!c.image)
+    .filter((c) => !!c.image && (imaged.size === 0 || imaged.has(c.id)))
     .map((c) => ({ ...c, tier: tierOf(c.rarity) }));
   if (pool.length < PACK_SIZE) return { error: "Ce set n'a pas assez de cartes." };
   const drawn = drawPack(pool, rand);
@@ -94,11 +97,13 @@ export async function openBooster(setId: string): Promise<OpenResult> {
     .select("id");
   if (error || !inserted) return { error: "Ouverture impossible, réessaie." };
 
-  const nextProfile: Profile = {
-    boosters: s.stock - 1,
-    // Réserve pleine avant l'ouverture : le compteur repart maintenant
-    refill_at: new Date(s.stock >= MAX_STOCK ? now : s.refillAt).toISOString(),
-  };
+  const nextProfile: Profile = UNLIMITED_BOOSTERS
+    ? { boosters: MAX_STOCK, refill_at: new Date(now).toISOString() }
+    : {
+        boosters: s.stock - 1,
+        // Réserve pleine avant l'ouverture : le compteur repart maintenant
+        refill_at: new Date(s.stock >= MAX_STOCK ? now : s.refillAt).toISOString(),
+      };
   await Promise.all([
     admin
       .from("game_profiles")
