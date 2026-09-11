@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Repeat2, Search, Tag, User, X } from "lucide-react";
+import { ArrowRight, Check, Repeat2, Tag, User, X } from "lucide-react";
 import { cancelTrade, proposeTrade, respondTrade, setForTradeMany } from "@/app/boosters/trade-actions";
 import { CardImage } from "@/components/card-image";
+import { CardGrid, SELECTED_RING, Segmented, TileCaption, TileCheck } from "@/components/card-grid-kit";
 import { FloatingBar } from "@/components/floating-bar";
+import { TierBadge } from "@/components/game/tier-badge";
 import { Sheet } from "@/components/sheet";
 import { Toast } from "@/components/toast";
 import { TIER_LABEL, gradeTone, type Tier } from "@/lib/game";
@@ -30,20 +32,19 @@ const normalize = (s: string) =>
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "");
 
-/** Vignette de carte pour les échanges : image, rareté, sceau de note */
-function CardTile({ card, className = "" }: { card: TCard; className?: string }) {
+/** Tuile de carte du site, avec la rareté et la note si gradée */
+function CardTile({ card, className = "", children }: { card: TCard; className?: string; children?: ReactNode }) {
   const tone = card.grade != null ? gradeTone(card.grade) : null;
   return (
-    <div className={`card-tile aspect-[63/88] ${className}`} style={tone ? { outline: `2px solid ${tone.ring}`, outlineOffset: "-2px" } : undefined}>
+    <div className={`card-tile aspect-[63/88] ${className}`}>
       <CardImage base={card.image} alt={card.name} />
+      <TierBadge tier={card.tier} />
       {tone && card.grade != null && (
-        <span className="absolute left-1 top-1 z-10 rounded-md px-1 text-[10px] font-bold shadow num" style={{ background: tone.ring, color: tone.text }}>
+        <span className="tile-badge num right-1.5 top-1.5" style={{ background: tone.ring, color: tone.text }}>
           {card.grade}
         </span>
       )}
-      <span className="tile-badge bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap !px-1.5 !text-[9px]">
-        {TIER_LABEL[card.tier]}
-      </span>
+      {children}
     </div>
   );
 }
@@ -85,10 +86,10 @@ export function TradesClient({
   }
 
   const tabs: { key: View; label: string; n?: number }[] = [
-    { key: "market", label: "Place d'échange" },
+    { key: "market", label: "Place d'échange", n: marketplace.length },
     { key: "incoming", label: "Reçues", n: incoming.length },
     { key: "outgoing", label: "Envoyées", n: outgoing.length },
-    { key: "mine", label: "Mes cartes" },
+    { key: "mine", label: "Mes cartes", n: forTrade.size },
   ];
 
   // Cartes de même rareté à offrir pour la cible choisie
@@ -143,32 +144,22 @@ export function TradesClient({
 
   const needle = normalize(q.trim());
   const mineFiltered = needle
-    ? myCards.filter((c) => normalize(`${c.name} ${c.setName}`).includes(needle))
+    ? myCards.filter((c) => normalize(`${c.name} ${c.setName} ${c.localId}`).includes(needle))
     : myCards;
 
   return (
     <>
       {/* Onglets internes */}
-      <div className="mb-5 flex flex-wrap gap-1.5">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => {
-              setView(t.key);
-              setSel(new Set());
-            }}
-            aria-current={view === t.key ? "page" : undefined}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
-              view === t.key ? "bg-accent text-accent-ink" : "border border-edge text-muted hover:text-foreground"
-            }`}
-          >
-            {t.label}
-            {t.n != null && t.n > 0 && (
-              <span className={`num rounded-full px-1.5 text-[11px] ${view === t.key ? "bg-black/20" : "bg-raised"}`}>{t.n}</span>
-            )}
-          </button>
-        ))}
+      <div className="mb-6">
+        <Segmented
+          items={tabs}
+          value={view}
+          onChange={(k) => {
+            setView(k);
+            setSel(new Set());
+          }}
+          label="Échanges"
+        />
       </div>
 
       {/* Place d'échange */}
@@ -179,20 +170,29 @@ export function TradesClient({
             dans « Mes cartes ».
           </Empty>
         ) : (
-          <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+          <CardGrid>
             {marketplace.map((m) => (
               <li key={m.card.id}>
-                <button type="button" onClick={() => openPropose(m)} className="group block w-full text-left" aria-label={`Proposer un échange pour ${m.card.name}`}>
+                <button
+                  type="button"
+                  onClick={() => openPropose(m)}
+                  className="group block w-full text-left"
+                  aria-label={`Proposer un échange pour ${m.card.name}`}
+                >
                   <CardTile card={m.card} />
-                  <p className="mt-1.5 truncate text-xs font-medium">{m.card.name}</p>
-                  <p className="flex items-center gap-1 truncate text-[11px] text-faint">
-                    <User size={10} aria-hidden />
-                    {m.ownerName}
-                  </p>
+                  <TileCaption
+                    name={m.card.name}
+                    sub={
+                      <span className="inline-flex items-center gap-1">
+                        <User size={11} aria-hidden />
+                        {m.ownerName}
+                      </span>
+                    }
+                  />
                 </button>
               </li>
             ))}
-          </ul>
+          </CardGrid>
         ))}
 
       {/* Reçues */}
@@ -203,10 +203,20 @@ export function TradesClient({
           <ul className="flex flex-col gap-3">
             {incoming.map((t) => (
               <TradeRow key={t.id} trade={t} youReceiveLeft>
-                <button type="button" disabled={busy} onClick={() => run(() => respondTrade(t.id, false), "Proposition refusée")} className="btn btn-ghost !py-1.5 text-[13px]">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => run(() => respondTrade(t.id, false), "Proposition refusée")}
+                  className="btn btn-ghost !py-1.5 text-[13px]"
+                >
                   Refuser
                 </button>
-                <button type="button" disabled={busy} onClick={() => run(() => respondTrade(t.id, true), "Échange effectué !")} className="btn btn-primary !py-1.5 text-[13px]">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => run(() => respondTrade(t.id, true), "Échange effectué !")}
+                  className="btn btn-primary !py-1.5 text-[13px]"
+                >
                   <Check size={14} aria-hidden />
                   Accepter
                 </button>
@@ -223,7 +233,12 @@ export function TradesClient({
           <ul className="flex flex-col gap-3">
             {outgoing.map((t) => (
               <TradeRow key={t.id} trade={t}>
-                <button type="button" disabled={busy} onClick={() => run(() => cancelTrade(t.id), "Proposition annulée")} className="btn btn-ghost !py-1.5 text-[13px]">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => run(() => cancelTrade(t.id), "Proposition annulée")}
+                  className="btn btn-ghost !py-1.5 text-[13px]"
+                >
                   <X size={14} aria-hidden />
                   Annuler
                 </button>
@@ -233,23 +248,30 @@ export function TradesClient({
         ))}
 
       {/* Mes cartes : sélection multiple, action groupée */}
-      {view === "mine" && (
-        <>
-          <div className="relative mb-3">
-            <Search size={15} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
-            <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher une carte…" className="field !pl-9" />
-          </div>
-          {myCards.length === 0 ? (
-            <Empty icon={<Tag size={40} strokeWidth={1.3} aria-hidden />}>
-              Ouvre des boosters : tes cartes apparaîtront ici, prêtes à mettre à échanger.
-            </Empty>
-          ) : (
-            <>
-              <p className="mb-3 text-[13px] text-muted">
-                Coche des cartes, puis mets-les à échanger.{" "}
-                <span className="num text-faint">{forTrade.size} sur la place</span>
+      {view === "mine" &&
+        (myCards.length === 0 ? (
+          <Empty icon={<Tag size={40} strokeWidth={1.3} aria-hidden />}>
+            Ouvre des boosters : tes cartes apparaîtront ici, prêtes à mettre à échanger.
+          </Empty>
+        ) : (
+          <>
+            <div className="mb-6 flex flex-wrap items-center gap-2">
+              <input
+                type="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Chercher une carte…"
+                className="field text-[15px] sm:!w-52 sm:text-[13px]"
+              />
+              <p className="w-full text-[13px] text-muted sm:ml-auto sm:w-auto">
+                Coche des cartes, puis mets-les à échanger ·{" "}
+                <span className="num">{forTrade.size}</span> sur la place
               </p>
-              <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+            </div>
+            {mineFiltered.length === 0 ? (
+              <p className="text-sm text-muted">Aucune carte ne correspond.</p>
+            ) : (
+              <CardGrid>
                 {mineFiltered.map((c) => {
                   const on = forTrade.has(c.id);
                   const picked = sel.has(c.id);
@@ -262,33 +284,31 @@ export function TradesClient({
                         aria-label={`Sélectionner ${c.name}`}
                         className="group block w-full text-left"
                       >
-                        <div className="relative">
-                          <CardTile card={c} className={picked ? "outline outline-2 outline-offset-2 outline-accent" : on ? "" : "opacity-90"} />
+                        <CardTile card={c} className={picked ? SELECTED_RING : ""}>
                           {on && (
-                            <span className="absolute left-1 top-1 z-10 flex items-center gap-0.5 rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-bold text-accent-ink shadow">
-                              <Tag size={9} aria-hidden />
+                            <span className="tile-badge left-1.5 top-1.5 flex items-center gap-1 !bg-accent !text-accent-ink">
+                              <Tag size={10} aria-hidden />
                               À échanger
                             </span>
                           )}
-                          <span
-                            className={`absolute bottom-1.5 right-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border transition ${
-                              picked ? "border-transparent bg-accent text-accent-ink" : "border-white/50 bg-black/40 text-transparent"
-                            }`}
-                            aria-hidden
-                          >
-                            <Check size={13} strokeWidth={3} />
-                          </span>
-                        </div>
-                        <p className="mt-1.5 truncate text-xs font-medium">{c.name}</p>
+                          <TileCheck on={picked} />
+                        </CardTile>
+                        <TileCaption
+                          name={c.name}
+                          sub={
+                            <>
+                              {c.setName} <span className="num text-faint">· {c.localId}</span>
+                            </>
+                          }
+                        />
                       </button>
                     </li>
                   );
                 })}
-              </ul>
-            </>
-          )}
-        </>
-      )}
+              </CardGrid>
+            )}
+          </>
+        ))}
 
       {/* Barre d'action de « Mes cartes » */}
       {view === "mine" && sel.size > 0 && (
@@ -303,17 +323,32 @@ export function TradesClient({
           </button>
           <span className="num shrink-0 whitespace-nowrap text-sm font-semibold">{sel.size}</span>
           {selAllOnTrade ? (
-            <button type="button" disabled={busy} onClick={() => applyTrade(false)} className="btn btn-ghost shrink-0 !rounded-full !py-2 text-[13px]">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => applyTrade(false)}
+              className="btn btn-ghost shrink-0 !rounded-full !py-2 text-[13px]"
+            >
               Retirer
             </button>
           ) : (
             <>
               {selSomeOnTrade && (
-                <button type="button" disabled={busy} onClick={() => applyTrade(false)} className="btn btn-ghost shrink-0 !rounded-full !py-2 text-[13px]">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => applyTrade(false)}
+                  className="btn btn-ghost shrink-0 !rounded-full !py-2 text-[13px]"
+                >
                   Retirer
                 </button>
               )}
-              <button type="button" disabled={busy} onClick={() => applyTrade(true)} className="btn btn-primary shrink-0 !rounded-full !py-2 text-[13px]">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => applyTrade(true)}
+                className="btn btn-primary shrink-0 !rounded-full !py-2 text-[13px]"
+              >
                 <Tag size={15} aria-hidden />
                 <span className="hidden min-[400px]:inline">Mettre à échanger</span>
                 <span className="min-[400px]:hidden">Échanger</span>
@@ -366,15 +401,21 @@ export function TradesClient({
               Tes cartes {TIER_LABEL[target.card.tier]} ({candidates.length})
             </p>
             {candidates.length === 0 ? (
-              <p className="rounded-xl bg-raised/60 px-4 py-6 text-center text-sm text-muted">
-                Tu n&apos;as aucune carte de cette rareté à offrir.
-              </p>
+              <p className="text-sm text-muted">Tu n&apos;as aucune carte de cette rareté à offrir.</p>
             ) : (
-              <ul className="grid max-h-[38vh] grid-cols-4 gap-2.5 overflow-y-auto sm:grid-cols-5">
+              <ul className="grid max-h-[38vh] grid-cols-4 gap-2.5 overflow-y-auto p-0.5 sm:grid-cols-5">
                 {candidates.map((c) => (
                   <li key={c.id}>
-                    <button type="button" onClick={() => setOffer(c.id)} aria-pressed={offer === c.id} className="block w-full">
-                      <CardTile card={c} className={offer === c.id ? "outline outline-2 outline-offset-2 outline-accent" : ""} />
+                    <button
+                      type="button"
+                      onClick={() => setOffer(c.id)}
+                      aria-pressed={offer === c.id}
+                      aria-label={c.name}
+                      className="block w-full"
+                    >
+                      <CardTile card={c} className={offer === c.id ? SELECTED_RING : ""}>
+                        <TileCheck on={offer === c.id} />
+                      </CardTile>
                     </button>
                   </li>
                 ))}
@@ -400,7 +441,15 @@ export function TradesClient({
 }
 
 /** Ligne d'échange : deux cartes reliées par une flèche + actions */
-function TradeRow({ trade, youReceiveLeft = false, children }: { trade: TradeView; youReceiveLeft?: boolean; children: React.ReactNode }) {
+function TradeRow({
+  trade,
+  youReceiveLeft = false,
+  children,
+}: {
+  trade: TradeView;
+  youReceiveLeft?: boolean;
+  children: ReactNode;
+}) {
   const left = youReceiveLeft ? trade.theirs : trade.mine;
   const right = youReceiveLeft ? trade.mine : trade.theirs;
   const leftLabel = youReceiveLeft ? "Tu reçois" : "Tu donnes";
@@ -430,7 +479,7 @@ function TradeRow({ trade, youReceiveLeft = false, children }: { trade: TradeVie
   );
 }
 
-function Empty({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+function Empty({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
     <div className="panel flex flex-col items-center gap-3 p-12 text-center text-faint">
       {icon}

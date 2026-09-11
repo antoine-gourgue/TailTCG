@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CardImage } from "@/components/card-image";
+import { CardGrid, TileCaption } from "@/components/card-grid-kit";
 import { GameCardDetail, type GameCardView } from "@/components/game/card-detail";
+import { TierBadge } from "@/components/game/tier-badge";
 import { GradedSlab } from "@/components/graded-slab";
 import { type Grade, type Tier } from "@/lib/game";
 
@@ -21,13 +23,14 @@ export type SetGridCard = {
 };
 
 /**
- * Grille d'un set dans la collection virtuelle : possédées en couleur
- * (×n, sceau de note si gradée), manquantes grisées. Clic → détail, où l'on
- * peut faire grader la carte.
+ * Grille d'un set dans la collection virtuelle, même grille que le catalogue :
+ * possédées en couleur (×n, boîtier si gradée), manquantes grisées. Clic →
+ * détail.
  */
 export function CollectionSetGrid({ cards, setName }: { cards: SetGridCard[]; setName: string }) {
   const router = useRouter();
   const [detail, setDetail] = useState<SetGridCard | null>(null);
+  const total = cards.length;
 
   const view: GameCardView | null = detail
     ? {
@@ -45,35 +48,39 @@ export function CollectionSetGrid({ cards, setName }: { cards: SetGridCard[]; se
 
   return (
     <>
-      <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+      <CardGrid>
         {cards.map((c) => {
           const owned = c.qty > 0;
-          const inner = (
-            <>
-              {owned && c.grade ? (
-                <GradedSlab
+          const inner =
+            owned && c.grade ? (
+              <GradedSlab
+                name={c.name}
+                setName=""
+                localId={c.localId}
+                imageUrl={c.image}
+                grade={c.grade.overall}
+                centering={c.grade.centering}
+                corners={c.grade.corners}
+                edges={c.grade.edges}
+                surface={c.grade.surface}
+              />
+            ) : (
+              <>
+                <div className={`card-tile aspect-[63/88] ${owned ? "" : "opacity-35 grayscale"}`}>
+                  <CardImage base={c.image} alt={c.name} />
+                  {c.qty > 1 && <span className="tile-badge num right-1.5 top-1.5">×{c.qty}</span>}
+                  {owned && <TierBadge tier={c.tier} />}
+                </div>
+                <TileCaption
                   name={c.name}
-                  setName=""
-                  localId={c.localId}
-                  imageUrl={c.image}
-                  grade={c.grade.overall}
-                  centering={c.grade.centering}
-                  corners={c.grade.corners}
-                  edges={c.grade.edges}
-                  surface={c.grade.surface}
+                  sub={
+                    <span className="num text-faint">
+                      {c.localId} / {total}
+                    </span>
+                  }
                 />
-              ) : (
-                <>
-                  <div className={`card-tile aspect-[63/88] ${owned ? "" : "opacity-35 grayscale"}`}>
-                    <CardImage base={c.image} alt={c.name} />
-                    {c.qty > 1 && <span className="tile-badge num right-1.5 top-1.5">×{c.qty}</span>}
-                  </div>
-                  <p className="mt-1.5 truncate text-xs font-medium">{c.name}</p>
-                  <p className="num text-[11px] text-faint">{c.localId}</p>
-                </>
-              )}
-            </>
-          );
+              </>
+            );
           return (
             <li key={c.id}>
               {owned ? (
@@ -91,7 +98,7 @@ export function CollectionSetGrid({ cards, setName }: { cards: SetGridCard[]; se
             </li>
           );
         })}
-      </ul>
+      </CardGrid>
       <GameCardDetail card={view} onClose={() => setDetail(null)} onGraded={() => router.refresh()} />
     </>
   );

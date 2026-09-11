@@ -17,6 +17,7 @@ import { CardImage } from "@/components/card-image";
 import { CardBack } from "@/components/game/card-back";
 import { PackArt } from "@/components/game/pack-art";
 import { GameCardDetail } from "@/components/game/card-detail";
+import { TIER_TILE } from "@/components/game/tier-badge";
 import { Toast } from "@/components/toast";
 import { formatCountdown, TIER_LABEL, TIERS, type Tier } from "@/lib/game";
 import { isMuted, play, setMuted } from "@/lib/sfx";
@@ -44,14 +45,7 @@ const OUT_FAST_MS = 200;
 /** Tape pendant le retournement : la carte reste ce minimum en grand */
 const PEEK_MS = 160;
 
-const TIER_CLASS: Record<Tier, string> = {
-  common: "!bg-neutral-700/90 !text-neutral-100",
-  uncommon: "!bg-emerald-700/90 !text-emerald-50",
-  rare: "!bg-sky-700/90 !text-sky-50",
-  holo: "!bg-violet-700/90 !text-violet-50",
-  ultra: "!bg-amber-500/95 !text-black",
-  secret: "!bg-gradient-to-r !from-amber-300 !via-rose-300 !to-sky-300 !text-black",
-};
+const TIER_CLASS = TIER_TILE;
 const GLOW: Partial<Record<Tier, string>> = {
   rare: "rgba(56, 189, 248, .45)",
   holo: "rgba(167, 139, 250, .6)",
