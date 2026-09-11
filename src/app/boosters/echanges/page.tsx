@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAll } from "@/lib/paginate";
 import { type Tier } from "@/lib/game";
-import { AppShell } from "@/components/app-shell";
 import { GameNav } from "@/components/game/game-nav";
 import { TradesClient, type TCard, type TradeView, type MarketCard } from "@/components/game/trades-client";
 
@@ -141,26 +140,24 @@ export default async function EchangesPage() {
   const myForTrade = new Set(myRows.filter((r) => r.for_trade).map((r) => r.id));
 
   return (
-    <AppShell>
-      <main className="mx-auto w-full max-w-6xl px-4 py-8">
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="display mb-1 text-3xl font-bold tracking-tight">Échanges</h1>
-            <p className="text-sm text-muted">
-              Une carte contre une carte de même rareté. Mets tes doubles à échanger et propose aux
-              autres dresseurs.
-            </p>
-          </div>
-          <GameNav current="echanges" />
+    <main className="mx-auto w-full max-w-6xl px-4 py-8">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="display mb-1 text-3xl font-bold tracking-tight">Échanges</h1>
+          <p className="text-sm text-muted">
+            Une carte contre une carte de même rareté. Mets tes doubles à échanger et propose aux
+            autres dresseurs.
+          </p>
         </div>
-        <TradesClient
-          marketplace={marketplace}
-          incoming={incoming}
-          outgoing={outgoing}
-          myCards={myCards}
-          myForTrade={[...myForTrade]}
-        />
-      </main>
-    </AppShell>
+        <GameNav current="echanges" />
+      </div>
+      <TradesClient
+        marketplace={marketplace}
+        incoming={incoming}
+        outgoing={outgoing}
+        myCards={myCards}
+        myForTrade={[...myForTrade]}
+      />
+    </main>
   );
 }

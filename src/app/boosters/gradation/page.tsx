@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/paginate";
 import { type Grade, type Tier } from "@/lib/game";
-import { AppShell } from "@/components/app-shell";
 import { GameNav } from "@/components/game/game-nav";
 import { GradingLab } from "@/components/game/grading-lab";
 import { GradeStats } from "@/components/game/grade-stats";
@@ -82,38 +81,36 @@ export default async function GradationPage() {
   }
 
   return (
-    <AppShell>
-      <main className="mx-auto w-full max-w-6xl px-4 py-8">
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="display mb-1 text-3xl font-bold tracking-tight">Gradation</h1>
-            <p className="text-sm text-muted">
-              Coche des cartes et lance la gradation : 4 sous-notes, une note globale, et la carte
-              passe sous boîtier.
-            </p>
-          </div>
-          <GameNav current="gradation" />
+    <main className="mx-auto w-full max-w-6xl px-4 py-8">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="display mb-1 text-3xl font-bold tracking-tight">Gradation</h1>
+          <p className="text-sm text-muted">
+            Coche des cartes et lance la gradation : 4 sous-notes, une note globale, et la carte
+            passe sous boîtier.
+          </p>
         </div>
+        <GameNav current="gradation" />
+      </div>
 
-        <GradeStats overalls={overalls} />
+      <GradeStats overalls={overalls} />
 
-        <section className="mb-8">
+      <section className="mb-8">
+        <h2 className="display mb-3 text-lg font-semibold">
+          À grader{" "}
+          {ungraded.length > 0 && <span className="num text-sm font-normal text-muted">{ungraded.length}</span>}
+        </h2>
+        <GradingLab cards={ungraded} gradedCount={graded.length} />
+      </section>
+
+      {graded.length > 0 && (
+        <section>
           <h2 className="display mb-3 text-lg font-semibold">
-            À grader{" "}
-            {ungraded.length > 0 && <span className="num text-sm font-normal text-muted">{ungraded.length}</span>}
+            Cartes gradées <span className="num text-sm font-normal text-muted">{graded.length}</span>
           </h2>
-          <GradingLab cards={ungraded} gradedCount={graded.length} />
+          <GameCardsGrid cards={graded} initialSort="grade" hideGradedFilter />
         </section>
-
-        {graded.length > 0 && (
-          <section>
-            <h2 className="display mb-3 text-lg font-semibold">
-              Cartes gradées <span className="num text-sm font-normal text-muted">{graded.length}</span>
-            </h2>
-            <GameCardsGrid cards={graded} initialSort="grade" hideGradedFilter />
-          </section>
-        )}
-      </main>
-    </AppShell>
+      )}
+    </main>
   );
 }

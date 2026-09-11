@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/paginate";
 import { fetchSetsIndex, getSet } from "@/lib/tcgdex";
 import { TIER_LABEL, tierOf, type Grade, type Tier } from "@/lib/game";
-import { AppShell } from "@/components/app-shell";
 import { GameNav } from "@/components/game/game-nav";
 import { CollectionSetGrid, type SetGridCard } from "@/components/game/collection-set-grid";
 import { GameCardsGrid, type OwnedCard } from "@/components/game/game-cards-grid";
@@ -96,32 +95,30 @@ export default async function GameCollectionPage({
       };
     });
     return (
-      <AppShell>
-        <main className="mx-auto w-full max-w-6xl px-4 py-8">
-          <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <Link
-                href="/boosters/collection"
-                aria-label="Retour à la collection virtuelle"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-edge text-muted transition hover:border-edge-strong hover:text-foreground"
-              >
-                <ChevronLeft size={16} aria-hidden />
-              </Link>
-              <div className="min-w-0">
-                <h1 className="display truncate text-2xl font-bold tracking-tight">{set.name}</h1>
-                <p className="num text-sm text-muted">
-                  {owned} / {list.length} · {pct}%
-                </p>
-              </div>
+      <main className="mx-auto w-full max-w-6xl px-4 py-8">
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <Link
+              href="/boosters/collection"
+              aria-label="Retour à la collection virtuelle"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-edge text-muted transition hover:border-edge-strong hover:text-foreground"
+            >
+              <ChevronLeft size={16} aria-hidden />
+            </Link>
+            <div className="min-w-0">
+              <h1 className="display truncate text-2xl font-bold tracking-tight">{set.name}</h1>
+              <p className="num text-sm text-muted">
+                {owned} / {list.length} · {pct}%
+              </p>
             </div>
-            <GameNav current="collection" />
           </div>
-          <div className="mb-6 h-2 overflow-hidden rounded-full bg-raised">
-            <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
-          </div>
-          <CollectionSetGrid cards={gridCards} setName={set.name} />
-        </main>
-      </AppShell>
+          <GameNav current="collection" />
+        </div>
+        <div className="mb-6 h-2 overflow-hidden rounded-full bg-raised">
+          <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+        </div>
+        <CollectionSetGrid cards={gridCards} setName={set.name} />
+      </main>
     );
   }
 
@@ -163,29 +160,27 @@ export default async function GameCollectionPage({
       grade: gradeOf(r),
     }));
     return (
-      <AppShell>
-        <main className="mx-auto w-full max-w-6xl px-4 py-8">
-          <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="display mb-1 text-3xl font-bold tracking-tight">Collection virtuelle</h1>
-              <p className="text-sm text-muted">
-                {all.length} carte{all.length > 1 ? "s" : ""} ·{" "}
-                <span className="inline-flex items-center gap-1">
-                  <BadgeCheck size={13} aria-hidden className="text-accent-strong" />
-                  {gradedCount} gradée{gradedCount > 1 ? "s" : ""}
-                </span>
-              </p>
-            </div>
-            <GameNav current="collection" />
+      <main className="mx-auto w-full max-w-6xl px-4 py-8">
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="display mb-1 text-3xl font-bold tracking-tight">Collection virtuelle</h1>
+            <p className="text-sm text-muted">
+              {all.length} carte{all.length > 1 ? "s" : ""} ·{" "}
+              <span className="inline-flex items-center gap-1">
+                <BadgeCheck size={13} aria-hidden className="text-accent-strong" />
+                {gradedCount} gradée{gradedCount > 1 ? "s" : ""}
+              </span>
+            </p>
           </div>
-          <div className="mb-5">{tabs}</div>
-          {all.length === 0 ? (
-            <Empty />
-          ) : (
-            <GameCardsGrid cards={owned} />
-          )}
-        </main>
-      </AppShell>
+          <GameNav current="collection" />
+        </div>
+        <div className="mb-5">{tabs}</div>
+        {all.length === 0 ? (
+          <Empty />
+        ) : (
+          <GameCardsGrid cards={owned} />
+        )}
+      </main>
     );
   }
 
@@ -210,55 +205,53 @@ export default async function GameCollectionPage({
   const rareOrBetter = all.filter((c) => !["common", "uncommon"].includes(c.tier)).length;
 
   return (
-    <AppShell>
-      <main className="mx-auto w-full max-w-6xl px-4 py-8">
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="display mb-1 text-3xl font-bold tracking-tight">Collection virtuelle</h1>
-            <p className="text-sm text-muted">
-              {all.length === 0
-                ? "Les cartes de tes boosters, à part de ta vraie collection."
-                : `${all.length} carte${all.length > 1 ? "s" : ""} · ${uniqueTotal} différente${uniqueTotal > 1 ? "s" : ""} · ${rareOrBetter} rare${rareOrBetter > 1 ? "s" : ""} ou mieux`}
-            </p>
-          </div>
-          <GameNav current="collection" />
+    <main className="mx-auto w-full max-w-6xl px-4 py-8">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="display mb-1 text-3xl font-bold tracking-tight">Collection virtuelle</h1>
+          <p className="text-sm text-muted">
+            {all.length === 0
+              ? "Les cartes de tes boosters, à part de ta vraie collection."
+              : `${all.length} carte${all.length > 1 ? "s" : ""} · ${uniqueTotal} différente${uniqueTotal > 1 ? "s" : ""} · ${rareOrBetter} rare${rareOrBetter > 1 ? "s" : ""} ou mieux`}
+          </p>
         </div>
+        <GameNav current="collection" />
+      </div>
 
-        {sets.length === 0 ? (
-          <Empty />
-        ) : (
-          <>
-            <div className="mb-5">{tabs}</div>
-            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {sets.map((s) => (
-                <li key={s.id}>
-                  <Link
-                    href={`/boosters/collection?set=${encodeURIComponent(s.id)}`}
-                    className="panel group flex flex-col gap-3 p-5 transition hover:border-accent hover:shadow-lg"
-                  >
-                    <div className="flex items-baseline justify-between gap-3">
-                      <p className="truncate text-sm font-medium group-hover:text-accent-strong">{s.name}</p>
-                      <p className="num shrink-0 text-xs text-muted">
-                        {s.total != null ? `${s.owned} / ${s.total} · ${Math.round(s.pct ?? 0)}%` : `${s.owned} cartes`}
-                      </p>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-foreground/[0.07]">
-                      <div className="h-full rounded-full bg-accent" style={{ width: `${Math.max(s.pct ?? 0, 1.5)}%` }} />
-                    </div>
-                    <p className="truncate text-[11px] text-faint">
-                      {(Object.entries(s.tiers) as [Tier, number][])
-                        .filter(([t]) => t !== "common" && t !== "uncommon")
-                        .map(([t, n]) => `${n} ${TIER_LABEL[t] ?? t}`)
-                        .join(" · ") || `${s.count} carte${s.count > 1 ? "s" : ""} tirée${s.count > 1 ? "s" : ""}`}
+      {sets.length === 0 ? (
+        <Empty />
+      ) : (
+        <>
+          <div className="mb-5">{tabs}</div>
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {sets.map((s) => (
+              <li key={s.id}>
+                <Link
+                  href={`/boosters/collection?set=${encodeURIComponent(s.id)}`}
+                  className="panel group flex flex-col gap-3 p-5 transition hover:border-accent hover:shadow-lg"
+                >
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="truncate text-sm font-medium group-hover:text-accent-strong">{s.name}</p>
+                    <p className="num shrink-0 text-xs text-muted">
+                      {s.total != null ? `${s.owned} / ${s.total} · ${Math.round(s.pct ?? 0)}%` : `${s.owned} cartes`}
                     </p>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </main>
-    </AppShell>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-foreground/[0.07]">
+                    <div className="h-full rounded-full bg-accent" style={{ width: `${Math.max(s.pct ?? 0, 1.5)}%` }} />
+                  </div>
+                  <p className="truncate text-[11px] text-faint">
+                    {(Object.entries(s.tiers) as [Tier, number][])
+                      .filter(([t]) => t !== "common" && t !== "uncommon")
+                      .map(([t, n]) => `${n} ${TIER_LABEL[t] ?? t}`)
+                      .join(" · ") || `${s.count} carte${s.count > 1 ? "s" : ""} tirée${s.count > 1 ? "s" : ""}`}
+                  </p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </main>
   );
 }
 

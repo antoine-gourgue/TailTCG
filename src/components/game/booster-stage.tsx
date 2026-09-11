@@ -30,8 +30,8 @@ type Reveal = {
   revealed: DrawnCard[];
   /** Carte du dessus en train de pivoter dans la pile */
   flipping: string | null;
-  /** Carte présentée en grand, avant de rejoindre la rangée */
-  show: { card: DrawnCard; sparkles: Sparkle[]; leaving: boolean } | null;
+  /** Carte présentée en grand, avant de rejoindre la rangée ; `fast` = passée d'une tape */
+  show: { card: DrawnCard; sparkles: Sparkle[]; leaving: boolean; fast: boolean } | null;
 };
 
 const noopSubscribe = () => () => {};
@@ -39,6 +39,10 @@ const noopSubscribe = () => () => {};
 const TEAR_TRAVEL = 0.6;
 const FLIP_MS = 650;
 const OUT_MS = 380;
+/** Sortie écourtée quand on tape la carte : rapide mais encore lisible */
+const OUT_FAST_MS = 200;
+/** Tape pendant le retournement : la carte reste ce minimum en grand */
+const PEEK_MS = 160;
 
 const TIER_CLASS: Record<Tier, string> = {
   common: "!bg-neutral-700/90 !text-neutral-100",
@@ -109,6 +113,8 @@ export function BoosterStage({
   /** « Tout retourner » : enchaîne les cartes, en respectant les tapes qui accélèrent */
   const auto = useRef(false);
   const leavingId = useRef<string | null>(null);
+  /** Tape reçue pendant le retournement : on écourte dès que la carte est visible */
+  const skipQueued = useRef(false);
 
   useEffect(() => {
     rvRef.current = rv;
@@ -209,17 +215,20 @@ export function BoosterStage({
   }
 
   // ——— Pile : la carte du dessus pivote, se présente en grand, rejoint la rangée ———
-  function flipTop() {
+  // `force` : appel depuis `leave`, avant que l'état « en train de sortir »
+  // soit visible dans rvRef (la suivante démarre pendant la sortie)
+  function flipTop(force = false) {
     const cur = rvRef.current;
     if (cur.remaining.length === 0) {
       auto.current = false;
       return;
     }
-    if (cur.flipping || cur.show) return;
+    if (cur.flipping || (cur.show && !cur.show.leaving && !force)) return;
     const top = cur.remaining[cur.remaining.length - 1];
+    skipQueued.current = false;
     play("flip");
     navigator.vibrate?.(rareOrBetter(top.tier) ? [15, 40, 25] : 10);
-    setRv({ ...cur, flipping: top.id });
+    setRv((c) => ({ ...c, flipping: top.id }));
     if (rank(top.tier) >= rank("ultra")) window.setTimeout(() => play("ultra"), 320);
     else if (rank(top.tier) >= rank("rare")) window.setTimeout(() => play("rare"), 320);
     const sparkles: Sparkle[] = rareOrBetter(top.tier)
@@ -239,41 +248,55 @@ export function BoosterStage({
                 ...c,
                 remaining: c.remaining.filter((x) => x.id !== top.id),
                 flipping: null,
-                show: { card: top, sparkles, leaving: false },
+                show: { card: top, sparkles, leaving: false, fast: false },
               }
             : c
         );
+        // Temps d'exposition selon la rareté ; tapée pendant le retournement,
+        // la carte ne reste qu'un instant
+        const fast = skipQueued.current;
+        skipQueued.current = false;
+        timers.current.push(
+          window.setTimeout(() => leave(top.id, fast), fast ? PEEK_MS : holdFor(top.tier))
+        );
       }, FLIP_MS),
-      // Temps d'exposition selon la rareté ; une tape sur la carte l'écourte
-      window.setTimeout(() => leave(top.id), FLIP_MS + holdFor(top.tier)),
     ];
   }
   /** La carte présentée quitte la scène et rejoint la rangée (une seule fois) */
-  function leave(id: string) {
+  function leave(id: string, fast = false) {
     const s = rvRef.current.show;
     if (!s || s.card.id !== id || s.leaving || leavingId.current === id) return;
     leavingId.current = id;
     for (const t of timers.current) window.clearTimeout(t);
     timers.current = [];
-    setRv((c) => (c.show?.card.id === id ? { ...c, show: { ...c.show, leaving: true } } : c));
+    setRv((c) => (c.show?.card.id === id ? { ...c, show: { ...c.show, leaving: true, fast } } : c));
+    // Passée d'une tape en mode « Tout retourner » : la suivante se retourne
+    // déjà pendant que celle-ci sort
+    if (fast && auto.current) flipTop(true);
     window.setTimeout(() => {
       play("land");
       setRv((c) =>
         c.show?.card.id === id ? { ...c, show: null, revealed: [...c.revealed, c.show.card] } : c
       );
       leavingId.current = null;
-      // En mode « Tout retourner », la suivante part dès que celle-ci est rangée
-      if (auto.current) {
+      if (auto.current && !fast) {
         window.setTimeout(() => {
           if (auto.current) flipTop();
         }, 120);
       }
-    }, OUT_MS);
+    }, fast ? OUT_FAST_MS : OUT_MS);
   }
-  /** Tape sur la carte présentée : on passe à la suite sans attendre */
+  /** Tape sur la carte : on passe à la suite tout de suite, en douceur */
   function skip() {
-    const s = rvRef.current.show;
-    if (s && !s.leaving) leave(s.card.id);
+    const cur = rvRef.current;
+    if (cur.show && !cur.show.leaving) leave(cur.show.card.id, true);
+    else if (cur.flipping) skipQueued.current = true;
+  }
+  /** Tape sur la pile : retourne la suivante, ou écourte celle qui se retourne */
+  function onTop() {
+    const cur = rvRef.current;
+    if (!cur.flipping && (!cur.show || cur.show.leaving)) flipTop();
+    else skip();
   }
   function revealAll() {
     auto.current = true;
@@ -415,10 +438,10 @@ export function BoosterStage({
                 >
                   <button
                     type="button"
-                    onClick={top && stage === "revealing" ? flipTop : undefined}
-                    disabled={!top || stage !== "revealing" || !idle}
+                    onClick={top && stage === "revealing" ? onTop : undefined}
+                    disabled={!top || stage !== "revealing"}
                     aria-label={top ? "Retourner la carte du dessus" : undefined}
-                    className={`block h-full w-full [perspective:1400px] ${top && idle ? "cursor-pointer" : ""}`}
+                    className={`block h-full w-full [perspective:1400px] ${top ? "cursor-pointer" : ""}`}
                   >
                     <div
                       className={`relative h-full w-full transition-transform duration-[650ms] [transform-style:preserve-3d] ${
@@ -454,6 +477,7 @@ export function BoosterStage({
                 ? "pointer-events-none animate-[showcase-out_.38s_ease-in_forwards]"
                 : "cursor-pointer animate-[showcase-in_.35s_cubic-bezier(.2,.8,.3,1)_both]"
             }`}
+            style={rv.show.leaving && rv.show.fast ? { animationDuration: `${OUT_FAST_MS}ms` } : undefined}
           >
             <div className="relative aspect-[63/88] w-[min(74vw,330px)]">
               {glow && rareOrBetter(rv.show.card.tier) && (
