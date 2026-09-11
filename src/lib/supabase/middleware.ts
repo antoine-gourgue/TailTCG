@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getJwks } from "@/lib/supabase/jwks";
 
 // /api/cron est protégé par CRON_SECRET dans la route ; /v est la vitrine
 // publique (jeton secret vérifié dans la page)
@@ -46,11 +47,21 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Ne rien insérer entre createServerClient et getUser : le refresh de
-  // session dépend de cet appel.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Ne rien insérer entre createServerClient et getClaims : le refresh de
+  // session dépend de cet appel. La signature du JWT est vérifiée
+  // localement (clés asymétriques du projet) : plus d'aller-retour vers
+  // l'API Auth à chaque requête.
+  const jwks = await getJwks();
+  const { data, error } = await supabase.auth.getClaims(
+    undefined,
+    jwks ? { jwks: jwks as NonNullable<Parameters<typeof supabase.auth.getClaims>[1]>["jwks"] } : undefined
+  );
+  let user: { sub?: string } | null = data?.claims ?? null;
+  if (!user && error && request.cookies.getAll().some((c) => c.name.startsWith("sb-"))) {
+    // Session présente mais vérification locale impossible : l'API Auth tranche
+    const res = await supabase.auth.getUser();
+    user = res.data.user ? { sub: res.data.user.id } : null;
+  }
 
   // "/" est publique : landing pour les visiteurs, collection une fois connecté
   const isPublic =

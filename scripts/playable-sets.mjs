@@ -107,6 +107,13 @@ for (let i = 0; i < briefs.length; i += CHUNK) {
   process.stdout.write(`\r${Math.min(i + CHUNK, briefs.length)} / ${briefs.length}`);
 }
 
+// Garde-fou : une API en panne ne doit jamais produire un instantané vide
+// (le workflow nocturne le committerait)
+if (series.length === 0 || list.length < 50) {
+  console.error(`\nInstantané refusé : ${list.length} sets seulement (API TCGdex indisponible ?)`);
+  process.exit(1);
+}
+
 list.sort((a, b) => b.releaseDate.localeCompare(a.releaseDate));
 await writeFile(new URL("../src/data/playable-sets.json", import.meta.url), JSON.stringify(list, null, 1) + "\n");
 

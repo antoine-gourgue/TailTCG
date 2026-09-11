@@ -192,7 +192,7 @@ export function BoosterStage({
     // Une action qui échoue (réseau, délai serveur) ne doit jamais laisser la
     // scène bloquée sur « Ouverture… »
     const res = await onOpen(set.id).catch((): OpenResult => ({ error: "Ouverture impossible, réessaie." }));
-    const wait = Math.max(0, 700 - (Date.now() - started));
+    const wait = Math.max(0, 450 - (Date.now() - started));
     window.setTimeout(() => {
       busy.current = false;
       if ("error" in res) {
@@ -206,7 +206,7 @@ export function BoosterStage({
       onOpened?.(res);
       setStage("opened");
       play("pop");
-      window.setTimeout(() => setStage("revealing"), 700);
+      window.setTimeout(() => setStage("revealing"), 520);
     }, wait);
   }
 
@@ -377,7 +377,7 @@ export function BoosterStage({
           <div
             className={`relative ${
               stage === "opened"
-                ? "animate-[pack-away_.6s_ease-in_forwards]"
+                ? "animate-[pack-away_.5s_ease-in_forwards]"
                 : stage === "sealed" && progress === 0
                   ? "animate-[pack-float_4.5s_ease-in-out_infinite]"
                   : ""
@@ -408,7 +408,7 @@ export function BoosterStage({
         {(stage === "opened" || stage === "revealing") && pack && !done && (
           <div
             className={`relative aspect-[63/88] w-[min(56vw,250px)] ${
-              stage === "opened" ? "animate-[stack-out_.65s_cubic-bezier(.2,.8,.3,1)_both]" : ""
+              stage === "opened" ? "animate-[stack-out_.55s_cubic-bezier(.2,.8,.3,1)_both]" : ""
             }`}
           >
             {glow && (

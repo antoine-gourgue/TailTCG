@@ -1,19 +1,13 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { currentUserId } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Result = { error: string } | { ok: true };
 
-async function me() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user?.id ?? null;
-}
+const me = currentUserId;
 
 /** Met (ou retire) une carte sur la place d'échange */
 export async function setForTrade(cardId: string, on: boolean): Promise<Result> {

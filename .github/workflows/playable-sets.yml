@@ -1,0 +1,40 @@
+# Chaque nuit : régénère l'instantané des sets jouables (liste + cartes de
+# chaque set) depuis TCGdex et le committe s'il a changé. Vercel redéploie
+# sur le push : un nouveau set apparaît dans les boosters le lendemain, sans
+# aucune requête TCGdex à l'exécution.
+name: Sets jouables (instantané)
+
+on:
+  schedule:
+    - cron: "17 4 * * *" # 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: playable-sets
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Régénérer l'instantané
+        run: node scripts/playable-sets.mjs
+      - name: Committer s'il y a du nouveau
+        run: |
+          if [ -n "$(git status --porcelain src/data)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/data
+            git commit -m "Boosters : instantané des sets mis à jour ($(date -u +%F))"
+            git push
+          else
+            echo "Aucun changement."
+          fi

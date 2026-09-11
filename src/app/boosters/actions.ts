@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { currentUserId } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSet } from "@/lib/tcgdex";
 import { imagedCardIds } from "@/lib/game-sets";
@@ -40,34 +40,33 @@ const rand = () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
 /**
  * Ouvre un booster d'un set : débite la réserve, tire 5 cartes côté serveur
  * et les ajoute à la collection virtuelle du joueur. Tout passe par le
- * service role après vérification de l'utilisateur.
+ * service role après vérification de l'utilisateur. Aucune requête TCGdex :
+ * les cartes du set sont embarquées ; lectures puis écritures en parallèle,
+ * deux allers-retours vers la base en tout.
  */
 export async function openBooster(setId: string): Promise<OpenResult> {
   if (!setId || setId.length > 40) return { error: "Set invalide" };
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Non connecté" };
+  const uid = await currentUserId();
+  if (!uid) return { error: "Non connecté" };
 
   const admin = createAdminClient();
-  const { data: prof } = await admin
-    .from("game_profiles")
-    .select("boosters, refill_at, opened")
-    .eq("owner_id", user.id)
-    .maybeSingle();
   const now = Date.now();
+  // Profil, cartes déjà possédées dans ce set (badge « Nouvelle ») et cartes
+  // du set, en parallèle
+  const [{ data: prof }, { data: owned }, local] = await Promise.all([
+    admin.from("game_profiles").select("boosters, refill_at, opened").eq("owner_id", uid).maybeSingle(),
+    admin.from("game_cards").select("tcgdex_id").eq("owner_id", uid).eq("set_id", setId),
+    loadSetPool(setId),
+  ]);
   const profile: Profile = prof ?? { boosters: MAX_STOCK, refill_at: new Date(now).toISOString() };
   const s = settleStock(profile, now);
   if (!UNLIMITED_BOOSTERS && s.stock < 1) {
     return { error: `Plus de booster : le prochain arrive dans ${formatCountdown((s.nextAt ?? now) - now)}.` };
   }
 
-  // Cartes du set embarquées dans le dépôt ; TCGdex seulement pour un set
-  // absent de l'instantané
+  // TCGdex seulement pour un set absent de l'instantané
   let setName: string;
   let cards: PoolCard[];
-  const local = await loadSetPool(setId);
   if (local) {
     setName = local.name;
     cards = local.cards;
@@ -83,42 +82,7 @@ export async function openBooster(setId: string): Promise<OpenResult> {
   const pool = cards.map((c) => ({ ...c, tier: tierOf(c.rarity) }));
   if (pool.length < PACK_SIZE) return { error: "Ce set n'a pas assez de cartes." };
   const drawn = drawPack(pool, rand);
-
-  // Cartes déjà possédées dans ce set → badge « Nouvelle » sur les autres
-  const { data: owned } = await admin
-    .from("game_cards")
-    .select("tcgdex_id")
-    .eq("owner_id", user.id)
-    .eq("set_id", setId);
   const ownedIds = new Set((owned ?? []).map((o) => o.tcgdex_id));
-
-  const { data: inserted, error } = await admin
-    .from("game_cards")
-    .insert(
-      drawn.map((c) => {
-        // Potentiel de gradation caché, figé au tirage
-        const g = rollGrade(Math.random);
-        return {
-          owner_id: user.id,
-          tcgdex_id: c.id,
-          set_id: setId,
-          set_name: setName,
-          card_name: c.name,
-          local_id: c.localId,
-          image_url: c.image ?? null,
-          rarity: c.rarity ?? null,
-          tier: c.tier,
-          source: "booster",
-          grade_centering: g.centering,
-          grade_corners: g.corners,
-          grade_edges: g.edges,
-          grade_surface: g.surface,
-          grade_overall: g.overall,
-        };
-      })
-    )
-    .select("id");
-  if (error || !inserted) return { error: "Ouverture impossible, réessaie." };
 
   const nextProfile: Profile = UNLIMITED_BOOSTERS
     ? { boosters: MAX_STOCK, refill_at: new Date(now).toISOString() }
@@ -127,14 +91,38 @@ export async function openBooster(setId: string): Promise<OpenResult> {
         // Réserve pleine avant l'ouverture : le compteur repart maintenant
         refill_at: new Date(s.stock >= MAX_STOCK ? now : s.refillAt).toISOString(),
       };
-  await Promise.all([
+
+  const [{ data: inserted, error }] = await Promise.all([
     admin
-      .from("game_profiles")
-      .upsert({ owner_id: user.id, ...nextProfile, opened: (prof?.opened ?? 0) + 1 }),
-    admin
-      .from("game_openings")
-      .insert({ owner_id: user.id, set_id: setId, tcgdex_ids: drawn.map((c) => c.id) }),
+      .from("game_cards")
+      .insert(
+        drawn.map((c) => {
+          // Potentiel de gradation caché, figé au tirage
+          const g = rollGrade(Math.random);
+          return {
+            owner_id: uid,
+            tcgdex_id: c.id,
+            set_id: setId,
+            set_name: setName,
+            card_name: c.name,
+            local_id: c.localId,
+            image_url: c.image ?? null,
+            rarity: c.rarity ?? null,
+            tier: c.tier,
+            source: "booster",
+            grade_centering: g.centering,
+            grade_corners: g.corners,
+            grade_edges: g.edges,
+            grade_surface: g.surface,
+            grade_overall: g.overall,
+          };
+        })
+      )
+      .select("id"),
+    admin.from("game_profiles").upsert({ owner_id: uid, ...nextProfile, opened: (prof?.opened ?? 0) + 1 }),
+    admin.from("game_openings").insert({ owner_id: uid, set_id: setId, tcgdex_ids: drawn.map((c) => c.id) }),
   ]);
+  if (error || !inserted) return { error: "Ouverture impossible, réessaie." };
 
   return {
     setId,
@@ -161,11 +149,8 @@ export async function gradeGameCard(
   cardId: string
 ): Promise<{ error: string } | { grade: Grade }> {
   if (!cardId) return { error: "Carte invalide" };
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Non connecté" };
+  const uid = await currentUserId();
+  if (!uid) return { error: "Non connecté" };
 
   const admin = createAdminClient();
   const { data: card } = await admin
@@ -173,7 +158,7 @@ export async function gradeGameCard(
     .select("owner_id, graded, grade_centering, grade_corners, grade_edges, grade_surface, grade_overall")
     .eq("id", cardId)
     .maybeSingle();
-  if (!card || card.owner_id !== user.id) return { error: "Carte introuvable" };
+  if (!card || card.owner_id !== uid) return { error: "Carte introuvable" };
   if (card.grade_overall == null) return { error: "Cette carte ne peut pas être gradée." };
 
   if (!card.graded) {
@@ -203,18 +188,15 @@ export async function gradeGameCards(
 ): Promise<{ error: string } | { graded: GradedResult[] }> {
   const clean = [...new Set(ids)].filter(Boolean).slice(0, 200);
   if (clean.length === 0) return { error: "Aucune carte sélectionnée." };
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Non connecté" };
+  const uid = await currentUserId();
+  if (!uid) return { error: "Non connecté" };
 
   const admin = createAdminClient();
   const { data: rows } = await admin
     .from("game_cards")
     .select("id, graded, grade_centering, grade_corners, grade_edges, grade_surface, grade_overall")
     .in("id", clean)
-    .eq("owner_id", user.id);
+    .eq("owner_id", uid);
   const valid = (rows ?? []).filter((r) => r.grade_overall != null);
   if (valid.length === 0) return { error: "Ces cartes ne peuvent pas être gradées." };
 
