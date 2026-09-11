@@ -189,7 +189,9 @@ export function BoosterStage({
     play("tear");
     navigator.vibrate?.(20);
     const started = Date.now();
-    const res = await onOpen(set.id);
+    // Une action qui échoue (réseau, délai serveur) ne doit jamais laisser la
+    // scène bloquée sur « Ouverture… »
+    const res = await onOpen(set.id).catch((): OpenResult => ({ error: "Ouverture impossible, réessaie." }));
     const wait = Math.max(0, 700 - (Date.now() - started));
     window.setTimeout(() => {
       busy.current = false;

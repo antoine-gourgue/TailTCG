@@ -1,10 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSet } from "@/lib/tcgdex";
 import { imagedCardIds } from "@/lib/game-sets";
+import { loadSetPool, type PoolCard } from "@/lib/game-pool";
 import {
   drawPack,
   formatCountdown,
@@ -63,12 +63,24 @@ export async function openBooster(setId: string): Promise<OpenResult> {
     return { error: `Plus de booster : le prochain arrive dans ${formatCountdown((s.nextAt ?? now) - now)}.` };
   }
 
-  const [set, imaged] = await Promise.all([getSet(setId, "fr"), imagedCardIds(setId)]);
-  if (!set) return { error: "Set introuvable" };
-  // Seules les cartes dont le visuel existe vraiment sur le CDN
-  const pool = (set.cards ?? [])
-    .filter((c) => !!c.image && (imaged.size === 0 || imaged.has(c.id)))
-    .map((c) => ({ ...c, tier: tierOf(c.rarity) }));
+  // Cartes du set embarquées dans le dépôt ; TCGdex seulement pour un set
+  // absent de l'instantané
+  let setName: string;
+  let cards: PoolCard[];
+  const local = await loadSetPool(setId);
+  if (local) {
+    setName = local.name;
+    cards = local.cards;
+  } else {
+    const [set, imaged] = await Promise.all([getSet(setId, "fr"), imagedCardIds(setId)]);
+    if (!set) return { error: "Set introuvable" };
+    setName = set.name;
+    // Seules les cartes dont le visuel existe vraiment sur le CDN
+    cards = (set.cards ?? [])
+      .filter((c) => !!c.image && (imaged.size === 0 || imaged.has(c.id)))
+      .map((c) => ({ id: c.id, localId: c.localId, name: c.name, image: c.image!, rarity: c.rarity ?? null }));
+  }
+  const pool = cards.map((c) => ({ ...c, tier: tierOf(c.rarity) }));
   if (pool.length < PACK_SIZE) return { error: "Ce set n'a pas assez de cartes." };
   const drawn = drawPack(pool, rand);
 
@@ -77,7 +89,7 @@ export async function openBooster(setId: string): Promise<OpenResult> {
     .from("game_cards")
     .select("tcgdex_id")
     .eq("owner_id", user.id)
-    .eq("set_id", set.id);
+    .eq("set_id", setId);
   const ownedIds = new Set((owned ?? []).map((o) => o.tcgdex_id));
 
   const { data: inserted, error } = await admin
@@ -89,8 +101,8 @@ export async function openBooster(setId: string): Promise<OpenResult> {
         return {
           owner_id: user.id,
           tcgdex_id: c.id,
-          set_id: set.id,
-          set_name: set.name,
+          set_id: setId,
+          set_name: setName,
           card_name: c.name,
           local_id: c.localId,
           image_url: c.image ?? null,
@@ -121,14 +133,12 @@ export async function openBooster(setId: string): Promise<OpenResult> {
       .upsert({ owner_id: user.id, ...nextProfile, opened: (prof?.opened ?? 0) + 1 }),
     admin
       .from("game_openings")
-      .insert({ owner_id: user.id, set_id: set.id, tcgdex_ids: drawn.map((c) => c.id) }),
+      .insert({ owner_id: user.id, set_id: setId, tcgdex_ids: drawn.map((c) => c.id) }),
   ]);
 
-  revalidatePath("/boosters");
-  revalidatePath("/boosters/collection");
   return {
-    setId: set.id,
-    setName: set.name,
+    setId,
+    setName,
     profile: nextProfile,
     cards: drawn.map((c, i) => ({
       id: inserted[i]?.id ?? `${c.id}-${i}`,
@@ -173,8 +183,6 @@ export async function gradeGameCard(
       .eq("id", cardId);
     if (error) return { error: "Gradation impossible, réessaie." };
   }
-  revalidatePath("/boosters/collection");
-  revalidatePath("/boosters/gradation");
   return {
     grade: {
       centering: card.grade_centering ?? 0,
@@ -219,8 +227,6 @@ export async function gradeGameCards(
     if (error) return { error: "Gradation impossible, réessaie." };
   }
 
-  revalidatePath("/boosters/collection");
-  revalidatePath("/boosters/gradation");
   return {
     graded: valid.map((r) => ({
       id: r.id,

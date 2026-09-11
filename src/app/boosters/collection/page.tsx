@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { BadgeCheck, ChevronLeft, LayoutGrid, Package } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/paginate";
-import { fetchSetsIndex, getSet } from "@/lib/tcgdex";
+import { getSet } from "@/lib/tcgdex";
+import { loadSetPool } from "@/lib/game-pool";
+import { PLAYABLE_BY_ID } from "@/lib/game-sets";
 import { TIER_LABEL, tierOf, type Grade, type Tier } from "@/lib/game";
 import { GameNav } from "@/components/game/game-nav";
 import { CollectionSetGrid, type SetGridCard } from "@/components/game/collection-set-grid";
@@ -67,7 +69,25 @@ export default async function GameCollectionPage({
 
   /* ——— Un set : toutes ses cartes, possédées ou non ——— */
   if (setId) {
-    const set = await getSet(setId, "fr");
+    // Cartes du set embarquées dans le dépôt ; TCGdex seulement hors instantané
+    const local = await loadSetPool(setId);
+    const set = local
+      ? { id: local.id, name: local.name, cards: local.cards }
+      : await getSet(setId, "fr").then((s) =>
+          s
+            ? {
+                id: s.id,
+                name: s.name,
+                cards: (s.cards ?? []).map((c) => ({
+                  id: c.id,
+                  name: c.name,
+                  localId: c.localId,
+                  image: c.image ?? null,
+                  rarity: c.rarity ?? null,
+                })),
+              }
+            : null
+        );
     if (!set) redirect("/boosters/collection");
     // Un exemplaire représentatif par carte du catalogue (le mieux gradé)
     const rep = new Map<string, Row>();
@@ -78,7 +98,7 @@ export default async function GameCollectionPage({
       const cur = rep.get(c.tcgdex_id);
       if (!cur || (gradeOf(c)?.overall ?? -1) > (gradeOf(cur)?.overall ?? -1)) rep.set(c.tcgdex_id, c);
     }
-    const list = set.cards ?? [];
+    const list = set.cards;
     const owned = list.filter((c) => qty.has(c.id)).length;
     const pct = list.length > 0 ? Math.round((owned / list.length) * 100) : 0;
     const gridCards: SetGridCard[] = list.map((c) => {
@@ -194,11 +214,10 @@ export default async function GameCollectionPage({
     s.tiers[c.tier] = (s.tiers[c.tier] ?? 0) + 1;
     bySet.set(c.set_id, s);
   }
-  const index = bySet.size > 0 ? await fetchSetsIndex().catch(() => new Map()) : new Map();
+  // Total = cartes tirables du set (instantané), cohérent avec les boosters
   const sets = [...bySet.values()]
     .map((s) => {
-      const cc = index.get(s.id)?.cardCount;
-      const total = cc?.total ?? cc?.official ?? null;
+      const total = PLAYABLE_BY_ID.get(s.id)?.total ?? null;
       return { ...s, owned: s.unique.size, total, pct: total ? Math.min(100, (s.unique.size / total) * 100) : null };
     })
     .sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0) || b.owned - a.owned);

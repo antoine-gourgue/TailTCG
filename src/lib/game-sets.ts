@@ -31,6 +31,8 @@ export type PlayableSet = {
 };
 
 const snapshot = SNAPSHOT as PlayableSet[];
+/** Sets de l'instantané par id (totaux, noms), sans requête */
+export const PLAYABLE_BY_ID: ReadonlyMap<string, PlayableSet> = new Map(snapshot.map((s) => [s.id, s]));
 
 /** Fiche brute d'un set : les cartes y ont `image` seulement si l'asset existe */
 export async function fetchSetRaw(id: string): Promise<TcgdexSetDetail | null> {

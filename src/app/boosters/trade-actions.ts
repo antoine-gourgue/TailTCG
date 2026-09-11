@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -28,7 +27,6 @@ export async function setForTrade(cardId: string, on: boolean): Promise<Result> 
     .eq("id", cardId)
     .eq("owner_id", uid);
   if (error) return { error: "Enregistrement impossible" };
-  revalidatePath("/boosters/echanges");
   return { ok: true };
 }
 
@@ -45,7 +43,6 @@ export async function setForTradeMany(cardIds: string[], on: boolean): Promise<R
     .in("id", ids)
     .eq("owner_id", uid);
   if (error) return { error: "Enregistrement impossible" };
-  revalidatePath("/boosters/echanges");
   return { ok: true };
 }
 
@@ -88,7 +85,6 @@ export async function proposeTrade(fromCardId: string, toCardId: string): Promis
     tier: to.tier,
   });
   if (error) return { error: "Proposition impossible, réessaie." };
-  revalidatePath("/boosters/echanges");
   return { ok: true };
 }
 
@@ -120,8 +116,6 @@ export async function respondTrade(tradeId: string, accept: boolean): Promise<Re
       .eq("status", "pending");
     if (error) return { error: "Action impossible" };
   }
-  revalidatePath("/boosters/echanges");
-  revalidatePath("/boosters/collection");
   return { ok: true };
 }
 
@@ -138,6 +132,5 @@ export async function cancelTrade(tradeId: string): Promise<Result> {
     .eq("from_owner", uid)
     .eq("status", "pending");
   if (error) return { error: "Annulation impossible" };
-  revalidatePath("/boosters/echanges");
   return { ok: true };
 }
