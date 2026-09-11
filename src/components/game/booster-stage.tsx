@@ -6,10 +6,11 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import { ArrowRight, Package, Sparkles, Volume2, VolumeX, X } from "lucide-react";
+import { ChevronsRight, Package, Scissors, Sparkles, Volume2, VolumeX, X } from "lucide-react";
 import type { DrawnCard, OpenResult } from "@/app/boosters/actions";
 import type { PlayableSet } from "@/lib/game-sets";
 import { CardImage } from "@/components/card-image";
@@ -103,6 +104,11 @@ export function BoosterStage({
   const tear = useRef<{ id: number; startX: number; width: number } | null>(null);
   const rvRef = useRef(rv);
   const busy = useRef(false);
+  /** Minuteries de la carte en cours (annulées quand on la passe) */
+  const timers = useRef<number[]>([]);
+  /** « Tout retourner » : enchaîne les cartes, en respectant les tapes qui accélèrent */
+  const auto = useRef(false);
+  const leavingId = useRef<string | null>(null);
 
   useEffect(() => {
     rvRef.current = rv;
@@ -205,7 +211,11 @@ export function BoosterStage({
   // ——— Pile : la carte du dessus pivote, se présente en grand, rejoint la rangée ———
   function flipTop() {
     const cur = rvRef.current;
-    if (cur.flipping || cur.show || cur.remaining.length === 0) return;
+    if (cur.remaining.length === 0) {
+      auto.current = false;
+      return;
+    }
+    if (cur.flipping || cur.show) return;
     const top = cur.remaining[cur.remaining.length - 1];
     play("flip");
     navigator.vibrate?.(rareOrBetter(top.tier) ? [15, 40, 25] : 10);
@@ -221,39 +231,59 @@ export function BoosterStage({
           size: 8 + Math.random() * 14,
         }))
       : [];
-    window.setTimeout(() => {
-      setRv((c) =>
-        c.flipping === top.id
-          ? {
-              ...c,
-              remaining: c.remaining.filter((x) => x.id !== top.id),
-              flipping: null,
-              show: { card: top, sparkles, leaving: false },
-            }
-          : c
-      );
-    }, FLIP_MS);
-    const hold = holdFor(top.tier);
-    window.setTimeout(() => {
-      setRv((c) => (c.show?.card.id === top.id ? { ...c, show: { ...c.show, leaving: true } } : c));
-    }, FLIP_MS + hold);
+    timers.current = [
+      window.setTimeout(() => {
+        setRv((c) =>
+          c.flipping === top.id
+            ? {
+                ...c,
+                remaining: c.remaining.filter((x) => x.id !== top.id),
+                flipping: null,
+                show: { card: top, sparkles, leaving: false },
+              }
+            : c
+        );
+      }, FLIP_MS),
+      // Temps d'exposition selon la rareté ; une tape sur la carte l'écourte
+      window.setTimeout(() => leave(top.id), FLIP_MS + holdFor(top.tier)),
+    ];
+  }
+  /** La carte présentée quitte la scène et rejoint la rangée (une seule fois) */
+  function leave(id: string) {
+    const s = rvRef.current.show;
+    if (!s || s.card.id !== id || s.leaving || leavingId.current === id) return;
+    leavingId.current = id;
+    for (const t of timers.current) window.clearTimeout(t);
+    timers.current = [];
+    setRv((c) => (c.show?.card.id === id ? { ...c, show: { ...c.show, leaving: true } } : c));
     window.setTimeout(() => {
       play("land");
       setRv((c) =>
-        c.show?.card.id === top.id ? { ...c, show: null, revealed: [...c.revealed, top] } : c
+        c.show?.card.id === id ? { ...c, show: null, revealed: [...c.revealed, c.show.card] } : c
       );
-    }, FLIP_MS + hold + OUT_MS);
+      leavingId.current = null;
+      // En mode « Tout retourner », la suivante part dès que celle-ci est rangée
+      if (auto.current) {
+        window.setTimeout(() => {
+          if (auto.current) flipTop();
+        }, 120);
+      }
+    }, OUT_MS);
+  }
+  /** Tape sur la carte présentée : on passe à la suite sans attendre */
+  function skip() {
+    const s = rvRef.current.show;
+    if (s && !s.leaving) leave(s.card.id);
   }
   function revealAll() {
-    const n = rvRef.current.remaining.length;
-    const cards = [...rvRef.current.remaining].reverse();
-    let at = 0;
-    for (let i = 0; i < n; i++) {
-      window.setTimeout(flipTop, at);
-      at += FLIP_MS + holdFor(cards[i].tier) + OUT_MS + 120;
-    }
+    auto.current = true;
+    flipTop();
   }
   function again() {
+    auto.current = false;
+    leavingId.current = null;
+    for (const t of timers.current) window.clearTimeout(t);
+    timers.current = [];
     setPack(null);
     setRv({ remaining: [], revealed: [], flipping: null, show: null });
     setProgress(0);
@@ -414,12 +444,15 @@ export function BoosterStage({
           </div>
         )}
 
-        {/* Carte présentée en grand */}
+        {/* Carte présentée en grand : une tape la range et passe à la suivante */}
         {rv.show && (
           <div
             key={rv.show.card.id}
-            className={`pointer-events-none absolute inset-0 z-20 flex items-center justify-center ${
-              rv.show.leaving ? "animate-[showcase-out_.38s_ease-in_forwards]" : "animate-[showcase-in_.35s_cubic-bezier(.2,.8,.3,1)_both]"
+            onClick={skip}
+            className={`absolute inset-0 z-20 flex items-center justify-center ${
+              rv.show.leaving
+                ? "pointer-events-none animate-[showcase-out_.38s_ease-in_forwards]"
+                : "cursor-pointer animate-[showcase-in_.35s_cubic-bezier(.2,.8,.3,1)_both]"
             }`}
           >
             <div className="relative aspect-[63/88] w-[min(74vw,330px)]">
@@ -467,6 +500,9 @@ export function BoosterStage({
                 {rv.show.card.name}
                 <span className="text-muted"> · {TIER_LABEL[rv.show.card.tier]}</span>
               </p>
+              {!rv.show.leaving && (
+                <p className="mt-1 text-center text-[11px] text-white/40">Touche pour continuer</p>
+              )}
             </div>
           </div>
         )}
@@ -512,28 +548,20 @@ export function BoosterStage({
         )}
 
         {/* Consigne / résumé */}
-        <div className="mt-5 flex min-h-[3.5rem] flex-col items-center justify-center gap-2 text-center">
-          {stage === "sealed" && canOpen && (
-            <>
-              <p className="flex items-center gap-2 text-sm text-muted">
-                <ArrowRight size={16} aria-hidden className="animate-[hint-slide_1.6s_ease-in-out_infinite]" />
-                Attrape l&apos;emballage et tire vers la droite
-              </p>
-              <button
-                type="button"
-                onClick={() => void startOpening()}
-                className="text-xs text-faint underline-offset-2 hover:text-foreground hover:underline"
-              >
-                ou touche ici pour l&apos;ouvrir
-              </button>
-            </>
+        <div className="mt-6 flex min-h-[3.75rem] flex-col items-center justify-center gap-2 text-center">
+          {((stage === "sealed" && canOpen) || stage === "tearing") && (
+            <SlideToOpen
+              progress={progress}
+              onProgress={setProgress}
+              onOpen={() => void startOpening()}
+              opening={stage === "tearing"}
+            />
           )}
           {stage === "sealed" && !canOpen && (
             <p className="text-sm text-muted">
               Plus de booster. Prochain dans {nextAt ? formatCountdown(nextAt - now) : "…"}.
             </p>
           )}
-          {stage === "tearing" && <p className="text-sm text-muted">Ouverture…</p>}
           {stage === "revealing" && rv.remaining.length > 0 && (
             <div className={`flex items-center gap-3 transition-opacity ${idle ? "opacity-100" : "opacity-0"}`}>
               <p className="text-sm text-muted">Touche la carte du dessus</p>
@@ -621,5 +649,116 @@ export function BoosterStage({
       {toast && <Toast message={toast.message} tone={toast.tone} onDone={() => setToast(null)} />}
     </div>,
     document.body
+  );
+}
+
+/** Diamètre du bouton coulissant et marge intérieure de la piste (px) */
+const KNOB = 52;
+const PAD = 4;
+
+/**
+ * « Glisse pour ouvrir » : piste avec un bouton qu'on tire vers la droite,
+ * façon slide to unlock. Partage `progress` avec la bande de déchirure de
+ * l'emballage, qui cède en même temps. Sans mouvement, rien ne s'ouvre
+ * (pas d'ouverture par simple tape) ; au clavier, Entrée / → ouvrent.
+ */
+function SlideToOpen({
+  progress,
+  onProgress,
+  onOpen,
+  opening,
+}: {
+  progress: number;
+  onProgress: (p: number) => void;
+  onOpen: () => void;
+  opening: boolean;
+}) {
+  const track = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ id: number; x0: number; p0: number; travel: number } | null>(null);
+  const [sliding, setSliding] = useState(false);
+  const p = opening ? 1 : progress;
+
+  function down(e: ReactPointerEvent<HTMLDivElement>) {
+    if (opening || e.button !== 0) return;
+    const r = track.current?.getBoundingClientRect();
+    if (!r) return;
+    drag.current = { id: e.pointerId, x0: e.clientX, p0: progress, travel: r.width - KNOB - PAD * 2 };
+    setSliding(true);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // capture indisponible : le glisser reste suivi par les events suivants
+    }
+    navigator.vibrate?.(8);
+  }
+  function move(e: ReactPointerEvent<HTMLDivElement>) {
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId) return;
+    const next = Math.min(1, Math.max(0, d.p0 + (e.clientX - d.x0) / d.travel));
+    if (next >= 0.96) {
+      drag.current = null;
+      setSliding(false);
+      onProgress(1);
+      onOpen();
+      return;
+    }
+    onProgress(next);
+  }
+  function up(e: ReactPointerEvent<HTMLDivElement>) {
+    if (drag.current?.id !== e.pointerId) return;
+    drag.current = null;
+    setSliding(false);
+    onProgress(0);
+  }
+  function key(e: ReactKeyboardEvent<HTMLDivElement>) {
+    if (opening) return;
+    if (e.key === "Enter" || e.key === " " || e.key === "ArrowRight" || e.key === "End") {
+      e.preventDefault();
+      onOpen();
+    }
+  }
+
+  const ease = sliding ? "none" : "left .28s cubic-bezier(.2,.8,.3,1), width .28s cubic-bezier(.2,.8,.3,1)";
+  return (
+    <div
+      ref={track}
+      onPointerDown={down}
+      onPointerMove={move}
+      onPointerUp={up}
+      onPointerCancel={up}
+      className="relative h-[60px] w-[min(84vw,340px)] touch-none select-none overflow-hidden rounded-full border border-white/10 bg-white/[0.06] shadow-[inset_0_2px_10px_rgba(0,0,0,.55)]"
+    >
+      {/* Remplissage derrière le bouton */}
+      <div
+        aria-hidden
+        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-accent/0 via-accent/25 to-accent/50"
+        style={{ width: `calc(${KNOB + PAD * 2}px + ${p} * (100% - ${KNOB + PAD * 2}px))`, transition: ease }}
+      />
+      {/* Libellé, qui s'efface à mesure qu'on glisse */}
+      <div
+        aria-hidden
+        className="absolute inset-0 flex items-center justify-center gap-1.5 pl-10 text-[15px] font-medium tracking-wide"
+        style={{ opacity: opening ? 1 : Math.max(0, 1 - progress * 1.8) }}
+      >
+        <span className={opening ? "text-white/80" : "slide-hint"}>{opening ? "Ouverture…" : "Glisse pour ouvrir"}</span>
+        {!opening && <ChevronsRight size={18} className="text-white/50" aria-hidden />}
+      </div>
+      {/* Bouton coulissant */}
+      <div
+        role="slider"
+        tabIndex={opening ? -1 : 0}
+        aria-label="Glisser pour ouvrir le booster"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(p * 100)}
+        onKeyDown={key}
+        className={`absolute top-1 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-accent text-accent-ink shadow-[0_6px_18px_rgba(240,72,62,.45)] outline-none ring-white/60 focus-visible:ring-2 ${
+          opening ? "" : "cursor-grab active:cursor-grabbing"
+        }`}
+        style={{ left: `calc(${PAD}px + ${p} * (100% - ${KNOB + PAD * 2}px))`, transition: ease }}
+      >
+        <Scissors size={22} aria-hidden className={opening ? "animate-pulse" : ""} />
+      </div>
+    </div>
   );
 }

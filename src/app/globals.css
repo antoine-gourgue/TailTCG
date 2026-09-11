@@ -195,6 +195,17 @@ body {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+/* iOS zoome la page au focus de tout champ dont la police fait moins de
+   16px : sur écran tactile, tous les champs restent à 16px, quelle que soit
+   la classe (hors layers Tailwind, donc prioritaire sur text-sm & co). */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 select.field {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
@@ -888,6 +899,22 @@ input:disabled,
   25% { opacity: 1; }
   75% { opacity: 1; }
   100% { transform: translateX(18px); opacity: 0; }
+}
+/* « Glisse pour ouvrir » : reflet qui parcourt le texte, façon slide to unlock */
+@keyframes slide-shimmer {
+  from { background-position: 180% 0; }
+  to   { background-position: -80% 0; }
+}
+.slide-hint {
+  background: linear-gradient(90deg, rgba(255,255,255,.35) 0%, #fff 45%, rgba(255,255,255,.35) 60%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: slide-shimmer 2.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .slide-hint { animation: none; color: rgba(255,255,255,.75); background: none; }
 }
 @keyframes pack-shake {
   0%, 100% { transform: translateX(0); }
