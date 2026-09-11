@@ -47,6 +47,9 @@ export function GradingLab({
   const [results, setResults] = useState<RevealItem[]>([]);
   const [detail, setDetail] = useState<OwnedCard | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // Affichage plafonné : la grille complète devient vite un mur de cartes
+  const [showAll, setShowAll] = useState(false);
+  const SHOWN = 36;
 
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const tiers = useMemo(() => {
@@ -196,7 +199,7 @@ export function GradingLab({
             </p>
           ) : (
             <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-              {list.map((c) => {
+              {(showAll ? list : list.slice(0, SHOWN)).map((c) => {
                 const on = sel.has(c.id);
                 return (
                   <li key={c.id}>
@@ -237,6 +240,17 @@ export function GradingLab({
                 );
               })}
             </ul>
+          )}
+          {list.length > SHOWN && (
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowAll((v) => !v)}
+                className="btn btn-ghost text-[13px]"
+              >
+                {showAll ? "Réduire" : `Afficher les ${list.length - SHOWN} autres`}
+              </button>
+            </div>
           )}
         </>
       )}

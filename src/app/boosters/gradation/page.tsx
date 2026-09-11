@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/paginate";
 import { type Grade, type Tier } from "@/lib/game";
 import { AppShell } from "@/components/app-shell";
 import { GameNav } from "@/components/game/game-nav";
@@ -57,14 +58,15 @@ export default async function GradationPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: rows } = await supabase
-    .from("game_cards")
-    .select(
-      "id, card_name, set_name, local_id, image_url, tier, graded, grade_centering, grade_corners, grade_edges, grade_surface, grade_overall"
-    )
-    .order("obtained_at", { ascending: false })
-    .range(0, 4999);
-  const all = (rows ?? []) as Row[];
+  const all = await fetchAll<Row>((from, to) =>
+    supabase
+      .from("game_cards")
+      .select(
+        "id, card_name, set_name, local_id, image_url, tier, graded, grade_centering, grade_corners, grade_edges, grade_surface, grade_overall"
+      )
+      .order("obtained_at", { ascending: false })
+      .range(from, to)
+  );
 
   const ungraded: OwnedCard[] = [];
   const graded: OwnedCard[] = [];

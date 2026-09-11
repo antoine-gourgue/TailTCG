@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BadgeCheck, ChevronLeft, LayoutGrid, Package } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/paginate";
 import { fetchSetsIndex, getSet } from "@/lib/tcgdex";
 import { TIER_LABEL, tierOf, type Grade, type Tier } from "@/lib/game";
 import { AppShell } from "@/components/app-shell";
@@ -55,14 +56,15 @@ export default async function GameCollectionPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: cards } = await supabase
-    .from("game_cards")
-    .select(
-      "id, tcgdex_id, set_id, set_name, card_name, local_id, image_url, tier, graded, grade_centering, grade_corners, grade_edges, grade_surface, grade_overall"
-    )
-    .order("obtained_at", { ascending: false })
-    .range(0, 4999);
-  const all = (cards ?? []) as Row[];
+  const all = await fetchAll<Row>((from, to) =>
+    supabase
+      .from("game_cards")
+      .select(
+        "id, tcgdex_id, set_id, set_name, card_name, local_id, image_url, tier, graded, grade_centering, grade_corners, grade_edges, grade_surface, grade_overall"
+      )
+      .order("obtained_at", { ascending: false })
+      .range(from, to)
+  );
 
   /* ——— Un set : toutes ses cartes, possédées ou non ——— */
   if (setId) {

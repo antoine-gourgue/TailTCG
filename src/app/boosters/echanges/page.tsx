@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchAll } from "@/lib/paginate";
 import { type Tier } from "@/lib/game";
 import { AppShell } from "@/components/app-shell";
 import { GameNav } from "@/components/game/game-nav";
@@ -49,9 +50,21 @@ export default async function EchangesPage() {
   const uid = user.id;
   const admin = createAdminClient();
 
-  const [{ data: mine }, { data: market }, { data: trades }] = await Promise.all([
-    admin.from("game_cards").select(SELECT).eq("owner_id", uid).order("obtained_at", { ascending: false }).range(0, 4999),
-    admin.from("game_cards").select(SELECT).eq("for_trade", true).neq("owner_id", uid).order("obtained_at", { ascending: false }).range(0, 400),
+  const [mine, market, { data: trades }] = await Promise.all([
+    fetchAll<Row>((from, to) =>
+      admin.from("game_cards").select(SELECT).eq("owner_id", uid).order("obtained_at", { ascending: false }).range(from, to)
+    ),
+    fetchAll<Row>(
+      (from, to) =>
+        admin
+          .from("game_cards")
+          .select(SELECT)
+          .eq("for_trade", true)
+          .neq("owner_id", uid)
+          .order("obtained_at", { ascending: false })
+          .range(from, to),
+      { maxPages: 3 }
+    ),
     admin
       .from("game_trades")
       .select("id, from_owner, to_owner, from_card_id, to_card_id, tier, status, created_at")
@@ -60,8 +73,8 @@ export default async function EchangesPage() {
       .order("created_at", { ascending: false }),
   ]);
 
-  const myRows = (mine ?? []) as Row[];
-  const marketRows = (market ?? []) as Row[];
+  const myRows = mine;
+  const marketRows = market;
   const pending = trades ?? [];
 
   // Cartes référencées par les échanges (les cartes d'en face ne sont pas dans
