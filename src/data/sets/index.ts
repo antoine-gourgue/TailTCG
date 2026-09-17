@@ -1,5 +1,6 @@
 // Généré par scripts/playable-sets.mjs — ne pas modifier à la main
 export const SET_POOLS: Record<string, () => Promise<{ default: unknown }>> = {
+  "30th": () => import("./30th.json"),
   "base1": () => import("./base1.json"),
   "base2": () => import("./base2.json"),
   "base3": () => import("./base3.json"),

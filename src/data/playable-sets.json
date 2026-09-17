@@ -1,5 +1,14 @@
 [
  {
+  "id": "30th",
+  "name": "30ᵉ Anniversaire",
+  "serie": "Méga-Évolution",
+  "logo": null,
+  "total": 158,
+  "releaseDate": "2026-09-16",
+  "cover": "https://assets.tcgdex.net/fr/me/30th/114"
+ },
+ {
   "id": "me05",
   "name": "Nuit Noire",
   "serie": "Méga-Évolution",
