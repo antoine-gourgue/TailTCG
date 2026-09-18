@@ -15,6 +15,8 @@ export type TcgdexCardBrief = {
   rarity?: string;
   /** Cote Cardmarket, moyenne 30 jours en euros — enrichie sur les pages de set */
   avg30?: number | null;
+  /** idProduct Cardmarket (pour le lien produit) — enrichi sur les pages de set */
+  cmId?: number | null;
 };
 
 export type TcgdexSetBrief = {
@@ -290,6 +292,7 @@ export async function getSet(
           } = await r.json();
           card.rarity = detail.rarity;
           card.avg30 = pickCardmarket(detail.pricing?.cardmarket, detail.variants).avg30;
+          card.cmId = detail.pricing?.cardmarket?.idProduct ?? null;
         } catch {
           // rareté et cote inconnues : la carte reste visible dans tous les filtres
         }
@@ -320,16 +323,32 @@ export function pickCardmarket(
   };
 }
 
-/**
- * Lien Cardmarket vers la carte. On NE se sert PAS de l'`idProduct` de TCGdex :
- * son mapping est généré automatiquement et souvent faux (ids partagés entre
- * cartes distinctes, mauvaise variante — cf. issues tcgdex/cards-database
- * #1936, #1939). Une recherche « nom numéro » atterrit de façon fiable sur la
- * bonne carte plutôt que sur un produit erroné.
- */
+/** Recherche Cardmarket « nom numéro » — repli quand l'idProduct est absent */
 export function cardmarketSearchUrl(name: string, localId?: string): string {
   const q = [name, localId].filter(Boolean).join(" ");
   return `https://www.cardmarket.com/fr/Pokemon/Products/Search?searchString=${encodeURIComponent(q)}`;
+}
+
+/** Page produit Cardmarket : `?idProduct=` redirige vers la fiche de la carte */
+export function cardmarketProductUrl(idProduct: number): string {
+  return `https://www.cardmarket.com/fr/Pokemon/Products?idProduct=${idProduct}`;
+}
+
+/**
+ * Lien Cardmarket vers LA carte : la fiche produit via l'idProduct quand on
+ * l'a (atterrit directement sur la carte, cohérent avec le prix affiché qui
+ * vient du même produit) ; sinon une recherche « nom numéro ». Attention : le
+ * mapping idProduct de TCGdex est parfois faux (issues cards-database
+ * #1936/#1939), le lien peut alors pointer sur une variante voisine.
+ */
+export function cardmarketUrl(opts: {
+  idProduct?: number | null;
+  name: string;
+  localId?: string;
+}): string {
+  return opts.idProduct != null && Number.isFinite(opts.idProduct)
+    ? cardmarketProductUrl(opts.idProduct)
+    : cardmarketSearchUrl(opts.name, opts.localId);
 }
 
 async function fetchCardBriefs(queryString: string): Promise<TcgdexCardBrief[]> {

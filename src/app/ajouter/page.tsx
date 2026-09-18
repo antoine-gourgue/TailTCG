@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCard, pickCardmarket, cardmarketSearchUrl } from "@/lib/tcgdex";
+import { getCard, pickCardmarket, cardmarketUrl } from "@/lib/tcgdex";
 import { CardImage } from "@/components/card-image";
 import { formatEur } from "@/lib/domain";
 import { AppShell } from "@/components/app-shell";
@@ -31,6 +31,7 @@ export default async function AjouterPage({
   let defaultType: string | null = null;
   let defaultLanguage = lang === "ja" ? "JP" : "FR";
   let avg30: number | null = null;
+  let cmId: number | null = null;
 
   if (cardId.startsWith("custom:")) {
     // Carte du catalogue perso (hors TCGdex)
@@ -76,6 +77,7 @@ export default async function AjouterPage({
     }`;
     rarity = card.rarity ?? null;
     avg30 = pickCardmarket(card.pricing?.cardmarket, card.variants).avg30;
+    cmId = card.pricing?.cardmarket?.idProduct ?? null;
     // Pré-sélection du type d'après les variantes du set
     defaultType = card.variants?.holo && !card.variants?.normal ? "Holo" : null;
   }
@@ -114,7 +116,7 @@ export default async function AjouterPage({
               )}
               {avg30 != null && (
                 <a
-                  href={cardmarketSearchUrl(meta.name, meta.localId)}
+                  href={cardmarketUrl({ idProduct: cmId, name: meta.name, localId: meta.localId })}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-edge px-3 py-2 transition hover:border-edge-strong"

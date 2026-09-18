@@ -7,7 +7,7 @@ import { Star, Plus, Check, CheckCheck, ListChecks, X } from "lucide-react";
 import { toggleWishlist } from "@/app/wishlist/actions";
 import { bulkAddToCollection } from "@/app/items/actions";
 import { CardImage } from "@/components/card-image";
-import { cardmarketSearchUrl } from "@/lib/tcgdex";
+import { cardmarketUrl } from "@/lib/tcgdex";
 import { formatEur } from "@/lib/domain";
 import { Toast } from "@/components/toast";
 import { Sheet } from "@/components/sheet";
@@ -21,6 +21,8 @@ export type SetCard = {
   rarity: string | null;
   /** Cote Cardmarket, moyenne 30 jours (euros) — null si indisponible */
   avg30: number | null;
+  /** idProduct Cardmarket, pour le lien produit — null si inconnu */
+  cmId: number | null;
 };
 
 /** Ordre d'affichage des raretés (inconnues à la fin) */
@@ -426,7 +428,7 @@ export function SetCardsGrid({
 
             {selected.avg30 != null && (
               <a
-                href={cardmarketSearchUrl(selected.name, selected.localId)}
+                href={cardmarketUrl({ idProduct: selected.cmId, name: selected.name, localId: selected.localId })}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-4 flex items-center justify-between gap-2 rounded-lg border border-edge px-3 py-2 transition hover:border-edge-strong"

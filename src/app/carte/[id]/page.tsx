@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Pencil, ExternalLink, X, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCard, pickCardmarket, cardmarketSearchUrl } from "@/lib/tcgdex";
+import { getCard, pickCardmarket, cardmarketUrl } from "@/lib/tcgdex";
 import { signStorageImages } from "@/lib/images";
 import { formatEur, CONDITIONS } from "@/lib/domain";
 import { AppShell } from "@/components/app-shell";
@@ -414,10 +414,11 @@ export default async function CartePage({
                 <div className="flex flex-col gap-0.5">
                   <span className="label-xs">Cardmarket · moy. 30 j</span>
                   <a
-                    href={cardmarketSearchUrl(
-                      item.card_name ?? "",
-                      item.local_id ?? undefined
-                    )}
+                    href={cardmarketUrl({
+                      idProduct: tcgdexCard?.pricing?.cardmarket?.idProduct,
+                      name: item.card_name ?? "",
+                      localId: item.local_id ?? undefined,
+                    })}
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Voir cette carte sur Cardmarket"
