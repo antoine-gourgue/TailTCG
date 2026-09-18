@@ -304,19 +304,19 @@ export async function getSet(
 }
 
 /**
- * Prix de référence Cardmarket d'une carte, en euros. Même règle que
- * Cardmarket (et GoupixDex) : première valeur de vente > 0 dans l'ordre
- * `trend → avg7 → avg30 → avg1 → avg`. **Jamais `low`** (la plus basse annonce,
- * toutes langues/états confondus, ex. copies coréennes sur des sets japonais).
- * Colonnes normales uniquement (les `*-holo` décrivent la variante reverse-holo).
+ * Prix de référence Cardmarket d'une carte, en euros : première valeur de
+ * vente > 0 dans l'ordre `avg30 → avg7 → avg → avg1 → trend`. La moyenne 30 j
+ * mène (stable) ; `trend` est en dernier car parfois aberrant (ex. Mentali
+ * Prime : trend 17,55 € alors que la moyenne 30 j est 124,40 €). **Jamais
+ * `low`** (annonce la plus basse, toutes langues/états). Colonnes normales
+ * uniquement (les `*-holo` décrivent la variante reverse-holo).
  */
-export const CM_REFERENCE_ORDER = ["trend", "avg7", "avg30", "avg1", "avg"] as const;
+export const CM_REFERENCE_ORDER = ["avg30", "avg7", "avg", "avg1", "trend"] as const;
 export function cardmarketReference(
   cm: CardmarketPricing | null | undefined
 ): number | null {
   if (!cm) return null;
-  // Colonnes normales seulement (les `*-holo` décrivent la variante
-  // reverse-holo, pas le prix principal), comme GoupixDex `reference_eur`.
+  // Colonnes normales seulement (les `*-holo` = variante reverse-holo).
   for (const field of CM_REFERENCE_ORDER) {
     const v = cm[field as keyof CardmarketPricing];
     if (typeof v === "number" && v > 0) return v;

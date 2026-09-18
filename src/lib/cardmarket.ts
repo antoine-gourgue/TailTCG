@@ -7,7 +7,7 @@ import { CM_REFERENCE_ORDER, cardmarketReference, type CardmarketPricing } from 
  * (`cardmarket_price_guide`), avec repli sur le bloc TCGdex — même logique que
  * `resolve_market_price_eur` de GoupixDex : le guide local gagne, il est
  * rafraîchi par notre propre cron. Le prix de référence suit l'ordre
- * `trend → avg7 → avg30 → avg1 → avg` (jamais `low`), colonnes normales.
+ * `avg30 → avg7 → avg → avg1 → trend` (jamais `low`), colonnes normales.
  */
 type GuideRow = {
   id_product: number;
