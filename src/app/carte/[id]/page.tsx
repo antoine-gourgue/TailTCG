@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Pencil, ExternalLink, X, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCard } from "@/lib/tcgdex";
+import { getCard, pickCardmarket, cardmarketSearchUrl } from "@/lib/tcgdex";
 import { signStorageImages } from "@/lib/images";
 import { formatEur, CONDITIONS } from "@/lib/domain";
 import { AppShell } from "@/components/app-shell";
@@ -102,6 +102,10 @@ export default async function CartePage({
   const isCustom = item.tcgdex_id?.startsWith("custom:") ?? false;
   const tcgdexCard =
     item.tcgdex_id && !isCustom ? await getCard(item.tcgdex_id) : null;
+  // Cote Cardmarket indicative (moy. 30 j) — pas la valorisation, qui reste manuelle
+  const marketAvg30 = tcgdexCard
+    ? pickCardmarket(tcgdexCard.pricing?.cardmarket, tcgdexCard.variants).avg30
+    : null;
 
   // Visuel des cartes hors catalogue : photo signée depuis le bucket privé
   const [{ image_url: displayImage }] = await signStorageImages(
@@ -559,6 +563,23 @@ export default async function CartePage({
                       La carte
                     </h2>
                     <dl className="grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-3">
+                      {marketAvg30 != null && (
+                        <Field label="Cote Cardmarket · moy. 30 j">
+                          <a
+                            href={cardmarketSearchUrl(
+                              item.card_name ?? "",
+                              item.local_id ?? undefined
+                            )}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 font-semibold text-accent-strong underline-offset-2 hover:underline"
+                            title="Voir cette carte sur Cardmarket"
+                          >
+                            <span className="num">{formatEur(marketAvg30)}</span>
+                            <ExternalLink size={12} aria-hidden />
+                          </a>
+                        </Field>
+                      )}
                       {tcgdexCard.rarity && (
                         <Field label="Rareté">{tcgdexCard.rarity}</Field>
                       )}
