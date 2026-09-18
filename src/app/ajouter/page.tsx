@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCard, cardmarketUrl } from "@/lib/tcgdex";
 import { resolveCardmarketPrice } from "@/lib/cardmarket";
+import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
 import { CardImage } from "@/components/card-image";
 import { formatEur } from "@/lib/domain";
 import { AppShell } from "@/components/app-shell";
@@ -77,7 +78,7 @@ export default async function AjouterPage({
       card.set.cardCount?.official ? ` / ${card.set.cardCount.official}` : ""
     }`;
     rarity = card.rarity ?? null;
-    cmId = card.pricing?.cardmarket?.idProduct ?? null;
+    cmId = overrideCardmarketId(card.id, card.pricing?.cardmarket?.idProduct);
     price = await resolveCardmarketPrice(cmId, card.pricing?.cardmarket);
     // Pré-sélection du type d'après les variantes du set
     defaultType = card.variants?.holo && !card.variants?.normal ? "Holo" : null;

@@ -5,6 +5,7 @@ import { getSet, type CatalogLang } from "@/lib/tcgdex";
 import { AppShell } from "@/components/app-shell";
 import { SetCardsGrid } from "@/components/set-cards-grid";
 import { fetchGuidePrices } from "@/lib/cardmarket";
+import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
 import { BinderFromSetButton } from "@/components/binder-from-set-button";
 
 export const metadata = {
@@ -47,7 +48,9 @@ export default async function ExtensionPage({
   }
 
   // Prix Cardmarket : guide local d'abord (par idProduct), repli TCGdex
-  const guidePrices = await fetchGuidePrices(set.cards.map((c) => c.cmId));
+  const guidePrices = await fetchGuidePrices(
+    set.cards.map((c) => overrideCardmarketId(c.id, c.cmId))
+  );
 
   const releaseDate = set.releaseDate
     ? new Date(set.releaseDate).toLocaleDateString("fr-FR", {
@@ -108,15 +111,18 @@ export default async function ExtensionPage({
         )}
 
         <SetCardsGrid
-          cards={set.cards.map((c) => ({
-            id: c.id,
-            localId: c.localId,
-            name: c.name,
-            image: c.image ?? null,
-            rarity: c.rarity ?? null,
-            price: (c.cmId != null ? guidePrices.get(c.cmId) : undefined) ?? c.price ?? null,
-            cmId: c.cmId ?? null,
-          }))}
+          cards={set.cards.map((c) => {
+            const cmId = overrideCardmarketId(c.id, c.cmId);
+            return {
+              id: c.id,
+              localId: c.localId,
+              name: c.name,
+              image: c.image ?? null,
+              rarity: c.rarity ?? null,
+              price: (cmId != null ? guidePrices.get(cmId) : undefined) ?? c.price ?? null,
+              cmId,
+            };
+          })}
           officialCount={set.cardCount?.official ?? null}
           langSuffix={langSuffix}
           setId={set.id}

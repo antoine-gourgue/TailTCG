@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCard, cardmarketUrl } from "@/lib/tcgdex";
 import { resolveCardmarketPrice } from "@/lib/cardmarket";
+import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
 import { signStorageImages } from "@/lib/images";
 import { formatEur, CONDITIONS } from "@/lib/domain";
 import { AppShell } from "@/components/app-shell";
@@ -104,10 +105,11 @@ export default async function CartePage({
   const tcgdexCard =
     item.tcgdex_id && !isCustom ? await getCard(item.tcgdex_id) : null;
   // Prix de référence Cardmarket (indicatif) — pas la valorisation, qui reste manuelle
-  const marketPrice = await resolveCardmarketPrice(
-    tcgdexCard?.pricing?.cardmarket?.idProduct,
-    tcgdexCard?.pricing?.cardmarket
+  const marketId = overrideCardmarketId(
+    item.tcgdex_id,
+    tcgdexCard?.pricing?.cardmarket?.idProduct
   );
+  const marketPrice = await resolveCardmarketPrice(marketId, tcgdexCard?.pricing?.cardmarket);
 
   // Visuel des cartes hors catalogue : photo signée depuis le bucket privé
   const [{ image_url: displayImage }] = await signStorageImages(
@@ -417,7 +419,7 @@ export default async function CartePage({
                   <span className="label-xs">Cardmarket</span>
                   <a
                     href={cardmarketUrl({
-                      idProduct: tcgdexCard?.pricing?.cardmarket?.idProduct,
+                      idProduct: marketId,
                       name: item.card_name ?? "",
                       localId: item.local_id ?? undefined,
                     })}
