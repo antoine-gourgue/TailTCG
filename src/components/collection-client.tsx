@@ -60,6 +60,8 @@ export type CollectionItem = {
   position?: number | null;
   /** Ajoutée en masse, infos à compléter */
   needs_review?: boolean | null;
+  /** Cote Cardmarket (prix de référence, dernier relevé) */
+  market_price?: number | null;
 };
 
 /** minuscules sans accents, pour la recherche texte */
@@ -243,6 +245,8 @@ export function CollectionClient({
     let invested = 0;
     let value = 0;
     let hasValue = false;
+    let market = 0;
+    let hasMarket = false;
     for (const i of filtered) {
       count += i.quantity;
       if (i.purchase_price != null) invested += i.purchase_price * i.quantity;
@@ -250,12 +254,17 @@ export function CollectionClient({
         value += i.current_price * i.quantity;
         hasValue = true;
       }
+      if (i.market_price != null) {
+        market += i.market_price * i.quantity;
+        hasMarket = true;
+      }
     }
     return {
       count,
       invested,
       value: hasValue ? value : null,
       gain: hasValue ? value - invested : null,
+      market: hasMarket ? market : null,
     };
   }, [filtered]);
 
@@ -572,6 +581,9 @@ export function CollectionClient({
             <>
               <Stat label="Investi" value={formatEur(summary.invested)} />
               <Stat label="Valeur estimée" value={formatEur(summary.value)} />
+              {summary.market != null && (
+                <Stat label="Valeur Cardmarket" value={formatEur(summary.market)} />
+              )}
               <Stat
                 label="Plus-value"
                 value={

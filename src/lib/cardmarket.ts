@@ -20,9 +20,15 @@ type GuideRow = {
 
 const SELECT = "id_product, trend, avg7, avg30, avg1, avg";
 
-function guideReference(row: GuideRow): number | null {
+export function guideReference(row: {
+  trend: number | null;
+  avg7: number | null;
+  avg30: number | null;
+  avg1: number | null;
+  avg: number | null;
+}): number | null {
   for (const field of CM_REFERENCE_ORDER) {
-    const v = row[field as keyof GuideRow];
+    const v = (row as Record<string, number | null>)[field];
     if (typeof v === "number" && v > 0) return v;
   }
   return null;

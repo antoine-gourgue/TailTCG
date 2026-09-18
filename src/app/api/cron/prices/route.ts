@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { pickCardmarket, type CardmarketPricing } from "@/lib/tcgdex";
+import { cardmarketReference, pickCardmarket, type CardmarketPricing } from "@/lib/tcgdex";
+import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
+import { guideReference } from "@/lib/cardmarket";
 
 // Cron Vercel quotidien (vercel.json, 0 6 * * *) : relève les cotes Cardmarket
 // via TCGdex pour chaque carte possédée et alimente price_snapshots.
@@ -56,15 +58,29 @@ export async function GET(request: NextRequest) {
         pricing?: { cardmarket?: CardmarketPricing };
         variants?: { normal?: boolean; holo?: boolean };
       } = await res.json();
-      const { trend, low, avg30 } = pickCardmarket(card.pricing?.cardmarket, card.variants);
+      const cm = card.pricing?.cardmarket;
+      const { trend, low, avg30 } = pickCardmarket(cm, card.variants);
 
-      if (trend == null && low == null && avg30 == null) {
+      // Prix de référence : idProduct corrigé → guide public → repli TCGdex
+      const idProduct = overrideCardmarketId(id, cm?.idProduct);
+      let reference = cardmarketReference(cm);
+      if (idProduct != null) {
+        const { data: g } = await admin
+          .from("cardmarket_price_guide")
+          .select("trend, avg7, avg30, avg1, avg")
+          .eq("id_product", idProduct)
+          .maybeSingle();
+        const gr = g ? guideReference(g) : null;
+        if (gr != null) reference = gr;
+      }
+
+      if (trend == null && low == null && avg30 == null && reference == null) {
         skipped++;
       } else {
         const { error: upsertError } = await admin
           .from("price_snapshots")
           .upsert(
-            { tcgdex_id: id, captured_at: today, trend, low, avg30 },
+            { tcgdex_id: id, captured_at: today, trend, low, avg30, reference },
             { onConflict: "tcgdex_id,captured_at" }
           );
         if (upsertError) skipped++;

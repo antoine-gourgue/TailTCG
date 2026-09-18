@@ -778,6 +778,7 @@ export type Database = {
           avg30: number | null
           captured_at: string
           low: number | null
+          reference: number | null
           tcgdex_id: string
           trend: number | null
         }
@@ -785,6 +786,7 @@ export type Database = {
           avg30?: number | null
           captured_at?: string
           low?: number | null
+          reference?: number | null
           tcgdex_id: string
           trend?: number | null
         }
@@ -792,6 +794,7 @@ export type Database = {
           avg30?: number | null
           captured_at?: string
           low?: number | null
+          reference?: number | null
           tcgdex_id?: string
           trend?: number | null
         }

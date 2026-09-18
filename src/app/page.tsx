@@ -119,6 +119,33 @@ export default async function Home({
       .map((i) => ({ id: i.id as string, card_name: i.card_name as string }));
   }
 
+  // Cote Cardmarket par carte (dernier relevé) → total « Valeur Cardmarket »
+  const marketByTcgdex = new Map<string, number>();
+  {
+    const tcgIds = [
+      ...new Set(
+        (items ?? [])
+          .map((i) => i.tcgdex_id)
+          .filter((x): x is string => !!x && !x.startsWith("custom:"))
+      ),
+    ];
+    if (tcgIds.length > 0) {
+      const admin = createAdminClient();
+      const { data: snaps } = await admin
+        .from("price_snapshots")
+        .select("tcgdex_id, reference, captured_at")
+        .in("tcgdex_id", tcgIds)
+        .not("reference", "is", null)
+        .gte("captured_at", daysAgoISO(10))
+        .order("captured_at", { ascending: false });
+      for (const s of snaps ?? []) {
+        if (s.reference != null && !marketByTcgdex.has(s.tcgdex_id)) {
+          marketByTcgdex.set(s.tcgdex_id, s.reference);
+        }
+      }
+    }
+  }
+
   return (
     <>
       <AppShell>
@@ -165,7 +192,11 @@ export default async function Home({
               await signStorageImages((items ?? []) as CollectionItem[], user.id),
               user.id
             )
-          ).map((i) => ({ ...i, photo_fallback: photoFallbacks.get(i.id) ?? null }))}
+          ).map((i) => ({
+            ...i,
+            photo_fallback: photoFallbacks.get(i.id) ?? null,
+            market_price: i.tcgdex_id ? marketByTcgdex.get(i.tcgdex_id) ?? null : null,
+          }))}
           sources={(sources ?? []) as SourceRef[]}
           initialSource={initialSource ?? ""}
           initialSet={initialSet ?? ""}
