@@ -13,6 +13,8 @@ export type TcgdexCardBrief = {
   image?: string;
   /** Enrichie carte par carte sur les pages de set (absente des briefs) */
   rarity?: string;
+  /** Cote Cardmarket, moyenne 30 jours en euros — enrichie sur les pages de set */
+  avg30?: number | null;
 };
 
 export type TcgdexSetBrief = {
@@ -281,10 +283,15 @@ export async function getSet(
             { next: { revalidate: DAY_SECONDS } }
           );
           if (!r.ok) return;
-          const detail: { rarity?: string } = await r.json();
+          const detail: {
+            rarity?: string;
+            pricing?: { cardmarket?: CardmarketPricing };
+            variants?: { normal?: boolean; holo?: boolean };
+          } = await r.json();
           card.rarity = detail.rarity;
+          card.avg30 = pickCardmarket(detail.pricing?.cardmarket, detail.variants).avg30;
         } catch {
-          // rareté inconnue : la carte reste visible dans tous les filtres
+          // rareté et cote inconnues : la carte reste visible dans tous les filtres
         }
       })
     );
@@ -293,19 +300,36 @@ export async function getSet(
   return set;
 }
 
-/** L'API ne fournit pas d'URL Cardmarket : lien de recherche pré-rempli, éditable */
-export function cardmarketSearchUrl(cardName: string): string {
-  return `https://www.cardmarket.com/fr/Pokemon/Products/Search?searchString=${encodeURIComponent(cardName)}`;
+/**
+ * Cote Cardmarket d'une carte, en respectant les cartes qui n'existent qu'en
+ * holo (Prime, EX…) : leur série « -holo » est la cote pertinente, alors que
+ * `trend`/`avg30` mélangent toutes les versions. Renvoie tendance, plus bas
+ * prix et moyenne 30 jours (null si absents).
+ */
+export function pickCardmarket(
+  cm: CardmarketPricing | null | undefined,
+  variants?: { normal?: boolean; holo?: boolean }
+): { trend: number | null; low: number | null; avg30: number | null } {
+  const holoOnly = variants?.holo === true && variants?.normal === false;
+  const pick = (base: number | null | undefined, holo: number | null | undefined) =>
+    (holoOnly ? holo ?? base : base ?? holo) ?? null;
+  return {
+    trend: pick(cm?.trend, cm?.["trend-holo"]),
+    low: pick(cm?.low, cm?.["low-holo"]),
+    avg30: pick(cm?.avg30, cm?.["avg30-holo"]),
+  };
 }
 
 /**
- * URL produit complète via l'idProduct TCGdex : Cardmarket redirige
- * ?idProduct=… vers la page produit en conservant les filtres.
- * Attention : le mapping TCGdex→Cardmarket est parfois erroné (mauvaise
- * variante) — l'URL reste éditable dans le formulaire.
+ * Lien Cardmarket vers la carte. On NE se sert PAS de l'`idProduct` de TCGdex :
+ * son mapping est généré automatiquement et souvent faux (ids partagés entre
+ * cartes distinctes, mauvaise variante — cf. issues tcgdex/cards-database
+ * #1936, #1939). Une recherche « nom numéro » atterrit de façon fiable sur la
+ * bonne carte plutôt que sur un produit erroné.
  */
-export function cardmarketProductUrl(idProduct: number): string {
-  return `https://www.cardmarket.com/fr/Pokemon/Products?idProduct=${idProduct}`;
+export function cardmarketSearchUrl(name: string, localId?: string): string {
+  const q = [name, localId].filter(Boolean).join(" ");
+  return `https://www.cardmarket.com/fr/Pokemon/Products/Search?searchString=${encodeURIComponent(q)}`;
 }
 
 async function fetchCardBriefs(queryString: string): Promise<TcgdexCardBrief[]> {

@@ -7,6 +7,8 @@ import { Star, Plus, Check, CheckCheck, ListChecks, X } from "lucide-react";
 import { toggleWishlist } from "@/app/wishlist/actions";
 import { bulkAddToCollection } from "@/app/items/actions";
 import { CardImage } from "@/components/card-image";
+import { cardmarketSearchUrl } from "@/lib/tcgdex";
+import { formatEur } from "@/lib/domain";
 import { Toast } from "@/components/toast";
 import { Sheet } from "@/components/sheet";
 import { FloatingBar } from "@/components/floating-bar";
@@ -17,6 +19,8 @@ export type SetCard = {
   name: string;
   image: string | null;
   rarity: string | null;
+  /** Cote Cardmarket, moyenne 30 jours (euros) — null si indisponible */
+  avg30: number | null;
 };
 
 /** Ordre d'affichage des raretés (inconnues à la fin) */
@@ -339,6 +343,14 @@ export function SetCardsGrid({
                       <Star size={11} fill="currentColor" aria-hidden />
                     </span>
                   )}
+                  {!selecting && card.avg30 != null && (
+                    <span
+                      className="tile-badge num bottom-1.5 left-1.5 !bg-black/70 !text-white"
+                      title="Cote Cardmarket, moyenne 30 jours"
+                    >
+                      {formatEur(card.avg30)}
+                    </span>
+                  )}
                 </div>
                 <div className="mt-2.5 px-0.5">
                   <p className="truncate text-sm font-medium leading-tight group-hover:text-accent-strong">
@@ -411,6 +423,26 @@ export function SetCardsGrid({
                 </p>
               )}
             </div>
+
+            {selected.avg30 != null && (
+              <a
+                href={cardmarketSearchUrl(selected.name, selected.localId)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 flex items-center justify-between gap-2 rounded-lg border border-edge px-3 py-2 transition hover:border-edge-strong"
+                title="Voir cette carte sur Cardmarket"
+              >
+                <span className="min-w-0">
+                  <span className="block text-[11px] uppercase tracking-wide text-faint">
+                    Cardmarket · moy. 30 j
+                  </span>
+                  <span className="num text-base font-semibold">
+                    {formatEur(selected.avg30)}
+                  </span>
+                </span>
+                <span className="shrink-0 text-xs text-accent-strong">Cardmarket ↗</span>
+              </a>
+            )}
 
             <Link
               href={`/ajouter?card=${encodeURIComponent(selected.id)}${langSuffix}`}

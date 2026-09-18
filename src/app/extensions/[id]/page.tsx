@@ -110,6 +110,7 @@ export default async function ExtensionPage({
             name: c.name,
             image: c.image ?? null,
             rarity: c.rarity ?? null,
+            avg30: c.avg30 ?? null,
           }))}
           officialCount={set.cardCount?.official ?? null}
           langSuffix={langSuffix}

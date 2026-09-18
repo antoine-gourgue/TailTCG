@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCard } from "@/lib/tcgdex";
+import { getCard, pickCardmarket, cardmarketSearchUrl } from "@/lib/tcgdex";
 import { CardImage } from "@/components/card-image";
+import { formatEur } from "@/lib/domain";
 import { AppShell } from "@/components/app-shell";
 import { ItemForm, type CardMeta } from "@/components/item-form";
 import { WishlistButton } from "@/components/wishlist-button";
@@ -29,6 +30,7 @@ export default async function AjouterPage({
   let rarity: string | null = null;
   let defaultType: string | null = null;
   let defaultLanguage = lang === "ja" ? "JP" : "FR";
+  let avg30: number | null = null;
 
   if (cardId.startsWith("custom:")) {
     // Carte du catalogue perso (hors TCGdex)
@@ -73,6 +75,7 @@ export default async function AjouterPage({
       card.set.cardCount?.official ? ` / ${card.set.cardCount.official}` : ""
     }`;
     rarity = card.rarity ?? null;
+    avg30 = pickCardmarket(card.pricing?.cardmarket, card.variants).avg30;
     // Pré-sélection du type d'après les variantes du set
     defaultType = card.variants?.holo && !card.variants?.normal ? "Holo" : null;
   }
@@ -108,6 +111,25 @@ export default async function AjouterPage({
                 <p className="mt-2 inline-block rounded-md bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong">
                   {rarity}
                 </p>
+              )}
+              {avg30 != null && (
+                <a
+                  href={cardmarketSearchUrl(meta.name, meta.localId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-edge px-3 py-2 transition hover:border-edge-strong"
+                  title="Voir cette carte sur Cardmarket"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-[11px] uppercase tracking-wide text-faint">
+                      Cardmarket · moy. 30 j
+                    </span>
+                    <span className="num text-base font-semibold">{formatEur(avg30)}</span>
+                  </span>
+                  <span className="shrink-0 text-xs text-accent-strong">
+                    Cardmarket ↗
+                  </span>
+                </a>
               )}
               <div className="mt-4">
                 <WishlistButton card={meta} initialWished={Boolean(wish)} />

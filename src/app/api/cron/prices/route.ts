@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { CardmarketPricing } from "@/lib/tcgdex";
+import { pickCardmarket, type CardmarketPricing } from "@/lib/tcgdex";
 
 // Cron Vercel quotidien (vercel.json, 0 6 * * *) : relève les cotes Cardmarket
 // via TCGdex pour chaque carte possédée et alimente price_snapshots.
@@ -56,18 +56,7 @@ export async function GET(request: NextRequest) {
         pricing?: { cardmarket?: CardmarketPricing };
         variants?: { normal?: boolean; holo?: boolean };
       } = await res.json();
-      const cm = card.pricing?.cardmarket;
-      // Carte qui n'existe qu'en holo (Prime, EX…) : la série -holo est la
-      // cote pertinente, `trend` mélange toutes les versions
-      const holoOnly = card.variants?.holo === true && card.variants?.normal === false;
-      const trend =
-        (holoOnly ? cm?.["trend-holo"] ?? cm?.trend : cm?.trend ?? cm?.["trend-holo"]) ??
-        null;
-      const low =
-        (holoOnly ? cm?.["low-holo"] ?? cm?.low : cm?.low ?? cm?.["low-holo"]) ?? null;
-      const avg30 =
-        (holoOnly ? cm?.["avg30-holo"] ?? cm?.avg30 : cm?.avg30 ?? cm?.["avg30-holo"]) ??
-        null;
+      const { trend, low, avg30 } = pickCardmarket(card.pricing?.cardmarket, card.variants);
 
       if (trend == null && low == null && avg30 == null) {
         skipped++;
