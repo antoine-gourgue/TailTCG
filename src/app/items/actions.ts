@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { adoptPlaceholders } from "@/lib/binder-adopt";
 import { geocodeAddress } from "@/lib/geocode";
 import {
   CONDITION_CODES,
@@ -124,12 +125,24 @@ export async function createItem(
     await recordValue(supabase, created.id, fields.manual_price);
   }
 
-  // Trouvée ! Elle sort automatiquement des recherchées
-  await supabase.from("wishlist").delete().eq("tcgdex_id", tcgdex_id);
+  // Trouvée ! Elle sort automatiquement des recherchées, et prend la place
+  // de ses pochettes « hors collection » dans les classeurs
+  const [, binders] = await Promise.all([
+    supabase.from("wishlist").delete().eq("tcgdex_id", tcgdex_id),
+    adoptPlaceholders(supabase, [{ id: created.id, tcgdex_id }]),
+  ]);
+  revalidateBinders(binders);
 
   revalidatePath("/");
   revalidatePath("/wishlist");
   redirect("/");
+}
+
+/** Classeurs dont une pochette « hors collection » vient d'être remplacée */
+function revalidateBinders(binderIds: string[]) {
+  if (binderIds.length === 0) return;
+  revalidatePath("/classeurs");
+  for (const id of binderIds) revalidatePath(`/classeurs/${id}`);
 }
 
 // Historise la valeur estimée du jour (la dernière saisie du jour gagne)
@@ -238,20 +251,28 @@ export async function bulkAddToCollection(cards: BulkCard[], language: string) {
     needs_review: true,
   }));
 
-  const { error } = await supabase.from("items").insert(rows);
+  const { data: created, error } = await supabase
+    .from("items")
+    .insert(rows)
+    .select("id, tcgdex_id");
   if (error) {
     console.error("bulkAddToCollection:", error.message);
     return { error: "Ajout impossible, réessaie.", added: 0 };
   }
 
-  // Ces cartes sortent des recherchées
-  await supabase
-    .from("wishlist")
-    .delete()
-    .in(
-      "tcgdex_id",
-      clean.map((c) => c.tcgdex_id)
-    );
+  // Ces cartes sortent des recherchées et prennent la place de leurs
+  // pochettes « hors collection » dans les classeurs
+  const [, binders] = await Promise.all([
+    supabase
+      .from("wishlist")
+      .delete()
+      .in(
+        "tcgdex_id",
+        clean.map((c) => c.tcgdex_id)
+      ),
+    adoptPlaceholders(supabase, created ?? []),
+  ]);
+  revalidateBinders(binders);
 
   revalidatePath("/");
   revalidatePath("/wishlist");
