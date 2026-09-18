@@ -64,7 +64,6 @@ function parseItemFields(formData: FormData): {
       card_type: strOrNull(formData, "card_type"),
       language: str(formData, "language") || "FR",
       source_id: strOrNull(formData, "source_id"),
-      cardmarket_url: strOrNull(formData, "cardmarket_url"),
       graded: formData.get("graded") === "on",
       grade: strOrNull(formData, "grade"),
       notes: strOrNull(formData, "notes"),

@@ -359,19 +359,6 @@ export function ItemForm({
             />
           </div>
         </div>
-        <div className="mt-3">
-          <label htmlFor="cardmarket_url" className="label-xs mb-1.5 block">
-            Lien Cardmarket
-          </label>
-          <input
-            id="cardmarket_url"
-            type="url"
-            name="cardmarket_url"
-            placeholder="https://…"
-            defaultValue={defaults.cardmarket_url ?? ""}
-            className="field"
-          />
-        </div>
       </Section>
 
       {/* 4 — Source */}

@@ -414,35 +414,43 @@ export default async function CartePage({
                   )}
                 </>
               )}
-              {marketPrice != null && (
-                <div className="flex flex-col gap-0.5">
-                  <span className="label-xs">Cardmarket</span>
-                  <a
-                    href={cardmarketUrl({
-                      idProduct: marketId,
-                      name: item.card_name ?? "",
-                      localId: item.local_id ?? undefined,
-                    })}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Voir cette carte sur Cardmarket"
-                    className="display num inline-flex items-center gap-1 text-xl font-bold leading-none text-accent-strong underline-offset-2 hover:underline"
-                  >
-                    {formatEur(marketPrice)}
-                    <ExternalLink size={14} aria-hidden />
-                  </a>
-                </div>
-              )}
-              {item.cardmarket_url && (
+              {/* Référence marché : distincte des chiffres de valorisation perso */}
+              {marketPrice != null ? (
                 <a
-                  href={item.cardmarket_url}
+                  href={cardmarketUrl({
+                    idProduct: marketId,
+                    name: item.card_name ?? "",
+                    localId: item.local_id ?? undefined,
+                  })}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn btn-ghost ml-auto !py-1.5 text-[13px]"
+                  title="Voir cette carte sur Cardmarket"
+                  className="group ml-auto flex items-center gap-3 rounded-xl border border-edge bg-raised/60 px-4 py-2 transition hover:border-accent/50 hover:bg-raised"
                 >
-                  Cardmarket
-                  <ExternalLink size={13} aria-hidden />
+                  <span className="flex flex-col gap-0.5">
+                    <span className="label-xs">Cote Cardmarket</span>
+                    <span className="num text-lg font-bold leading-none">
+                      {formatEur(marketPrice)}
+                    </span>
+                  </span>
+                  <ExternalLink
+                    size={15}
+                    aria-hidden
+                    className="shrink-0 text-faint transition group-hover:text-accent-strong"
+                  />
                 </a>
+              ) : (
+                item.cardmarket_url && (
+                  <a
+                    href={item.cardmarket_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-ghost ml-auto !py-1.5 text-[13px]"
+                  >
+                    Cardmarket
+                    <ExternalLink size={13} aria-hidden />
+                  </a>
+                )
               )}
             </div>
 
