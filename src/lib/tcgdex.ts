@@ -13,8 +13,8 @@ export type TcgdexCardBrief = {
   image?: string;
   /** Enrichie carte par carte sur les pages de set (absente des briefs) */
   rarity?: string;
-  /** Cote Cardmarket, moyenne 30 jours en euros — enrichie sur les pages de set */
-  avg30?: number | null;
+  /** Prix de référence Cardmarket en euros — enrichi sur les pages de set */
+  price?: number | null;
   /** idProduct Cardmarket (pour le lien produit) — enrichi sur les pages de set */
   cmId?: number | null;
 };
@@ -291,7 +291,7 @@ export async function getSet(
             variants?: { normal?: boolean; holo?: boolean };
           } = await r.json();
           card.rarity = detail.rarity;
-          card.avg30 = pickCardmarket(detail.pricing?.cardmarket, detail.variants).avg30;
+          card.price = cardmarketReference(detail.pricing?.cardmarket);
           card.cmId = detail.pricing?.cardmarket?.idProduct ?? null;
         } catch {
           // rareté et cote inconnues : la carte reste visible dans tous les filtres
@@ -301,6 +301,30 @@ export async function getSet(
   }
 
   return set;
+}
+
+/**
+ * Prix de référence Cardmarket d'une carte, en euros. Même règle que
+ * Cardmarket (et GoupixDex) : première valeur de vente > 0 dans l'ordre
+ * `trend → avg7 → avg30 → avg1 → avg`. **Jamais `low`** (la plus basse annonce,
+ * toutes langues/états confondus, ex. copies coréennes sur des sets japonais).
+ * Colonnes normales d'abord ; repli sur les colonnes reverse-holo (`*-holo`,
+ * produits japonais Poké Ball / Master Ball) si la carte n'a que celles-là.
+ */
+const CM_REFERENCE_ORDER = ["trend", "avg7", "avg30", "avg1", "avg"] as const;
+export function cardmarketReference(
+  cm: CardmarketPricing | null | undefined
+): number | null {
+  if (!cm) return null;
+  const pick = (holo: boolean): number | null => {
+    for (const field of CM_REFERENCE_ORDER) {
+      const key = (holo ? `${field}-holo` : field) as keyof CardmarketPricing;
+      const v = cm[key];
+      if (typeof v === "number" && v > 0) return v;
+    }
+    return null;
+  };
+  return pick(false) ?? pick(true);
 }
 
 /**

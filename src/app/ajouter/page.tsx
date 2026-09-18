@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCard, pickCardmarket, cardmarketUrl } from "@/lib/tcgdex";
+import { getCard, cardmarketReference, cardmarketUrl } from "@/lib/tcgdex";
 import { CardImage } from "@/components/card-image";
 import { formatEur } from "@/lib/domain";
 import { AppShell } from "@/components/app-shell";
@@ -30,7 +30,7 @@ export default async function AjouterPage({
   let rarity: string | null = null;
   let defaultType: string | null = null;
   let defaultLanguage = lang === "ja" ? "JP" : "FR";
-  let avg30: number | null = null;
+  let price: number | null = null;
   let cmId: number | null = null;
 
   if (cardId.startsWith("custom:")) {
@@ -76,7 +76,7 @@ export default async function AjouterPage({
       card.set.cardCount?.official ? ` / ${card.set.cardCount.official}` : ""
     }`;
     rarity = card.rarity ?? null;
-    avg30 = pickCardmarket(card.pricing?.cardmarket, card.variants).avg30;
+    price = cardmarketReference(card.pricing?.cardmarket);
     cmId = card.pricing?.cardmarket?.idProduct ?? null;
     // Pré-sélection du type d'après les variantes du set
     defaultType = card.variants?.holo && !card.variants?.normal ? "Holo" : null;
@@ -114,7 +114,7 @@ export default async function AjouterPage({
                   {rarity}
                 </p>
               )}
-              {avg30 != null && (
+              {price != null && (
                 <a
                   href={cardmarketUrl({ idProduct: cmId, name: meta.name, localId: meta.localId })}
                   target="_blank"
@@ -124,9 +124,9 @@ export default async function AjouterPage({
                 >
                   <span className="min-w-0">
                     <span className="block text-[11px] uppercase tracking-wide text-faint">
-                      Cardmarket · moy. 30 j
+                      Cardmarket
                     </span>
-                    <span className="num text-base font-semibold">{formatEur(avg30)}</span>
+                    <span className="num text-base font-semibold">{formatEur(price)}</span>
                   </span>
                   <span className="shrink-0 text-xs text-accent-strong">
                     Cardmarket ↗

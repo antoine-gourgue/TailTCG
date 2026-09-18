@@ -19,8 +19,8 @@ export type SetCard = {
   name: string;
   image: string | null;
   rarity: string | null;
-  /** Cote Cardmarket, moyenne 30 jours (euros) — null si indisponible */
-  avg30: number | null;
+  /** Prix de référence Cardmarket (euros) — null si indisponible */
+  price: number | null;
   /** idProduct Cardmarket, pour le lien produit — null si inconnu */
   cmId: number | null;
 };
@@ -345,12 +345,12 @@ export function SetCardsGrid({
                       <Star size={11} fill="currentColor" aria-hidden />
                     </span>
                   )}
-                  {!selecting && card.avg30 != null && (
+                  {!selecting && card.price != null && (
                     <span
                       className="tile-badge num bottom-1.5 left-1.5 !bg-black/70 !text-white"
-                      title="Cote Cardmarket, moyenne 30 jours"
+                      title="Prix de référence Cardmarket"
                     >
-                      {formatEur(card.avg30)}
+                      {formatEur(card.price)}
                     </span>
                   )}
                 </div>
@@ -426,7 +426,7 @@ export function SetCardsGrid({
               )}
             </div>
 
-            {selected.avg30 != null && (
+            {selected.price != null && (
               <a
                 href={cardmarketUrl({ idProduct: selected.cmId, name: selected.name, localId: selected.localId })}
                 target="_blank"
@@ -436,10 +436,10 @@ export function SetCardsGrid({
               >
                 <span className="min-w-0">
                   <span className="block text-[11px] uppercase tracking-wide text-faint">
-                    Cardmarket · moy. 30 j
+                    Cardmarket
                   </span>
                   <span className="num text-base font-semibold">
-                    {formatEur(selected.avg30)}
+                    {formatEur(selected.price)}
                   </span>
                 </span>
                 <span className="shrink-0 text-xs text-accent-strong">Cardmarket ↗</span>

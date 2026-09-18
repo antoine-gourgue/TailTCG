@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Pencil, ExternalLink, X, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCard, pickCardmarket, cardmarketUrl } from "@/lib/tcgdex";
+import { getCard, cardmarketReference, cardmarketUrl } from "@/lib/tcgdex";
 import { signStorageImages } from "@/lib/images";
 import { formatEur, CONDITIONS } from "@/lib/domain";
 import { AppShell } from "@/components/app-shell";
@@ -102,9 +102,9 @@ export default async function CartePage({
   const isCustom = item.tcgdex_id?.startsWith("custom:") ?? false;
   const tcgdexCard =
     item.tcgdex_id && !isCustom ? await getCard(item.tcgdex_id) : null;
-  // Cote Cardmarket indicative (moy. 30 j) — pas la valorisation, qui reste manuelle
-  const marketAvg30 = tcgdexCard
-    ? pickCardmarket(tcgdexCard.pricing?.cardmarket, tcgdexCard.variants).avg30
+  // Prix de référence Cardmarket (indicatif) — pas la valorisation, qui reste manuelle
+  const marketPrice = tcgdexCard
+    ? cardmarketReference(tcgdexCard.pricing?.cardmarket)
     : null;
 
   // Visuel des cartes hors catalogue : photo signée depuis le bucket privé
@@ -410,9 +410,9 @@ export default async function CartePage({
                   )}
                 </>
               )}
-              {marketAvg30 != null && (
+              {marketPrice != null && (
                 <div className="flex flex-col gap-0.5">
-                  <span className="label-xs">Cardmarket · moy. 30 j</span>
+                  <span className="label-xs">Cardmarket</span>
                   <a
                     href={cardmarketUrl({
                       idProduct: tcgdexCard?.pricing?.cardmarket?.idProduct,
@@ -424,7 +424,7 @@ export default async function CartePage({
                     title="Voir cette carte sur Cardmarket"
                     className="display num inline-flex items-center gap-1 text-xl font-bold leading-none text-accent-strong underline-offset-2 hover:underline"
                   >
-                    {formatEur(marketAvg30)}
+                    {formatEur(marketPrice)}
                     <ExternalLink size={14} aria-hidden />
                   </a>
                 </div>
