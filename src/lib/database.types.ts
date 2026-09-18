@@ -228,6 +228,87 @@ export type Database = {
           },
         ]
       }
+      cardmarket_price_guide: {
+        Row: {
+          avg: number | null
+          avg_holo: number | null
+          avg1: number | null
+          avg1_holo: number | null
+          avg30: number | null
+          avg30_holo: number | null
+          avg7: number | null
+          avg7_holo: number | null
+          id_category: number | null
+          id_product: number
+          low: number | null
+          low_holo: number | null
+          trend: number | null
+          trend_holo: number | null
+          updated_at: string
+        }
+        Insert: {
+          avg?: number | null
+          avg_holo?: number | null
+          avg1?: number | null
+          avg1_holo?: number | null
+          avg30?: number | null
+          avg30_holo?: number | null
+          avg7?: number | null
+          avg7_holo?: number | null
+          id_category?: number | null
+          id_product: number
+          low?: number | null
+          low_holo?: number | null
+          trend?: number | null
+          trend_holo?: number | null
+          updated_at?: string
+        }
+        Update: {
+          avg?: number | null
+          avg_holo?: number | null
+          avg1?: number | null
+          avg1_holo?: number | null
+          avg30?: number | null
+          avg30_holo?: number | null
+          avg7?: number | null
+          avg7_holo?: number | null
+          id_category?: number | null
+          id_product?: number
+          low?: number | null
+          low_holo?: number | null
+          trend?: number | null
+          trend_holo?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cardmarket_price_guide_meta: {
+        Row: {
+          created_at: string | null
+          etag: string | null
+          id: number
+          last_modified: string | null
+          refreshed_at: string
+          row_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          etag?: string | null
+          id?: number
+          last_modified?: string | null
+          refreshed_at?: string
+          row_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          etag?: string | null
+          id?: number
+          last_modified?: string | null
+          refreshed_at?: string
+          row_count?: number | null
+        }
+        Relationships: []
+      }
       custom_cards: {
         Row: {
           created_at: string | null

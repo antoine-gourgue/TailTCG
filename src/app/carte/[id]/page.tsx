@@ -3,7 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { Pencil, ExternalLink, X, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCard, cardmarketReference, cardmarketUrl } from "@/lib/tcgdex";
+import { getCard, cardmarketUrl } from "@/lib/tcgdex";
+import { resolveCardmarketPrice } from "@/lib/cardmarket";
 import { signStorageImages } from "@/lib/images";
 import { formatEur, CONDITIONS } from "@/lib/domain";
 import { AppShell } from "@/components/app-shell";
@@ -103,9 +104,10 @@ export default async function CartePage({
   const tcgdexCard =
     item.tcgdex_id && !isCustom ? await getCard(item.tcgdex_id) : null;
   // Prix de référence Cardmarket (indicatif) — pas la valorisation, qui reste manuelle
-  const marketPrice = tcgdexCard
-    ? cardmarketReference(tcgdexCard.pricing?.cardmarket)
-    : null;
+  const marketPrice = await resolveCardmarketPrice(
+    tcgdexCard?.pricing?.cardmarket?.idProduct,
+    tcgdexCard?.pricing?.cardmarket
+  );
 
   // Visuel des cartes hors catalogue : photo signée depuis le bucket privé
   const [{ image_url: displayImage }] = await signStorageImages(

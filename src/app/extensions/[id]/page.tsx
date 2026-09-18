@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSet, type CatalogLang } from "@/lib/tcgdex";
 import { AppShell } from "@/components/app-shell";
 import { SetCardsGrid } from "@/components/set-cards-grid";
+import { fetchGuidePrices } from "@/lib/cardmarket";
 import { BinderFromSetButton } from "@/components/binder-from-set-button";
 
 export const metadata = {
@@ -44,6 +45,9 @@ export default async function ExtensionPage({
       ownedQty[o.tcgdex_id] = (ownedQty[o.tcgdex_id] ?? 0) + (o.quantity ?? 1);
     }
   }
+
+  // Prix Cardmarket : guide local d'abord (par idProduct), repli TCGdex
+  const guidePrices = await fetchGuidePrices(set.cards.map((c) => c.cmId));
 
   const releaseDate = set.releaseDate
     ? new Date(set.releaseDate).toLocaleDateString("fr-FR", {
@@ -110,7 +114,7 @@ export default async function ExtensionPage({
             name: c.name,
             image: c.image ?? null,
             rarity: c.rarity ?? null,
-            price: c.price ?? null,
+            price: (c.cmId != null ? guidePrices.get(c.cmId) : undefined) ?? c.price ?? null,
             cmId: c.cmId ?? null,
           }))}
           officialCount={set.cardCount?.official ?? null}

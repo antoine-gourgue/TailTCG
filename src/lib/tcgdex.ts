@@ -308,23 +308,20 @@ export async function getSet(
  * Cardmarket (et GoupixDex) : première valeur de vente > 0 dans l'ordre
  * `trend → avg7 → avg30 → avg1 → avg`. **Jamais `low`** (la plus basse annonce,
  * toutes langues/états confondus, ex. copies coréennes sur des sets japonais).
- * Colonnes normales d'abord ; repli sur les colonnes reverse-holo (`*-holo`,
- * produits japonais Poké Ball / Master Ball) si la carte n'a que celles-là.
+ * Colonnes normales uniquement (les `*-holo` décrivent la variante reverse-holo).
  */
-const CM_REFERENCE_ORDER = ["trend", "avg7", "avg30", "avg1", "avg"] as const;
+export const CM_REFERENCE_ORDER = ["trend", "avg7", "avg30", "avg1", "avg"] as const;
 export function cardmarketReference(
   cm: CardmarketPricing | null | undefined
 ): number | null {
   if (!cm) return null;
-  const pick = (holo: boolean): number | null => {
-    for (const field of CM_REFERENCE_ORDER) {
-      const key = (holo ? `${field}-holo` : field) as keyof CardmarketPricing;
-      const v = cm[key];
-      if (typeof v === "number" && v > 0) return v;
-    }
-    return null;
-  };
-  return pick(false) ?? pick(true);
+  // Colonnes normales seulement (les `*-holo` décrivent la variante
+  // reverse-holo, pas le prix principal), comme GoupixDex `reference_eur`.
+  for (const field of CM_REFERENCE_ORDER) {
+    const v = cm[field as keyof CardmarketPricing];
+    if (typeof v === "number" && v > 0) return v;
+  }
+  return null;
 }
 
 /**
