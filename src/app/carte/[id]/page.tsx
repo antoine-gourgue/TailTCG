@@ -410,6 +410,24 @@ export default async function CartePage({
                   )}
                 </>
               )}
+              {marketAvg30 != null && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="label-xs">Cardmarket · moy. 30 j</span>
+                  <a
+                    href={cardmarketSearchUrl(
+                      item.card_name ?? "",
+                      item.local_id ?? undefined
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Voir cette carte sur Cardmarket"
+                    className="display num inline-flex items-center gap-1 text-xl font-bold leading-none text-accent-strong underline-offset-2 hover:underline"
+                  >
+                    {formatEur(marketAvg30)}
+                    <ExternalLink size={14} aria-hidden />
+                  </a>
+                </div>
+              )}
               {item.cardmarket_url && (
                 <a
                   href={item.cardmarket_url}
@@ -563,23 +581,6 @@ export default async function CartePage({
                       La carte
                     </h2>
                     <dl className="grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-3">
-                      {marketAvg30 != null && (
-                        <Field label="Cote Cardmarket · moy. 30 j">
-                          <a
-                            href={cardmarketSearchUrl(
-                              item.card_name ?? "",
-                              item.local_id ?? undefined
-                            )}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 font-semibold text-accent-strong underline-offset-2 hover:underline"
-                            title="Voir cette carte sur Cardmarket"
-                          >
-                            <span className="num">{formatEur(marketAvg30)}</span>
-                            <ExternalLink size={12} aria-hidden />
-                          </a>
-                        </Field>
-                      )}
                       {tcgdexCard.rarity && (
                         <Field label="Rareté">{tcgdexCard.rarity}</Field>
                       )}
