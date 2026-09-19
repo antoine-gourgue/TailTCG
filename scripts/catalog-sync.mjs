@@ -9,22 +9,19 @@
 //     énergies, 30th Classic Collection…) pris chez pokemontcg.io (données
 //     publiques GitHub, par numéro puis par nom anglais) puis Limitless
 //     international (grille du set). Scans anglais, à défaut de français.
-// Idempotent (upsert). Service role via .env.local.
+// Idempotent (upsert). Service role via .env.local ou les variables du job nocturne.
 //
 //   node scripts/catalog-sync.mjs [--lang fr|ja] [--set <id>] [--no-limitless]
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
+import { supabaseAdminEnv } from "./lib/env.mjs";
 
-const env = Object.fromEntries(
-  readFileSync(".env.local", "utf8")
-    .split("\n")
-    .filter((l) => /^[A-Z_]+=/.test(l))
-    .map((l) => {
-      const i = l.indexOf("=");
-      return [l.slice(0, i), l.slice(i + 1).replace(/^"|"$/g, "")];
-    })
-);
-const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, { auth: { persistSession: false } });
+const sb = supabaseAdminEnv();
+if (!sb) {
+  console.error("NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SECRET_KEY manquants (.env.local ou variables du job)");
+  process.exit(1);
+}
+const db = createClient(sb.url, sb.key, { auth: { persistSession: false } });
 const args = process.argv.slice(2);
 const opt = (k) => (args.includes(k) ? args[args.indexOf(k) + 1] : null);
 const ONLY_LANG = opt("--lang");
