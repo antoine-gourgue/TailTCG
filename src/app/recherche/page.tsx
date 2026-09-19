@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { FilePlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { isAdminEmail } from "@/lib/admin";
 import { fetchSeriesWithSets, type CatalogLang } from "@/lib/tcgdex";
 import { AppShell } from "@/components/app-shell";
 import { SearchClient } from "./search-client";
@@ -55,6 +56,7 @@ export default async function RecherchePage({
           lang={lang}
           customCount={customCount ?? 0}
           pokedexCount={pokedexCount ?? 0}
+          scanEnabled={isAdminEmail(user.email)}
         />
       </main>
     </AppShell>
