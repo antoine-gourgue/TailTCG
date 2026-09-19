@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
 import { isCaptureExpired } from "@/lib/capture";
 import { ScanSessionClient } from "@/app/scan/[id]/scan-session-client";
+import { scanDetails } from "@/app/scan/actions";
 
 export const metadata = { title: "Cartes scannées — TailTCG" };
 
@@ -26,6 +27,7 @@ export default async function ScanSessionPage({ params }: { params: Promise<{ id
     .select("*")
     .eq("session_id", id)
     .order("created_at");
+  const details = await scanDetails(scans ?? []);
 
   return (
     <AppShell>
@@ -37,6 +39,7 @@ export default async function ScanSessionPage({ params }: { params: Promise<{ id
           expired: isCaptureExpired(session.expires_at),
         }}
         initialScans={scans ?? []}
+        initialDetails={details}
       />
     </AppShell>
   );
