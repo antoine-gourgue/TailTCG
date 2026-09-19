@@ -89,6 +89,7 @@ export function CardScanner({
   const missCount = useRef(0);
   const lastId = useRef<string | null>(null);
   const lastAmbig = useRef<string>("");
+  const failures = useRef(0);
   const phaseRef = useRef<Phase>("scanning");
   const [phase, setPhase] = useState<Phase>("scanning");
   const [camera, setCamera] = useState<"starting" | "ready" | "error">("starting");
@@ -99,6 +100,7 @@ export function CardScanner({
   const [choices, setChoices] = useState<ScanCandidate[]>([]);
   const [confirming, setConfirming] = useState(false);
   const [ticks, setTicks] = useState(0);
+  const [apiDown, setApiDown] = useState(false);
 
   useEffect(() => {
     phaseRef.current = phase;
@@ -268,7 +270,14 @@ export function CardScanner({
           headers: { "content-type": "image/jpeg" },
           body: blob,
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          // Trois échecs de suite : on le dit, plutôt que d'analyser dans le vide
+          failures.current += 1;
+          if (failures.current >= 3) setApiDown(true);
+          return;
+        }
+        failures.current = 0;
+        setApiDown(false);
         const data: ScanResult = await res.json();
         setTicks((t) => t + 1);
         if (data.status === "match") {
@@ -311,6 +320,8 @@ export function CardScanner({
     lastId.current = null;
     lastAmbig.current = "";
     missCount.current = 0;
+    failures.current = 0;
+    setApiDown(false);
     setLocked(null);
     setChoices([]);
     setGlimpse(null);
@@ -355,6 +366,11 @@ export function CardScanner({
       <>
         <Loader2 size={13} className="animate-spin" aria-hidden />
         Chargement de la détection (une seule fois)…
+      </>
+    ) : apiDown ? (
+      <>
+        <RefreshCw size={13} className="text-loss" aria-hidden />
+        Reconnaissance indisponible, réessaie dans un instant
       </>
     ) : glimpse ? (
       <>
