@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Check, Loader2, RefreshCw, ScanLine, Sparkles, X } from "lucide-react";
+import { Check, ExternalLink, Loader2, RefreshCw, ScanLine, Sparkles, X } from "lucide-react";
 import { CardImage } from "@/components/card-image";
+import { formatEur } from "@/lib/domain";
 import type { Pt } from "@/lib/scan/detect.mjs";
 import { ScanEngine, type Quad } from "@/lib/scan/engine";
 import type { ScanCandidate, ScanResult } from "@/lib/scan/index";
@@ -132,6 +133,8 @@ export function CardScanner({
   const [seen, setSeen] = useState(false);
   const [glimpse, setGlimpse] = useState<ScanCandidate | null>(null);
   const [found, setFound] = useState<ScanCandidate | null>(null);
+  /** Cote Cardmarket de la dernière carte reconnue (`id` ≠ carte affichée = en cours de chargement) */
+  const [priceOf, setPriceOf] = useState<{ id: string; value: number | null; url: string | null } | null>(null);
   const [choices, setChoices] = useState<ScanCandidate[]>([]);
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
@@ -207,6 +210,23 @@ export function CardScanner({
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
+
+  // Cote Cardmarket de la carte reconnue
+  useEffect(() => {
+    if (!found) return;
+    let alive = true;
+    const q = new URLSearchParams({ id: found.id, lang: found.lang });
+    if (token) q.set("token", token);
+    fetch(`/api/scan/price?${q}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { price: number | null; url: string | null } | null) => {
+        if (alive) setPriceOf({ id: found.id, value: data?.price ?? null, url: data?.url ?? null });
+      })
+      .catch(() => alive && setPriceOf({ id: found.id, value: null, url: null }));
+    return () => {
+      alive = false;
+    };
+  }, [found, token]);
 
   // Confirmation d'ajout éphémère
   useEffect(() => {
@@ -532,6 +552,9 @@ export function CardScanner({
         ? "Rapproche-toi, évite les reflets, montre les quatre coins."
         : null;
 
+  /** Cote de la carte affichée (null tant qu'elle charge) */
+  const price = found && priceOf?.id === found.id ? priceOf : null;
+
   const sheetStyle = { animation: "sheet-in 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both" };
   const sheetClass =
     "absolute inset-x-0 bottom-0 z-20 rounded-t-3xl bg-background px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 text-foreground shadow-[0_-12px_40px_rgba(0,0,0,.45)]";
@@ -601,6 +624,17 @@ export function CardScanner({
         </div>
       )}
 
+      {/* Un tap hors de la feuille la referme et relance le scan */}
+      {phase !== "scanning" && (
+        <button
+          type="button"
+          onClick={rescan}
+          disabled={confirming}
+          aria-label="Fermer et rescanner"
+          className="absolute inset-0 z-10 cursor-default bg-transparent"
+        />
+      )}
+
       {/* Carte reconnue */}
       {phase === "found" && found && (
         <section className={sheetClass} style={sheetStyle}>
@@ -620,6 +654,31 @@ export function CardScanner({
               </p>
               <p className="mt-1 text-sm text-muted">
                 {found.setName} <span className="num text-faint">· n° {found.localId}</span>
+              </p>
+              <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                {!price ? (
+                  <span className="inline-flex items-center gap-1.5 text-faint">
+                    <Loader2 size={12} className="animate-spin" aria-hidden />
+                    Cote Cardmarket…
+                  </span>
+                ) : price.value != null ? (
+                  <>
+                    <span className="text-muted">Cote Cardmarket</span>
+                    <span className="num font-semibold">{formatEur(price.value)}</span>
+                  </>
+                ) : (
+                  <span className="text-faint">Cote Cardmarket indisponible</span>
+                )}
+                {price?.url && (
+                  <a
+                    href={price.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-accent-strong underline-offset-4 hover:underline"
+                  >
+                    Voir <ExternalLink size={11} aria-hidden />
+                  </a>
+                )}
               </p>
             </div>
           </div>
