@@ -26,18 +26,15 @@ export default async function CapturePage({
     );
   }
 
+  // Détection : le scanner occupe tout l'écran (son propre en-tête) ; photos : page classique
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col px-4 py-6">
-      <div className="mb-4 text-center">
-        <p className="display text-lg font-bold">
-          {session.kind === "detect" ? "Scanner une carte" : "Photographier la carte"}
-        </p>
-        <p className="text-sm text-muted">
-          {session.kind === "detect"
-            ? "Cadre la carte dans le rectangle : elle est reconnue toute seule."
-            : "Cadre bien la carte, prends une ou plusieurs photos."}
-        </p>
-      </div>
+      {session.kind === "photos" && (
+        <div className="mb-4 text-center">
+          <p className="display text-lg font-bold">Photographier la carte</p>
+          <p className="text-sm text-muted">Cadre bien la carte, prends une ou plusieurs photos.</p>
+        </div>
+      )}
       <CapturePhone token={token} kind={session.kind} />
     </main>
   );

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, Loader2, Send, Plus, X } from "lucide-react";
 import { CameraCapture } from "@/components/capture/camera-capture";
-import { CardScanner } from "@/components/scan/card-scanner";
+import { CardScanner, type ConfirmResult } from "@/components/scan/card-scanner";
 import { Logo } from "@/components/logo";
 import type { ScanCandidate } from "@/lib/scan/index";
 
@@ -28,7 +28,7 @@ export function CapturePhone({
   const [phase, setPhase] = useState<"capture" | "sending" | "done">("capture");
   const [error, setError] = useState<string | null>(null);
 
-  async function sendDetect(card: ScanCandidate) {
+  async function sendDetect(card: ScanCandidate): Promise<ConfirmResult> {
     setError(null);
     const res = await fetch(`/api/capture/${token}/result`, {
       method: "POST",
@@ -43,8 +43,9 @@ export function CapturePhone({
         query: `${card.name} ${card.localId}`,
       }),
     });
-    if (res.ok) setPhase("done");
-    else setError("Envoi impossible (session expirée ?)");
+    if (!res.ok) return { status: "error", error: "Envoi impossible (session expirée ?)" };
+    setPhase("done");
+    return { status: "leave" };
   }
 
   async function sendPhotos() {
@@ -81,10 +82,12 @@ export function CapturePhone({
   return (
     <div className="flex flex-col gap-4">
       {kind === "detect" && (
-        <>
-          <CardScanner token={token} onConfirm={sendDetect} confirmLabel="Envoyer sur l'ordinateur" />
-          {error && <p className="text-center text-xs text-loss">{error}</p>}
-        </>
+        <CardScanner
+          token={token}
+          onConfirm={sendDetect}
+          confirmLabel="Envoyer sur l'ordinateur"
+          title="Scanner pour l'ordinateur"
+        />
       )}
 
       {kind === "photos" && phase === "capture" && (

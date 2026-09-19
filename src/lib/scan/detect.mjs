@@ -18,6 +18,33 @@ export const CARD_H = 447;
 
 /** @typedef {[number, number]} Pt */
 
+/** Seuils de Canny (plus bas = trop de bruit, les droites se fragmentent) */
+const CANNY_LO = 30;
+const CANNY_HI = 100;
+/**
+ * Contours couleur (min des canaux R, G, B : le jaune tranche sur le blanc)
+ * en SECOND essai seulement, quand la luminance ne donne aucun candidat :
+ * en première passe ils ajoutent du bruit et font perdre des détections.
+ */
+const COLOR_FALLBACK = true;
+/** Poids de la surface dans la note (1 = linéaire ; plus haut = favorise les grands rectangles) */
+const AREA_EXP = 1;
+/** Format accepté (court / long) ; 63/88 = 0,716, vu en perspective */
+const RATIO_MIN = 0.58;
+const RATIO_MAX = 0.85;
+/** Écart-type de l'a priori sur le format, en ratio */
+const SHAPE_SIGMA = 0.08;
+/** Pénalité maximale d'un candidat décentré (la carte scannée est au milieu de l'écran) */
+const CENTER_PENALTY = 0.35;
+/** Un candidat contenu qui fait moins que cette part de la surface du contenant est un objet distinct */
+const CONTAINED_RATIO = 0.6;
+/** Facteur appliqué à un candidat qui contient un tel objet (cadre, écran, pochette derrière la carte) ; 1 = désactivé */
+const CONTAINER_PENALTY = 0.1;
+/** Écart de direction maximal entre côtés opposés (perspective), et minimal entre côtés adjacents, en degrés */
+const MAX_SKEW_DEG = 12;
+const MIN_PERP_DEG = 76;
+/** Marge tolérée hors image pour un coin, en part du grand côté de l'image */
+const CORNER_MARGIN = 0.005;
 
 /** Coins ordonnés haut-gauche, haut-droit, bas-droit, bas-gauche, côté long vertical */
 function orderCorners(pts) {
@@ -164,8 +191,8 @@ function evaluate(edges, gray, q, imgArea, verbose) {
   const area = quadArea(q);
   if (area < 0.05 * imgArea || area > 0.95 * imgArea) return why(`area ${(area / imgArea).toFixed(2)}`);
   const ratio = aspectOf(q);
-  // format 63/88 (0,716) vu en perspective
-  if (ratio < 0.56 || ratio > 0.86) return why(`ratio ${ratio.toFixed(2)}`);
+  // format 63/88 (0,716) vu en perspective — un écran 16/9 (0,56) est exclu
+  if (ratio < RATIO_MIN || ratio > RATIO_MAX) return why(`ratio ${ratio.toFixed(2)}`);
   const sides = [0, 1, 2, 3].map((i) => sideSupport(edges, q[i], q[(i + 1) % 4]));
   const clean = sides.map((sg) => sg.filter((v) => v >= 0.6).length);
   const cleanCount = clean.filter((c) => c >= 4).length;
@@ -175,16 +202,26 @@ function evaluate(edges, gray, q, imgArea, verbose) {
   if (cleanCount < 2 || Math.min(...clean) < 2 || cleanTotal < 15) {
     return why(`clean ${clean.join("/")} sides ${sides.map((sg) => sg.map((v) => v.toFixed(1)).join(",")).join(" | ")}`);
   }
-  const support = sides.reduce((t, sg) => t + sg.reduce((u, v) => u + v, 0) / sg.length, 0) / 4;
+  const sideMeans = sides.map((sg) => sg.reduce((u, v) => u + v, 0) / sg.length);
+  const support = sideMeans.reduce((t, v) => t + v, 0) / 4;
+  const minSide = Math.min(...sideMeans);
   const rim = rimUniformity(gray, q, area);
   // La carte entière est le plus grand quadrilatère soutenu par de vrais
   // contours, bordé d'une bande unie (les « full art » gardent un plancher) ;
   // un côté traversant (alignement fortuit toléré) coûte la moitié.
   // a priori sur le format 63/88 : un côté remplacé par une ligne interne
   // de la carte donne un quadrilatère trop court (ratio 0,78–0,85)
-  const shape = Math.exp(-Math.pow((ratio - 0.716) / 0.1, 2));
-  const score = Math.pow(area / imgArea, 1.5) * support * (0.4 + 0.6 * rim) * shape;
-  return { corners: q, area, ratio, support, rim, through: 0, score };
+  const shape = Math.exp(-Math.pow((ratio - 0.716) / SHAPE_SIGMA, 2));
+  // a priori de centrage : on scanne la carte au milieu de l'écran, pas un
+  // cadre ou un écran qui traîne dans un coin
+  const W = edges.cols;
+  const H = edges.rows;
+  const cx = (q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4;
+  const cy = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4;
+  const off = Math.min(1, Math.hypot((cx - W / 2) / (W / 2), (cy - H / 2) / (H / 2)));
+  const center = 1 - CENTER_PENALTY * off;
+  const score = Math.pow(area / imgArea, AREA_EXP) * support * (0.4 + 0.6 * rim) * shape * center;
+  return { corners: q, area, ratio, support, minSide, rim, through: 0, score };
 }
 
 /** Stratégie A : contour fermé à quatre côtés */
@@ -460,9 +497,10 @@ function houghQuads(cv, edges, gray, imgArea, debug) {
   if (debug) debug.lines = L;
   if (L.length < 4) return [];
 
-  // paires de côtés opposés : directions proches (perspective tolérée) et
-  // séparation d'au moins 12 % de l'image
-  const maxSkew = (22 * Math.PI) / 180;
+  // paires de côtés opposés : directions proches (la perspective d'une carte
+  // tenue devant soi fait converger ses côtés de quelques degrés, pas plus) et
+  // séparation d'au moins 10 % de l'image
+  const maxSkew = (MAX_SKEW_DEG * Math.PI) / 180;
   const pairs = [];
   for (let i = 0; i < L.length; i++) {
     for (let j = i + 1; j < L.length; j++) {
@@ -474,9 +512,9 @@ function houghQuads(cv, edges, gray, imgArea, debug) {
       pairs.push([i, j]);
     }
   }
-  const margin = 0.02 * Math.max(W, H);
+  const margin = CORNER_MARGIN * Math.max(W, H);
   const out = [];
-  const minPerp = (65 * Math.PI) / 180;
+  const minPerp = (MIN_PERP_DEG * Math.PI) / 180;
   for (let a = 0; a < pairs.length; a++) {
     const [i, j] = pairs[a];
     for (let b = a + 1; b < pairs.length; b++) {
@@ -532,46 +570,157 @@ function houghQuads(cv, edges, gray, imgArea, debug) {
 }
 
 /**
- * Cherche une carte dans une image RGBA. Renvoie ses coins (ordre haut-gauche,
- * haut-droit, bas-droit, bas-gauche, côté long vertical) ou null.
+ * Carte des contours (Canny sur la luminance floutée, dilatée d'un pixel) ;
+ * avec `withColor`, on y ajoute les contours du min(R, G, B), où la bordure
+ * jaune d'une carte sur une table claire tranche alors qu'elle est presque
+ * invisible en gris.
+ */
+function edgeMap(cv, src, blur, withColor) {
+  const edges = new cv.Mat();
+  cv.Canny(blur, edges, CANNY_LO, CANNY_HI);
+  if (withColor) {
+    const chans = new cv.MatVector();
+    cv.split(src, chans);
+    const mn = new cv.Mat();
+    const cb = new cv.Mat();
+    const ce = new cv.Mat();
+    cv.min(chans.get(0), chans.get(1), mn);
+    cv.min(mn, chans.get(2), mn);
+    cv.GaussianBlur(mn, cb, new cv.Size(5, 5), 0);
+    cv.Canny(cb, ce, CANNY_LO, CANNY_HI);
+    cv.bitwise_or(edges, ce, edges);
+    mn.delete();
+    cb.delete();
+    ce.delete();
+    chans.delete();
+  }
+  const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+  cv.dilate(edges, edges, kernel);
+  kernel.delete();
+  return edges;
+}
+
+/** Le point est-il dans le quadrilatère convexe (coins ordonnés) ? */
+function inside(q, [x, y]) {
+  let sign = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = q[i];
+    const b = q[(i + 1) % 4];
+    const cr = (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]);
+    const s = Math.sign(cr);
+    if (s === 0) continue;
+    if (sign === 0) sign = s;
+    else if (s !== sign) return false;
+  }
+  return true;
+}
+
+/**
+ * Un quadrilatère qui recouvre en grande partie un autre candidat nettement
+ * plus petit, bien soutenu et au format carte n'est pas la carte : c'est le
+ * cadre, l'écran ou la pochette derrière elle (l'objet au premier plan est
+ * celui qu'on scanne), ou un mélange de leurs bords. Le bord intérieur de la
+ * bordure d'une carte, lui, fait ≥ 80 % de son bord extérieur : on ne le
+ * confond pas avec un objet distinct ; et un détail interne à la carte est
+ * trop petit ou trop allongé pour compter.
+ */
+function demoteContainers(candidates) {
+  if (CONTAINER_PENALTY >= 1) return;
+  // « Objet distinct » = un vrai rectangle fermé au format carte, parmi les
+  // mieux notés : quatre côtés soutenus, bande intérieure unie, format serré
+  const strong = [...candidates]
+    .sort((x, y) => y.score - x.score)
+    .slice(0, 5)
+    .filter((c) => c.minSide >= 0.75 && c.rim >= 0.5 && c.ratio >= 0.66 && c.ratio <= 0.78);
+  for (const a of candidates) {
+    for (const b of strong) {
+      if (b === a || b.area >= CONTAINED_RATIO * a.area || b.area < 0.15 * a.area) continue;
+      const cx = (b.corners[0][0] + b.corners[1][0] + b.corners[2][0] + b.corners[3][0]) / 4;
+      const cy = (b.corners[0][1] + b.corners[1][1] + b.corners[2][1] + b.corners[3][1]) / 4;
+      if (!inside(a.corners, [cx, cy])) continue;
+      const within = b.corners.filter((p) => inside(a.corners, p)).length;
+      if (within >= 2) {
+        a.score *= CONTAINER_PENALTY;
+        a.contains = true;
+        break;
+      }
+    }
+  }
+}
+
+/** Deux quadrilatères (coins ordonnés) décrivent-ils le même objet ? */
+function sameQuad(a, b) {
+  const diag = Math.hypot(a[2][0] - a[0][0], a[2][1] - a[0][1]);
+  let e = 0;
+  for (let i = 0; i < 4; i++) e += Math.hypot(a[i][0] - b[i][0], a[i][1] - b[i][1]);
+  return e / 4 < 0.06 * diag;
+}
+
+/**
+ * Cherche des cartes dans une image RGBA : jusqu'à `k` candidats distincts,
+ * du plus vraisemblable au moins vraisemblable (coins ordonnés haut-gauche,
+ * haut-droit, bas-droit, bas-gauche, côté long vertical). Le premier est en
+ * général la carte ; quand un cadre ou un écran derrière lui vole la vedette,
+ * le suivant est la carte — c'est la reconnaissance qui tranche.
  * @param {any} cv OpenCV.js
  * @param {any} src cv.Mat RGBA
+ * @param {number} [k]
  */
-export function detectCardQuad(cv, src, debug) {
+export function detectCardQuads(cv, src, k = 3, debug) {
   const W = src.cols;
   const H = src.rows;
   const imgArea = W * H;
   const gray = new cv.Mat();
   const blur = new cv.Mat();
-  const edges = new cv.Mat();
   cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
   cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
-  cv.Canny(blur, edges, 30, 100);
-  const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-  cv.dilate(edges, edges, kernel);
+  gray.delete();
+  let edges = null;
   let candidates = [];
-  try {
+  const collect = (withColor) => {
+    edges?.delete();
+    edges = edgeMap(cv, src, blur, withColor);
     const a = closedContours(cv, edges, blur, imgArea);
     const b = houghQuads(cv, edges, blur, imgArea, debug);
-    candidates = a.concat(b);
     if (debug) {
       debug.closed = a.length;
       debug.hough = b.length;
+    }
+    return a.concat(b);
+  };
+  try {
+    candidates = collect(false);
+    if (candidates.length === 0 && COLOR_FALLBACK) candidates = collect(true);
+    if (debug) {
       debug.edges = edges;
       debug.blur = blur;
-      debug.evaluate = (q) => evaluate(edges, blur, orderCorners(q), imgArea, true);
+      const e = edges;
+      debug.evaluate = (q) => evaluate(e, blur, orderCorners(q), imgArea, true);
     }
   } finally {
     if (!debug) {
-      edges.delete();
+      edges?.delete();
       blur.delete();
     }
-    gray.delete();
-    kernel.delete();
   }
-  if (candidates.length === 0) return null;
+  demoteContainers(candidates);
   candidates.sort((a, b) => b.score - a.score);
-  return candidates[0];
+  const out = [];
+  for (const c of candidates) {
+    if (out.some((o) => sameQuad(o.corners, c.corners))) continue;
+    out.push(c);
+    if (out.length >= k) break;
+  }
+  return out;
+}
+
+/**
+ * Le candidat le plus vraisemblable, ou null.
+ * @param {any} cv OpenCV.js
+ * @param {any} src cv.Mat RGBA
+ */
+export function detectCardQuad(cv, src, debug) {
+  return detectCardQuads(cv, src, 1, debug)[0] ?? null;
 }
 
 /**

@@ -164,7 +164,9 @@ const COARSE = [
 ];
 const DENSE = (() => {
   const out = [];
-  for (const z of [1.06, 1, 0.94, 0.88, 0.82]) {
+  // 1,12 : la carte redressée sur le bord intérieur de sa bordure (bord
+  // extérieur invisible sur fond clair) ; 0,82 : recadrage large de repli
+  for (const z of [1.12, 1.06, 1, 0.94, 0.88, 0.82]) {
     for (const dx of [-0.04, -0.02, 0, 0.02, 0.04]) {
       for (const dy of [-0.04, -0.02, 0, 0.02, 0.04]) {
         for (const rot of [-4, -2, 0, 2, 4]) out.push({ z, dx, dy, rot });

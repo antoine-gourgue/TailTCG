@@ -1,30 +1,43 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
-import { CardScanner } from "@/components/scan/card-scanner";
-import { addCardUrl } from "@/lib/scan/url";
+import { CardScanner, type ConfirmResult } from "@/components/scan/card-scanner";
+import { bulkAddToCollection } from "@/app/items/actions";
+import type { ScanCandidate } from "@/lib/scan/index";
+import { addCardUrl, ITEM_LANGUAGE } from "@/lib/scan/url";
 
-/** Scan direct sur mobile : la carte reconnue ouvre sa fiche d'ajout */
+/**
+ * Scan direct sur mobile, à la chaîne : chaque carte reconnue s'ajoute en un
+ * geste (état « quasi parfaite », quantité 1, langue du visuel, marquée à
+ * compléter) et on passe à la suivante ; la fiche d'ajout complète reste à
+ * un tap pour ceux qui veulent préciser tout de suite.
+ */
 export function ScanClient() {
   const router = useRouter();
+
+  async function quickAdd(card: ScanCandidate): Promise<ConfirmResult> {
+    const res = await bulkAddToCollection(
+      [
+        {
+          tcgdex_id: card.id,
+          card_name: card.name,
+          set_id: card.setId,
+          set_name: card.setName,
+          local_id: card.localId,
+          image_url: card.image,
+        },
+      ],
+      ITEM_LANGUAGE[card.lang],
+    );
+    if (res.error) return { status: "error", error: res.error };
+    return { status: "continue" };
+  }
+
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pb-8 pt-4">
-      <div className="mb-3 flex items-center gap-2">
-        <Link
-          href="/recherche"
-          aria-label="Retour"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-edge text-muted transition hover:text-foreground"
-        >
-          <ChevronLeft size={16} aria-hidden />
-        </Link>
-        <div className="min-w-0">
-          <p className="display text-lg font-bold leading-tight">Scanner une carte</p>
-          <p className="text-xs text-muted">Cadre-la, elle est reconnue toute seule.</p>
-        </div>
-      </div>
-      <CardScanner onConfirm={(c) => router.push(addCardUrl(c))} />
-    </main>
+    <CardScanner
+      onConfirm={quickAdd}
+      detailsHref={addCardUrl}
+      onClose={() => router.push("/recherche")}
+    />
   );
 }
