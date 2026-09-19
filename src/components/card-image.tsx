@@ -16,6 +16,9 @@ function langOf(src: string): string | null {
 function nextLangSrc(src: string, tried: Set<string>): string | null {
   const cur = langOf(src);
   if (!cur) return null;
+  // Les chemins japonais (ja/SV/SV9/001) n'ont pas d'équivalent dans les
+  // autres langues : un 404 est définitif, inutile de tenter cinq fois
+  if (cur === "ja") return null;
   const next = LANG_CASCADE.find((l) => l !== cur && !tried.has(l));
   if (!next) return null;
   return src.replace(

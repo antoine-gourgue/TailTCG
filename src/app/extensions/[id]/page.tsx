@@ -103,9 +103,9 @@ export default async function ExtensionPage({
           </div>
         </div>
 
-        {lang === "ja" && (
+        {set.scansMissing && (
           <p className="mb-6 rounded-xl border border-edge bg-surface px-4 py-3 text-sm text-muted">
-            TCGdex ne fournit pas encore les scans japonais — les cartes sont
+            TCGdex n&apos;a pas encore les scans de ce set — les cartes sont
             listées par nom et numéro, et restent ajoutables normalement.
           </p>
         )}

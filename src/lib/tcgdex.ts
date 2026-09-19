@@ -145,11 +145,14 @@ export async function getCard(
   });
   if (!res.ok) return null;
   const card: TcgdexCard = await res.json();
-  if (!card.image) {
+  // Les identifiants japonais (SV9-022) n'existent pas dans les autres langues
+  if (!card.image && lang !== "ja") {
     card.image = (await findImageInOtherLangs(id)) ?? undefined;
   }
   if (!card.image && card.set?.id) {
-    // Dernier recours : l'URL d'asset par convention (série via le set)
+    // Dernier recours : l'URL d'asset par convention (série via le set) ;
+    // en japonais, on vérifie qu'elle existe (le CDN a souvent les scans que
+    // l'API ne liste pas — Méga, Soleil & Lune… — mais pas les plus anciens)
     try {
       const setRes = await fetch(
         `${langBase(lang)}/sets/${encodeURIComponent(card.set.id)}`,
@@ -158,7 +161,8 @@ export async function getCard(
       if (setRes.ok) {
         const set: TcgdexSetDetail = await setRes.json();
         if (set.serie?.id) {
-          card.image = guessAssetBase(set.serie.id, card.set.id, card.localId);
+          const guess = guessAssetBase(lang, set.serie.id, card.set.id, card.localId);
+          if (lang !== "ja" || (await assetExists(guess))) card.image = guess;
         }
       }
     } catch {
@@ -240,19 +244,35 @@ export type TcgdexSetDetail = {
   cardCount?: { total: number; official: number };
   serie?: { id: string; name: string };
   cards: TcgdexCardBrief[];
+  /** Aucun scan disponible pour ce set (ni dans l'API, ni sur le CDN) */
+  scansMissing?: boolean;
 };
 
 /**
- * L'API omet parfois des images pourtant présentes sur le CDN (ex. promos
- * MEP) : on construit l'URL par convention assets/{lang}/{série}/{set}/{n°},
- * le repli client (cascade de langues → placeholder) tranche les vrais 404.
+ * L'API omet parfois des images pourtant présentes sur le CDN (promos MEP,
+ * et la plupart des sets japonais : Méga, Soleil & Lune…) : on construit
+ * l'URL par convention assets/{lang}/{série}/{set}/{n°}. Chemins
+ * internationaux en minuscules (en/sv/sv09/001), japonais tels quels
+ * (ja/SV/SV9/001, ja/M/M4/001). Le repli client tranche les vrais 404.
  */
-function guessAssetBase(
+export function guessAssetBase(
+  lang: CatalogLang,
   serieId: string,
   setId: string,
   localId: string
 ): string {
+  if (lang === "ja") return `https://assets.tcgdex.net/ja/${serieId}/${setId}/${localId}`;
   return `https://assets.tcgdex.net/en/${serieId.toLowerCase()}/${setId.toLowerCase()}/${localId}`;
+}
+
+/** Le CDN a-t-il un scan à cette adresse ? (sonde HEAD, cachée 24 h) */
+async function assetExists(base: string): Promise<boolean> {
+  try {
+    const r = await fetch(`${base}/low.webp`, { method: "HEAD", next: { revalidate: DAY_SECONDS } });
+    return r.ok;
+  } catch {
+    return false;
+  }
 }
 
 export async function getSet(
@@ -266,11 +286,18 @@ export async function getSet(
   const set: TcgdexSetDetail = await res.json();
 
   if (set.serie?.id) {
-    for (const card of set.cards ?? []) {
-      if (!card.image) {
-        card.image = guessAssetBase(set.serie.id, set.id, card.localId);
-      }
+    const missing = (set.cards ?? []).filter((c) => !c.image);
+    // Japonais : l'API ne liste presque jamais les scans ; une sonde sur la
+    // première carte manquante dit si le CDN les a (sinon on n'inflige pas
+    // un 404 par carte au navigateur, et la page signale l'absence de scans)
+    let fill = missing.length > 0;
+    if (lang === "ja" && missing.length > 0) {
+      fill = await assetExists(guessAssetBase(lang, set.serie.id, set.id, missing[0].localId));
     }
+    if (fill) {
+      for (const card of missing) card.image = guessAssetBase(lang, set.serie.id, set.id, card.localId);
+    }
+    set.scansMissing = !fill && missing.length === (set.cards ?? []).length && missing.length > 0;
   }
 
   // Rareté par carte (absente des briefs) : fiches détaillées par lots,

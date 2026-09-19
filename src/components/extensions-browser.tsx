@@ -3,20 +3,23 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Layers } from "lucide-react";
-import type { SerieWithSets, CatalogLang } from "@/lib/tcgdex";
+import { guessAssetBase, type SerieWithSets, type CatalogLang } from "@/lib/tcgdex";
 import { artworkUrl } from "@/lib/pokedex";
 import { Logo } from "@/components/logo";
 
 function SetLogo({
   logo,
   symbol,
+  cover,
   name,
 }: {
   logo?: string;
   symbol?: string;
+  /** Scan de la première carte du set : sert de visuel quand TCGdex n'a pas de logo (sets japonais) */
+  cover?: string;
   name: string;
 }) {
-  // Cascade : logo (.webp puis .png) → symbole → icône générique
+  // Cascade : logo (.webp puis .png) → symbole → première carte → icône générique
   const candidates = useMemo(
     () =>
       [
@@ -24,8 +27,9 @@ function SetLogo({
         logo && `${logo}.png`,
         symbol && `${symbol}.webp`,
         symbol && `${symbol}.png`,
+        cover,
       ].filter((s): s is string => Boolean(s)),
-    [logo, symbol]
+    [logo, symbol, cover]
   );
   const [idx, setIdx] = useState(0);
 
@@ -39,13 +43,14 @@ function SetLogo({
 
   const src = candidates[idx];
   const isSymbol = symbol && src === `${symbol}.webp`;
+  const isCover = src === cover;
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
       alt={name}
       loading="lazy"
-      className={`mx-auto object-contain ${isSymbol ? "h-10" : "h-14 max-w-full"}`}
+      className={`mx-auto object-contain ${isCover ? "h-14 rounded-md shadow-sm" : isSymbol ? "h-10" : "h-14 max-w-full"}`}
       onError={() => setIdx((i) => i + 1)}
     />
   );
@@ -122,10 +127,9 @@ export function ExtensionsBrowser({
       </div>
 
       {lang === "ja" && (
-        <p className="mb-6 rounded-xl border border-edge bg-surface px-4 py-3 text-sm text-muted">
-          TCGdex ne fournit pas encore les visuels japonais (logos et scans) —
-          tu peux quand même parcourir les sets et ajouter les cartes avec
-          leurs noms officiels.
+        <p className="mb-6 text-xs text-faint">
+          TCGdex ne fournit pas de logo pour les sets japonais : chaque set est illustré par sa première carte
+          quand son scan existe.
         </p>
       )}
 
@@ -209,7 +213,12 @@ export function ExtensionsBrowser({
                     className="panel group flex flex-col gap-3 p-4 transition hover:border-accent hover:shadow-lg"
                   >
                     <div className="flex h-14 items-center justify-center">
-                      <SetLogo logo={set.logo} symbol={set.symbol} name={set.name} />
+                      <SetLogo
+                        logo={set.logo}
+                        symbol={set.symbol}
+                        cover={lang === "ja" ? `${guessAssetBase("ja", serie.id, set.id, "001")}/low.webp` : undefined}
+                        name={set.name}
+                      />
                     </div>
                     <div className="mt-auto">
                       <p className="truncate text-sm font-medium leading-tight group-hover:text-accent-strong">

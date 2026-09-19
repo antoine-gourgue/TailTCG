@@ -91,7 +91,15 @@ for (const lang of onlyLang ? [onlyLang] : LANGS) {
     }
     const serie = detail.serie?.id ?? "";
     index.sets[`${lang}/${detail.id}`] = [detail.name, serie];
-    const cards = (detail.cards ?? []).filter((c) => c.image && !known.has(`${lang}/${c.id}`));
+    const fresh = (detail.cards ?? []).filter((c) => !known.has(`${lang}/${c.id}`));
+    // L'API omet souvent les scans pourtant présents sur le CDN (la plupart
+    // des sets japonais) : URL par convention, vérifiée une fois par set
+    const missing = fresh.filter((c) => !c.image);
+    if (missing.length > 0 && serie) {
+      const probe = await fetchRetry(`${derivedImage(lang, serie, detail.id, missing[0].id)}/low.webp`, "bin");
+      if (probe) for (const c of missing) c.image = derivedImage(lang, serie, detail.id, c.id);
+    }
+    const cards = fresh.filter((c) => c.image);
     if (cards.length === 0) continue;
 
     let i = 0;
