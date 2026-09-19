@@ -16,8 +16,6 @@ const MAX_QUADS = 3;
 const STABLE_HITS = 2;
 /** Délai minimal entre deux reconnaissances */
 const RECOG_EVERY_MS = 250;
-/** Score en dessous duquel une seule reconnaissance suffit à verrouiller (sinon deux d'affilée) */
-const T_LOCK = 0.2;
 /** Le cadre reste affiché ce temps après la dernière détection (une image ratée ne le fait pas clignoter) */
 const HOLD_MS = 450;
 /** Constante de temps du lissage du cadre (ms) : réactif mais sans tremblement */
@@ -77,10 +75,10 @@ function LangBadge({ lang }: { lang: ScanCandidate["lang"] }) {
  * stable, elle est redressée en perspective et envoyée à la reconnaissance,
  * en parallèle de la détection qui continue. Quand un cadre ou un écran
  * derrière la carte se fait passer pour elle, les candidats suivants sont
- * essayés : c'est la reconnaissance qui tranche. Une carte reconnue sûrement
- * (ou vue deux fois de suite) est verrouillée et proposée ; s'il existe
- * plusieurs versions (réimpressions), on laisse choisir. Après l'action
- * principale, on enchaîne sur la carte suivante.
+ * essayés : c'est la reconnaissance qui tranche. Dès qu'elle est sûre, la
+ * carte est proposée ; s'il existe plusieurs versions (réimpressions), on
+ * laisse choisir. Après l'action principale, on enchaîne sur la carte
+ * suivante.
  */
 export function CardScanner({
   token,
@@ -123,15 +121,11 @@ export function CardScanner({
   const lastRecogAt = useRef(0);
   const lastFallbackAt = useRef(0);
   const failures = useRef(0);
-  const lastId = useRef<string | null>(null);
-  const lastAmbig = useRef<string>("");
-  const glimpseRef = useRef(false);
   const phaseRef = useRef<Phase>("scanning");
   const [phase, setPhase] = useState<Phase>("scanning");
   const [camera, setCamera] = useState<"starting" | "ready" | "error">("starting");
   const [engine, setEngine] = useState<"loading" | "ready" | "error">("loading");
   const [seen, setSeen] = useState(false);
-  const [glimpse, setGlimpse] = useState<ScanCandidate | null>(null);
   const [found, setFound] = useState<ScanCandidate | null>(null);
   /** Cote Cardmarket de la dernière carte reconnue (`id` ≠ carte affichée = en cours de chargement) */
   const [priceOf, setPriceOf] = useState<{ id: string; value: number | null; url: string | null } | null>(null);
@@ -146,9 +140,6 @@ export function CardScanner({
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
-  useEffect(() => {
-    glimpseRef.current = glimpse !== null;
-  }, [glimpse]);
 
   // Moteur de détection (worker OpenCV)
   useEffect(() => {
@@ -317,7 +308,7 @@ export function CardScanner({
         shown.current = cur.map((p, i) => [p[0] + (t.corners[i][0] - p[0]) * a, p[1] + (t.corners[i][1] - p[1]) * a] as Pt);
       }
       const alpha = age <= HOLD_MS ? 1 : 1 - (age - HOLD_MS) / 250;
-      drawOverlay(shown.current, glimpseRef.current ? "lock" : "seek", alpha);
+      drawOverlay(shown.current, "seek", alpha);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
@@ -344,35 +335,20 @@ export function CardScanner({
       setTicks((t) => t + 1);
       if (phaseRef.current !== "scanning") return;
       if (data.status === "match") {
-        const top = data.candidates[0];
-        setGlimpse(top);
+        // Une réponse sûre (score et marge sur le suivant vérifiés par l'API) suffit : on verrouille
         altIndex.current = 0;
-        if (top.score <= T_LOCK || lastId.current === top.id) {
-          // Sûre, ou stable sur deux analyses : on verrouille
-          navigator.vibrate?.(30);
-          setFound(top);
-          setPhase("found");
-        }
-        lastId.current = top.id;
-        lastAmbig.current = "";
+        navigator.vibrate?.(30);
+        setFound(data.candidates[0]);
+        setPhase("found");
       } else if (data.status === "ambiguous") {
-        const key = data.candidates.map((c) => c.id).join("|");
-        setGlimpse(data.candidates[0]);
         altIndex.current = 0;
-        if (lastAmbig.current === key) {
-          navigator.vibrate?.(20);
-          setChoices(data.candidates);
-          setPhase("choose");
-        }
-        lastAmbig.current = key;
-        lastId.current = null;
+        navigator.vibrate?.(20);
+        setChoices(data.candidates);
+        setPhase("choose");
       } else {
         // Rien : ce candidat n'est pas une carte connue, au suivant
         track.current = null;
         altIndex.current += 1;
-        lastId.current = null;
-        lastAmbig.current = "";
-        setGlimpse(null);
       }
     } catch {
       // réseau : on réessaie à la prochaine carte stable
@@ -470,8 +446,6 @@ export function CardScanner({
   }, [camera, engine, token]);
 
   function rescan() {
-    lastId.current = null;
-    lastAmbig.current = "";
     failures.current = 0;
     track.current = null;
     target.current = null;
@@ -481,7 +455,6 @@ export function CardScanner({
     setApiDown(false);
     setFound(null);
     setChoices([]);
-    setGlimpse(null);
     setConfirmError(null);
     setPhase("scanning");
   }
@@ -528,11 +501,6 @@ export function CardScanner({
         <RefreshCw size={14} className="text-loss" aria-hidden />
         Reconnaissance indisponible, réessaie dans un instant
       </>
-    ) : glimpse ? (
-      <>
-        <Sparkles size={14} className="text-gain" aria-hidden />
-        On dirait <span className="font-semibold">{glimpse.name}</span>… ne bouge plus
-      </>
     ) : seen ? (
       <>
         <Loader2 size={14} className="animate-spin" aria-hidden />
@@ -548,7 +516,7 @@ export function CardScanner({
   const hint =
     engine === "error"
       ? "Détection indisponible : remplis l'écran avec la carte."
-      : ticks > 8 && !glimpse
+      : ticks > 8
         ? "Rapproche-toi, évite les reflets, montre les quatre coins."
         : null;
 
