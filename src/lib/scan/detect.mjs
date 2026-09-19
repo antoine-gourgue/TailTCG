@@ -1,0 +1,594 @@
+// Détection d'une carte dans une image et redressement en perspective, avec
+// OpenCV.js. Partagé entre le navigateur (scanner caméra) et Node (banc
+// scripts/scan-detect-bench.mjs). Deux stratégies, la meilleure gagne :
+//   A. bord fermé : contours des bords, polygone à 4 côtés convexe ;
+//   B. droites de Hough fusionnées, recalées sur le contour et bornées à leur
+//      étendue réelle ; deux paires à peu près perpendiculaires → coins par
+//      intersection. Résiste à une main qui cache un coin, à un reflet, aux
+//      illustrations très texturées (filtre d'isolement des droites).
+// Un candidat est validé par sa surface, son ratio (format 63/88 vu en
+// perspective), le soutien de ses côtés par les pixels de contour, l'ancrage
+// de ses coins dans l'étendue des droites, et noté par sa surface, son
+// soutien, l'uniformité de sa bande intérieure (bordure de carte) et son
+// format.
+
+/** Taille de la carte redressée (format 63/88) */
+export const CARD_W = 320;
+export const CARD_H = 447;
+
+/** @typedef {[number, number]} Pt */
+
+
+/** Coins ordonnés haut-gauche, haut-droit, bas-droit, bas-gauche, côté long vertical */
+function orderCorners(pts) {
+  const cx = pts.reduce((s, p) => s + p[0], 0) / 4;
+  const cy = pts.reduce((s, p) => s + p[1], 0) / 4;
+  const sorted = [...pts].sort((a, b) => Math.atan2(a[1] - cy, a[0] - cx) - Math.atan2(b[1] - cy, b[0] - cx));
+  // commence par le coin le plus haut-gauche
+  let start = 0;
+  let best = Infinity;
+  sorted.forEach((p, i) => {
+    const v = p[0] + p[1];
+    if (v < best) {
+      best = v;
+      start = i;
+    }
+  });
+  let q = [0, 1, 2, 3].map((i) => sorted[(start + i) % 4]);
+  // sens horaire attendu (repère image, y vers le bas)
+  const cross = (q[1][0] - q[0][0]) * (q[2][1] - q[0][1]) - (q[1][1] - q[0][1]) * (q[2][0] - q[0][0]);
+  if (cross < 0) q = [q[0], q[3], q[2], q[1]];
+  // carte tenue à l'horizontale : on tourne pour que le côté long soit vertical
+  const top = dist(q[0], q[1]);
+  const right = dist(q[1], q[2]);
+  if (top > right * 1.1) q = [q[1], q[2], q[3], q[0]];
+  return q;
+}
+
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const quadArea = (q) => {
+  let s = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = q[i];
+    const b = q[(i + 1) % 4];
+    s += a[0] * b[1] - b[0] * a[1];
+  }
+  return Math.abs(s) / 2;
+};
+/** court / long, sur les moyennes des côtés opposés */
+const aspectOf = (q) => {
+  const w = (dist(q[0], q[1]) + dist(q[3], q[2])) / 2;
+  const h = (dist(q[1], q[2]) + dist(q[0], q[3])) / 2;
+  return Math.min(w, h) / Math.max(w, h);
+};
+const isConvex = (q) => {
+  let sign = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = q[i];
+    const b = q[(i + 1) % 4];
+    const c = q[(i + 2) % 4];
+    const cr = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+    const s = Math.sign(cr);
+    if (s === 0) continue;
+    if (sign === 0) sign = s;
+    else if (s !== sign) return false;
+  }
+  return true;
+};
+
+/**
+ * Soutien d'un côté par les pixels de contour, en 5 tronçons (part des points
+ * de chaque tronçon qui tombent à ≤ 2 px d'un contour). Un côté « propre »
+ * a au moins 4 tronçons bien soutenus : ça rejette les côtés qui prolongent
+ * le bord d'une carte par une arête du fond.
+ */
+function sideSupport(edges, a, b) {
+  const W = edges.cols;
+  const H = edges.rows;
+  const d = edges.data;
+  const SEG = 5;
+  const PER = 8;
+  const out = new Array(SEG).fill(0);
+  for (let sgm = 0; sgm < SEG; sgm++) {
+    let hit = 0;
+    for (let i = 0; i < PER; i++) {
+      const t = (sgm + (i + 0.5) / PER) / SEG;
+      const x = Math.round(a[0] + (b[0] - a[0]) * t);
+      const y = Math.round(a[1] + (b[1] - a[1]) * t);
+      let ok = false;
+      for (let dy = -2; dy <= 2 && !ok; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const xx = x + dx;
+          const yy = y + dy;
+          if (xx >= 0 && yy >= 0 && xx < W && yy < H && d[yy * W + xx]) {
+            ok = true;
+            break;
+          }
+        }
+      }
+      if (ok) hit++;
+    }
+    out[sgm] = hit / PER;
+  }
+  return out;
+}
+
+/**
+ * Uniformité de la bande juste à l'intérieur du quadrilatère (0..1) : la
+ * bordure d'une carte est une bande unie tout autour, alors qu'un rectangle
+ * interne (fenêtre d'illustration, moitié haute) ou un bloc du fond ont un
+ * contenu varié le long de leurs côtés.
+ */
+function rimUniformity(gray, q, area) {
+  const W = gray.cols;
+  const H = gray.rows;
+  const g = gray.data;
+  const inset = Math.max(2, 0.02 * Math.sqrt(area));
+  const cx = (q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4;
+  const cy = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4;
+  const vals = [];
+  for (let i = 0; i < 4; i++) {
+    const a = q[i];
+    const b = q[(i + 1) % 4];
+    // normale vers le centre
+    let nx = -(b[1] - a[1]);
+    let ny = b[0] - a[0];
+    const nl = Math.hypot(nx, ny) || 1;
+    nx /= nl;
+    ny /= nl;
+    const mx = (a[0] + b[0]) / 2;
+    const my = (a[1] + b[1]) / 2;
+    if ((cx - mx) * nx + (cy - my) * ny < 0) {
+      nx = -nx;
+      ny = -ny;
+    }
+    for (let k = 0; k < 12; k++) {
+      const t = 0.08 + (0.84 * (k + 0.5)) / 12;
+      const x = Math.round(a[0] + (b[0] - a[0]) * t + nx * inset);
+      const y = Math.round(a[1] + (b[1] - a[1]) * t + ny * inset);
+      if (x >= 0 && y >= 0 && x < W && y < H) vals.push(g[y * W + x]);
+    }
+  }
+  if (vals.length < 24) return 0;
+  const sorted = [...vals].sort((u, v) => u - v);
+  const med = sorted[sorted.length >> 1];
+  let near = 0;
+  for (const v of vals) if (Math.abs(v - med) <= 22) near++;
+  return near / vals.length;
+}
+
+/** Note d'un candidat, ou null s'il est rejeté */
+function evaluate(edges, gray, q, imgArea, verbose) {
+  const why = (r) => (verbose ? { rejected: r, q } : null);
+  if (!isConvex(q)) return why("convex");
+  const area = quadArea(q);
+  if (area < 0.05 * imgArea || area > 0.95 * imgArea) return why(`area ${(area / imgArea).toFixed(2)}`);
+  const ratio = aspectOf(q);
+  // format 63/88 (0,716) vu en perspective
+  if (ratio < 0.56 || ratio > 0.86) return why(`ratio ${ratio.toFixed(2)}`);
+  const sides = [0, 1, 2, 3].map((i) => sideSupport(edges, q[i], q[(i + 1) % 4]));
+  const clean = sides.map((sg) => sg.filter((v) => v >= 0.6).length);
+  const cleanCount = clean.filter((c) => c >= 4).length;
+  const cleanTotal = clean.reduce((t, c) => t + c, 0);
+  // deux côtés propres au moins, les deux autres en grande partie visibles :
+  // la main qui tient la carte cache un coin, donc un bout de deux côtés
+  if (cleanCount < 2 || Math.min(...clean) < 2 || cleanTotal < 15) {
+    return why(`clean ${clean.join("/")} sides ${sides.map((sg) => sg.map((v) => v.toFixed(1)).join(",")).join(" | ")}`);
+  }
+  const support = sides.reduce((t, sg) => t + sg.reduce((u, v) => u + v, 0) / sg.length, 0) / 4;
+  const rim = rimUniformity(gray, q, area);
+  // La carte entière est le plus grand quadrilatère soutenu par de vrais
+  // contours, bordé d'une bande unie (les « full art » gardent un plancher) ;
+  // un côté traversant (alignement fortuit toléré) coûte la moitié.
+  // a priori sur le format 63/88 : un côté remplacé par une ligne interne
+  // de la carte donne un quadrilatère trop court (ratio 0,78–0,85)
+  const shape = Math.exp(-Math.pow((ratio - 0.716) / 0.1, 2));
+  const score = Math.pow(area / imgArea, 1.5) * support * (0.4 + 0.6 * rim) * shape;
+  return { corners: q, area, ratio, support, rim, through: 0, score };
+}
+
+/** Stratégie A : contour fermé à quatre côtés */
+function closedContours(cv, edges, gray, imgArea) {
+  const out = [];
+  const contours = new cv.MatVector();
+  const hier = new cv.Mat();
+  cv.findContours(edges, contours, hier, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+  for (let i = 0; i < contours.size(); i++) {
+    const c = contours.get(i);
+    if (cv.contourArea(c) >= 0.05 * imgArea) {
+      const approx = new cv.Mat();
+      cv.approxPolyDP(c, approx, 0.03 * cv.arcLength(c, true), true);
+      if (approx.rows === 4) {
+        const pts = [];
+        for (let k = 0; k < 4; k++) pts.push([approx.data32S[k * 2], approx.data32S[k * 2 + 1]]);
+        const ev = evaluate(edges, gray, orderCorners(pts), imgArea);
+        if (ev) out.push(ev);
+      }
+      approx.delete();
+    }
+    c.delete();
+  }
+  contours.delete();
+  hier.delete();
+  return out;
+}
+
+/** Intersection de deux droites (φ, ρ) : x cosφ + y sinφ = ρ */
+function intersect(l1, l2) {
+  const det = Math.cos(l1.phi) * Math.sin(l2.phi) - Math.sin(l1.phi) * Math.cos(l2.phi);
+  if (Math.abs(det) < 1e-6) return null;
+  const x = (l1.rho * Math.sin(l2.phi) - l2.rho * Math.sin(l1.phi)) / det;
+  const y = (l2.rho * Math.cos(l1.phi) - l1.rho * Math.cos(l2.phi)) / det;
+  return [x, y];
+}
+
+/** Écart angulaire entre deux directions de normale (radians, 0..π/2) */
+function angDiff(a, b) {
+  const d = Math.abs(a - b) % Math.PI;
+  return Math.min(d, Math.PI - d);
+}
+
+/**
+ * Suit les pixels de contour le long d'une droite (φ, ρ, direction dx/dy) à
+ * partir de l'abscisse `tc`, dans les deux sens, en tolérant des trous de
+ * `maxGap` px. Renvoie l'étendue [tmin, tmax] et la longueur soutenue.
+ */
+function traceExtent(edges, l, tc, maxGap, win = 2) {
+  const W = edges.cols;
+  const H = edges.rows;
+  const d = edges.data;
+  const x0 = Math.cos(l.phi) * l.rho;
+  const y0 = Math.sin(l.phi) * l.rho;
+  const nx = Math.cos(l.phi);
+  const ny = Math.sin(l.phi);
+  /** écart (px, le long de la normale) du pixel de contour le plus proche, ou null */
+  const hit = (t) => {
+    const px = x0 + l.dx * t;
+    const py = y0 + l.dy * t;
+    for (let k = 0; k <= 2 * win; k++) {
+      // 0, +1, -1, +2, -2, …
+      const o = k % 2 ? (k + 1) / 2 : -k / 2;
+      const x = Math.round(px + nx * o);
+      const y = Math.round(py + ny * o);
+      if (x >= 0 && y >= 0 && x < W && y < H && d[y * W + x]) return o;
+    }
+    return null;
+  };
+  const inside = (t) => {
+    const px = x0 + l.dx * t;
+    const py = y0 + l.dy * t;
+    return px >= -2 && py >= -2 && px <= W + 1 && py <= H + 1;
+  };
+  const STEP = 2;
+  let length = 0;
+  const samples = [];
+  const walk = (dir) => {
+    let last = tc;
+    let gap = 0;
+    for (let t = tc; inside(t); t += dir * STEP) {
+      const o = hit(t);
+      if (o !== null) {
+        last = t;
+        gap = 0;
+        length += STEP;
+        samples.push([t, o]);
+      } else {
+        gap += STEP;
+        if (gap > maxGap) break;
+      }
+    }
+    return last;
+  };
+  const tmin = walk(-1);
+  const tmax = walk(1);
+  return { tmin, tmax, length, samples };
+}
+
+/** Recale une droite sur les écarts mesurés le long d'elle (moindres carrés o = a + b·t) */
+function snapLine(l, samples) {
+  const n = samples.length;
+  if (n < 10) return;
+  let st = 0;
+  let so = 0;
+  for (const [t, o] of samples) {
+    st += t;
+    so += o;
+  }
+  const mt = st / n;
+  const mo = so / n;
+  let stt = 0;
+  let sto = 0;
+  for (const [t, o] of samples) {
+    stt += (t - mt) * (t - mt);
+    sto += (t - mt) * (o - mo);
+  }
+  const b = stt > 0 ? sto / stt : 0;
+  const a = mo - b * mt;
+  // deux points de la droite corrigée → nouveaux φ, ρ, direction
+  const x0 = Math.cos(l.phi) * l.rho;
+  const y0 = Math.sin(l.phi) * l.rho;
+  const nx = Math.cos(l.phi);
+  const ny = Math.sin(l.phi);
+  const t1 = mt - 100;
+  const t2 = mt + 100;
+  const p1 = [x0 + l.dx * t1 + nx * (a + b * t1), y0 + l.dy * t1 + ny * (a + b * t1)];
+  const p2 = [x0 + l.dx * t2 + nx * (a + b * t2), y0 + l.dy * t2 + ny * (a + b * t2)];
+  let phi = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) + Math.PI / 2;
+  while (phi < 0) phi += Math.PI;
+  while (phi >= Math.PI) phi -= Math.PI;
+  l.phi = phi;
+  l.rho = p1[0] * Math.cos(phi) + p1[1] * Math.sin(phi);
+  l.dx = -Math.sin(phi);
+  l.dy = Math.cos(phi);
+}
+
+/** Stratégie B : droites de Hough → paires de côtés à peu près parallèles, deux à deux perpendiculaires */
+function houghQuads(cv, edges, gray, imgArea, debug) {
+  const W = edges.cols;
+  const H = edges.rows;
+  const minDim = Math.min(W, H);
+  const lines = new cv.Mat();
+  cv.HoughLinesP(edges, lines, 1, Math.PI / 360, 20, 0.08 * minDim, 6);
+  const segs = [];
+  for (let i = 0; i < lines.rows; i++) {
+    const x1 = lines.data32S[i * 4];
+    const y1 = lines.data32S[i * 4 + 1];
+    const x2 = lines.data32S[i * 4 + 2];
+    const y2 = lines.data32S[i * 4 + 3];
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    // normale φ ∈ [0, π) et distance signée ρ : x cosφ + y sinφ = ρ
+    let phi = Math.atan2(y2 - y1, x2 - x1) + Math.PI / 2;
+    while (phi < 0) phi += Math.PI;
+    while (phi >= Math.PI) phi -= Math.PI;
+    const rho = ((x1 + x2) / 2) * Math.cos(phi) + ((y1 + y2) / 2) * Math.sin(phi);
+    segs.push({ phi, rho, len, x1, y1, x2, y2 });
+  }
+  lines.delete();
+  if (segs.length < 4) return [];
+
+  // Fusion des segments colinéaires : même direction (3°) et les deux
+  // extrémités à moins de 0,8 % de l'image de la droite hôte. Fine, pour ne
+  // pas confondre le bord extérieur et le bord intérieur de la bordure d'une
+  // carte, qui sont à quelques pixels l'un de l'autre.
+  segs.sort((a, b) => b.len - a.len);
+  const tol = 0.008 * Math.max(W, H);
+  const tolPhi = (3 * Math.PI) / 180;
+  const distTo = (l, x, y) => Math.abs(x * Math.cos(l.phi) + y * Math.sin(l.phi) - l.rho);
+  const merged = [];
+  for (const sg of segs) {
+    let host = null;
+    for (const m of merged) {
+      if (angDiff(m.phi, sg.phi) <= tolPhi && distTo(m, sg.x1, sg.y1) <= tol && distTo(m, sg.x2, sg.y2) <= tol) {
+        host = m;
+        break;
+      }
+    }
+    if (host) {
+      host.weight += sg.len;
+      host.segs.push(sg);
+    } else merged.push({ phi: sg.phi, rho: sg.rho, weight: sg.len, segs: [sg] });
+  }
+  // Réajustement de chaque droite (régression orthogonale pondérée sur les
+  // extrémités de ses segments) et étendue réelle le long de la droite : là
+  // où le contour existe vraiment, un vrai coin de carte doit s'y trouver.
+  const maxGap = 0.02 * Math.max(W, H);
+  for (const m of merged) {
+    let sw = 0;
+    let mx = 0;
+    let my = 0;
+    for (const sg of m.segs) {
+      mx += (sg.x1 + sg.x2) * sg.len;
+      my += (sg.y1 + sg.y2) * sg.len;
+      sw += 2 * sg.len;
+    }
+    mx /= sw;
+    my /= sw;
+    let sxx = 0;
+    let sxy = 0;
+    let syy = 0;
+    for (const sg of m.segs) {
+      for (const [x, y] of [
+        [sg.x1, sg.y1],
+        [sg.x2, sg.y2],
+      ]) {
+        sxx += (x - mx) * (x - mx) * sg.len;
+        sxy += (x - mx) * (y - my) * sg.len;
+        syy += (y - my) * (y - my) * sg.len;
+      }
+    }
+    // direction principale, puis normale
+    const theta = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+    let phi = theta + Math.PI / 2;
+    while (phi < 0) phi += Math.PI;
+    while (phi >= Math.PI) phi -= Math.PI;
+    m.phi = phi;
+    m.rho = mx * Math.cos(phi) + my * Math.sin(phi);
+    const dx = -Math.sin(phi);
+    const dy = Math.cos(phi);
+    m.dx = dx;
+    m.dy = dy;
+    // Étendue réelle : on suit les contours le long de la droite ajustée, à
+    // partir du milieu du segment le plus long (sûrement sur le bord), en
+    // tolérant des trous de 2 % de l'image (un reflet, un doigt fin). Les
+    // segments de Hough, fragmentés, s'arrêtent souvent bien avant les coins ;
+    // ce suivi va jusqu'au bout du bord.
+    // Un premier suivi (fenêtre ±3 px) mesure l'écart réel du contour, la
+    // droite est recalée dessus (elle dérive de quelques pixels sur la
+    // longueur après la régression sur les segments), puis un second suivi
+    // (±2 px) donne l'étendue définitive.
+    const main = m.segs[0];
+    let tc = ((main.x1 + main.x2) / 2) * dx + ((main.y1 + main.y2) / 2) * dy;
+    const first = traceExtent(edges, m, tc, maxGap, 3);
+    snapLine(m, first.samples);
+    tc = ((main.x1 + main.x2) / 2) * m.dx + ((main.y1 + main.y2) / 2) * m.dy;
+    const traced = traceExtent(edges, m, tc, maxGap, 2);
+    m.tmin = traced.tmin;
+    m.tmax = traced.tmax;
+    m.weight = traced.length;
+  }
+  // Isolement : un vrai bord a au moins un côté sans contours à 5 px (le
+  // fond, ou la bande unie de la bordure) ; une « droite » née de la texture
+  // d'une illustration holo baigne dans les contours des deux côtés.
+  const ed = edges.data;
+  const isolation = (m) => {
+    const x0 = Math.cos(m.phi) * m.rho;
+    const y0 = Math.sin(m.phi) * m.rho;
+    const nx = Math.cos(m.phi) * 5;
+    const ny = Math.sin(m.phi) * 5;
+    let hitA = 0;
+    let hitB = 0;
+    let n = 0;
+    for (let i = 0; i < 24; i++) {
+      const t = m.tmin + ((m.tmax - m.tmin) * (i + 0.5)) / 24;
+      const px = x0 + m.dx * t;
+      const py = y0 + m.dy * t;
+      const ax = Math.round(px + nx);
+      const ay = Math.round(py + ny);
+      const bx = Math.round(px - nx);
+      const by = Math.round(py - ny);
+      if (ax < 0 || ay < 0 || ax >= W || ay >= H || bx < 0 || by < 0 || bx >= W || by >= H) continue;
+      n++;
+      if (ed[ay * W + ax]) hitA++;
+      if (ed[by * W + bx]) hitB++;
+    }
+    return n < 8 ? 0 : 1 - Math.min(hitA, hitB) / n;
+  };
+  const L = merged
+    .filter((m) => m.weight >= 0.15 * minDim && isolation(m) >= 0.6)
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 32);
+  if (debug) debug.lines = L;
+  if (L.length < 4) return [];
+
+  // paires de côtés opposés : directions proches (perspective tolérée) et
+  // séparation d'au moins 12 % de l'image
+  const maxSkew = (22 * Math.PI) / 180;
+  const pairs = [];
+  for (let i = 0; i < L.length; i++) {
+    for (let j = i + 1; j < L.length; j++) {
+      if (angDiff(L[i].phi, L[j].phi) > maxSkew) continue;
+      // point de L[j] le plus proche du centre de l'image, distance à L[i]
+      const px = Math.cos(L[j].phi) * L[j].rho;
+      const py = Math.sin(L[j].phi) * L[j].rho;
+      if (distTo(L[i], px, py) < 0.1 * minDim) continue;
+      pairs.push([i, j]);
+    }
+  }
+  const margin = 0.02 * Math.max(W, H);
+  const out = [];
+  const minPerp = (65 * Math.PI) / 180;
+  for (let a = 0; a < pairs.length; a++) {
+    const [i, j] = pairs[a];
+    for (let b = a + 1; b < pairs.length; b++) {
+      const [k, m] = pairs[b];
+      if (k === i || k === j || m === i || m === j) continue;
+      // les deux paires doivent être à peu près perpendiculaires (pas de
+      // moyenne d'angles : φ se replie en 0/π pour les côtés quasi verticaux)
+      if (angDiff(L[i].phi, L[k].phi) < minPerp || angDiff(L[j].phi, L[m].phi) < minPerp) continue;
+      const p = [intersect(L[i], L[k]), intersect(L[i], L[m]), intersect(L[j], L[m]), intersect(L[j], L[k])];
+      if (p.some((v) => !v)) continue;
+      if (p.some(([x, y]) => x < -margin || y < -margin || x > W + margin || y > H + margin)) continue;
+      // Chaque coin doit tomber dans l'étendue réelle de ses deux droites
+      // (à 8 % de la longueur du côté près) ; un seul coin peut y échapper,
+      // celui que cache la main. Ça élimine les quadrilatères qui prolongent
+      // les bords d'une carte jusqu'à une arête du fond.
+      const lineOf = [
+        [i, k],
+        [i, m],
+        [j, m],
+        [j, k],
+      ];
+      let loose = 0;
+      const overrun = new Map();
+      for (let c = 0; c < 4; c++) {
+        const [x, y] = p[c];
+        for (const li of lineOf[c]) {
+          const l = L[li];
+          const t = x * l.dx + y * l.dy;
+          // longueur du côté porté par cette droite
+          const other = lineOf.findIndex((pair, idx) => idx !== c && pair.includes(li));
+          const side = other >= 0 ? Math.hypot(p[other][0] - x, p[other][1] - y) : minDim;
+          const slack = 0.08 * side;
+          if (t < l.tmin - slack || t > l.tmax + slack) {
+            loose++;
+            break;
+          }
+          // de combien le contour continue au-delà de ce coin, en part du côté
+          const tOther = other >= 0 ? p[other][0] * l.dx + p[other][1] * l.dy : t;
+          const beyond = tOther > t ? t - l.tmin : l.tmax - t;
+          overrun.set(li, Math.max(overrun.get(li) ?? 0, beyond / side));
+        }
+      }
+      // Un bord de carte s'arrête au coin ; une rangée de touches, le bord
+      // d'une table continuent. Deux côtés « traversants » : ce n'est pas la carte.
+      const through = [...overrun.values()].filter((v) => v > 0.15).length;
+      if (through > 1) continue;
+      if (loose > 1) continue;
+      const ev = evaluate(edges, gray, orderCorners(p), imgArea);
+      if (ev) out.push({ ...ev, through });
+    }
+  }
+  return out;
+}
+
+/**
+ * Cherche une carte dans une image RGBA. Renvoie ses coins (ordre haut-gauche,
+ * haut-droit, bas-droit, bas-gauche, côté long vertical) ou null.
+ * @param {any} cv OpenCV.js
+ * @param {any} src cv.Mat RGBA
+ */
+export function detectCardQuad(cv, src, debug) {
+  const W = src.cols;
+  const H = src.rows;
+  const imgArea = W * H;
+  const gray = new cv.Mat();
+  const blur = new cv.Mat();
+  const edges = new cv.Mat();
+  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+  cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
+  cv.Canny(blur, edges, 30, 100);
+  const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+  cv.dilate(edges, edges, kernel);
+  let candidates = [];
+  try {
+    const a = closedContours(cv, edges, blur, imgArea);
+    const b = houghQuads(cv, edges, blur, imgArea, debug);
+    candidates = a.concat(b);
+    if (debug) {
+      debug.closed = a.length;
+      debug.hough = b.length;
+      debug.edges = edges;
+      debug.blur = blur;
+      debug.evaluate = (q) => evaluate(edges, blur, orderCorners(q), imgArea, true);
+    }
+  } finally {
+    if (!debug) {
+      edges.delete();
+      blur.delete();
+    }
+    gray.delete();
+    kernel.delete();
+  }
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates[0];
+}
+
+/**
+ * Redresse la carte (homographie) en CARD_W×CARD_H. Renvoie un cv.Mat RGBA à
+ * libérer par l'appelant.
+ * @param {any} cv
+ * @param {any} src cv.Mat RGBA
+ * @param {Pt[]} corners
+ */
+export function warpCard(cv, src, corners) {
+  const from = cv.matFromArray(4, 1, cv.CV_32FC2, corners.flat());
+  const to = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, CARD_W, 0, CARD_W, CARD_H, 0, CARD_H]);
+  const M = cv.getPerspectiveTransform(from, to);
+  const dst = new cv.Mat();
+  cv.warpPerspective(src, dst, M, new cv.Size(CARD_W, CARD_H), cv.INTER_LINEAR, cv.BORDER_REPLICATE, new cv.Scalar());
+  from.delete();
+  to.delete();
+  M.delete();
+  return dst;
+}

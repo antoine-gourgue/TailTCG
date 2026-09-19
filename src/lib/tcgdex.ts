@@ -131,7 +131,8 @@ async function findImageInOtherLangs(cardId: string): Promise<string | null> {
 }
 
 /** Catalogues navigables : international (fr) et japonais (ja) */
-export type CatalogLang = "fr" | "ja";
+/** Langues des catalogues TCGdex utilisées par l'app (recherche fr/ja, scan toutes) */
+export type CatalogLang = "fr" | "en" | "ja" | "de" | "es" | "it";
 
 const langBase = (lang: CatalogLang) => `https://api.tcgdex.net/v2/${lang}`;
 

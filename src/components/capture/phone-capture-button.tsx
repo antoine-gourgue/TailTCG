@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Smartphone, Check, Loader2 } from "lucide-react";
 import { createCaptureSession } from "@/app/capture/actions";
 import { Sheet } from "@/components/sheet";
+import { addCardUrl } from "@/lib/scan/url";
 
 /**
  * Bouton desktop : ouvre une session de capture, affiche un QR à flasher,
@@ -65,11 +66,12 @@ export function PhoneCaptureButton({
             setDone(true);
             if (kind === "detect") {
               const cardId = String(data.result?.cardId ?? "");
+              const lang = String(data.result?.lang ?? "fr");
               const q = String(data.result?.query ?? "");
               setTimeout(() => {
                 setOpen(false);
-                // Carte reconnue par image : droit sur sa fiche d'ajout
-                if (cardId) router.push(`/ajouter?card=${encodeURIComponent(cardId)}`);
+                // Carte reconnue par image : droit sur sa fiche d'ajout, dans sa langue
+                if (cardId) router.push(addCardUrl({ id: cardId, lang }));
                 else if (onDetect) onDetect(q);
                 else router.push(`/recherche?q=${encodeURIComponent(q)}`);
               }, 700);

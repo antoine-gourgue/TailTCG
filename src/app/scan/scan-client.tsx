@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { CardScanner } from "@/components/scan/card-scanner";
+import { addCardUrl } from "@/lib/scan/url";
 
 /** Scan direct sur mobile : la carte reconnue ouvre sa fiche d'ajout */
 export function ScanClient() {
@@ -23,7 +24,7 @@ export function ScanClient() {
           <p className="text-xs text-muted">Cadre-la, elle est reconnue toute seule.</p>
         </div>
       </div>
-      <CardScanner onConfirm={(c) => router.push(`/ajouter?card=${encodeURIComponent(c.id)}`)} />
+      <CardScanner onConfirm={(c) => router.push(addCardUrl(c))} />
     </main>
   );
 }

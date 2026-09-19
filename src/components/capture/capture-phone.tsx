@@ -35,6 +35,7 @@ export function CapturePhone({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         cardId: card.id,
+        lang: card.lang,
         name: card.name,
         setName: card.setName,
         localId: card.localId,

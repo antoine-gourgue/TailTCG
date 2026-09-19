@@ -43,3 +43,6 @@ next-env.d.ts
 
 # IDE
 .idea/
+
+# banc de détection du scan (images de test)
+.scan-bench/

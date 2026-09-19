@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCard, cardmarketUrl } from "@/lib/tcgdex";
+import { ITEM_LANGUAGE, isScanLang } from "@/lib/scan/url";
 import { resolveCardmarketPrice } from "@/lib/cardmarket";
 import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
 import { CardImage } from "@/components/card-image";
@@ -24,14 +25,16 @@ export default async function AjouterPage({
   if (!cardId) redirect("/recherche");
 
   const supabase = await createClient();
-  const lang = langParam === "ja" ? ("ja" as const) : ("fr" as const);
+  // Langue du catalogue : ja depuis les extensions japonaises, n'importe
+  // laquelle depuis le scan (la carte est montrée telle que scannée)
+  const lang = isScanLang(langParam) ? langParam : "fr";
 
   let meta: CardMeta;
   let previewImage: string | null = null;
   let subtitle = "";
   let rarity: string | null = null;
   let defaultType: string | null = null;
-  let defaultLanguage = lang === "ja" ? "JP" : "FR";
+  let defaultLanguage: string = ITEM_LANGUAGE[lang];
   let price: number | null = null;
   let cmId: number | null = null;
 

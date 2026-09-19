@@ -27,6 +27,7 @@ export async function POST(
       result: {
         query,
         cardId: cardId || null,
+        lang: str("lang", 5),
         name: str("name", 120),
         setName: str("setName", 120),
         localId: str("localId", 20),

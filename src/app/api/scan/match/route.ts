@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { canScan } from "@/lib/scan/access";
 import { loadCaptureByToken } from "@/lib/capture";
+import sharp from "sharp";
 import { hashCardVariants } from "@/lib/scan/phash.mjs";
 import { matchCard } from "@/lib/scan/index";
 
@@ -28,8 +29,14 @@ export async function POST(request: NextRequest) {
   }
   try {
     // Plusieurs cadrages de la même photo : tolère un cadre décalé ou tourné
-    const variants = await hashCardVariants(buf);
-    return NextResponse.json(matchCard(variants));
+    let result = matchCard(await hashCardVariants(buf));
+    if (result.status === "none") {
+      // Carte tenue à l'envers : on retente tête en bas
+      const flipped = await sharp(buf).rotate(180).jpeg({ quality: 85 }).toBuffer();
+      const again = matchCard(await hashCardVariants(flipped));
+      if (again.status !== "none") result = again;
+    }
+    return NextResponse.json(result);
   } catch {
     return NextResponse.json({ error: "image" }, { status: 400 });
   }
