@@ -78,6 +78,8 @@ export function ItemForm({
   cardFields,
   defaults,
   sources: initialSources,
+  scanId,
+  submitLabel,
 }: {
   mode: "create" | "edit";
   itemId?: string;
@@ -86,6 +88,9 @@ export function ItemForm({
   cardFields?: ManualCardFields;
   defaults: ItemDefaults;
   sources: SourceOption[];
+  /** Carte scannée depuis le téléphone : l'enregistrement enchaîne sur la suivante */
+  scanId?: string;
+  submitLabel?: string;
 }) {
   const stepNo = (n: number) =>
     String(n + (cardFields ? 1 : 0)).padStart(2, "0");
@@ -148,6 +153,7 @@ export function ItemForm({
       {mode === "edit" && itemId && (
         <input type="hidden" name="item_id" value={itemId} />
       )}
+      {scanId && <input type="hidden" name="scan_id" value={scanId} />}
 
       {/* 0 — Carte manuelle : identité saisie à la main */}
       {cardFields && (
@@ -519,7 +525,9 @@ export function ItemForm({
       >
         {pending
           ? "Enregistrement…"
-          : mode === "create"
+          : submitLabel
+            ? submitLabel
+            : mode === "create"
             ? "Ajouter à la collection"
             : "Enregistrer les modifications"}
       </button>

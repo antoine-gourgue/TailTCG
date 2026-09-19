@@ -22,8 +22,10 @@ export function isScanLang(v: unknown): v is ScanLang {
  * Fiche d'ajout d'une carte reconnue : la carte est montrée dans la langue
  * scannée (nom, visuel) et la langue de l'exemplaire est présélectionnée.
  */
-export function addCardUrl(c: { id: string; lang?: string | null }): string {
+export function addCardUrl(c: { id: string; lang?: string | null; scan?: string | null }): string {
   const p = new URLSearchParams({ card: c.id });
   if (isScanLang(c.lang) && c.lang !== "fr") p.set("lang", c.lang);
+  // Carte scannée depuis le téléphone : la fiche enchaîne sur la suivante
+  if (c.scan) p.set("scan", c.scan);
   return `/ajouter?${p.toString()}`;
 }

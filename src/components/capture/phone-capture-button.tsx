@@ -1,30 +1,29 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Smartphone, Check, Loader2 } from "lucide-react";
 import { createCaptureSession } from "@/app/capture/actions";
 import { Sheet } from "@/components/sheet";
-import { addCardUrl } from "@/lib/scan/url";
 
 /**
- * Bouton desktop : ouvre une session de capture, affiche un QR à flasher,
- * et attend (polling) le résultat du téléphone.
+ * Bouton desktop « avec ton téléphone ».
+ * - Scan : ouvre une session et va sur sa page (QR à flasher, cartes reçues
+ *   en direct, ajout une à une ou en masse). Sur écran tactile, on scanne
+ *   directement.
+ * - Photos : QR dans une feuille, puis attente (sondage) des photos.
  */
 export function PhoneCaptureButton({
   kind,
   itemId,
   label,
   className = "btn btn-ghost",
-  onDetect,
   directHref,
 }: {
   kind: "detect" | "photos";
   itemId?: string;
   label: string;
   className?: string;
-  /** Détection : reçoit la requête lue sur le téléphone (sinon navigue) */
-  onDetect?: (query: string) => void;
   /** Sur écran tactile (téléphone), on scanne directement à cette adresse plutôt que via le QR */
   directHref?: string;
 }) {
@@ -33,10 +32,12 @@ export function PhoneCaptureButton({
   const [qr, setQr] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [starting, startTransition] = useTransition();
   const stop = useRef(false);
 
+  // Photos : session + QR + sondage jusqu'à réception
   useEffect(() => {
-    if (!open) return;
+    if (!open || kind !== "photos") return;
     stop.current = false;
 
     (async () => {
@@ -54,7 +55,6 @@ export function PhoneCaptureButton({
       const QR = (await import("qrcode")).default;
       setQr(await QR.toDataURL(url, { margin: 1, width: 240 }));
 
-      // Polling de l'état
       while (!stop.current) {
         await new Promise((r) => setTimeout(r, 1500));
         if (stop.current) break;
@@ -64,23 +64,10 @@ export function PhoneCaptureButton({
           const data = await res.json();
           if (data.status === "done") {
             setDone(true);
-            if (kind === "detect") {
-              const cardId = String(data.result?.cardId ?? "");
-              const lang = String(data.result?.lang ?? "fr");
-              const q = String(data.result?.query ?? "");
-              setTimeout(() => {
-                setOpen(false);
-                // Carte reconnue par image : droit sur sa fiche d'ajout, dans sa langue
-                if (cardId) router.push(addCardUrl({ id: cardId, lang }));
-                else if (onDetect) onDetect(q);
-                else router.push(`/recherche?q=${encodeURIComponent(q)}`);
-              }, 700);
-            } else {
-              setTimeout(() => {
-                setOpen(false);
-                router.refresh();
-              }, 700);
-            }
+            setTimeout(() => {
+              setOpen(false);
+              router.refresh();
+            }, 700);
             break;
           }
         } catch {}
@@ -93,23 +80,34 @@ export function PhoneCaptureButton({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  function start() {
+    if (directHref && window.matchMedia("(pointer: coarse)").matches) {
+      router.push(directHref);
+      return;
+    }
+    if (kind === "detect") {
+      setError(null);
+      startTransition(async () => {
+        const session = await createCaptureSession("detect");
+        if ("error" in session) {
+          setError(session.error);
+          setOpen(true);
+          return;
+        }
+        router.push(`/scan/${session.id}`);
+      });
+      return;
+    }
+    setQr(null);
+    setError(null);
+    setDone(false);
+    setOpen(true);
+  }
+
   return (
     <>
-      <button
-        type="button"
-        onClick={() => {
-          if (directHref && window.matchMedia("(pointer: coarse)").matches) {
-            router.push(directHref);
-            return;
-          }
-          setQr(null);
-          setError(null);
-          setDone(false);
-          setOpen(true);
-        }}
-        className={className}
-      >
-        <Smartphone size={15} aria-hidden />
+      <button type="button" onClick={start} disabled={starting} className={className}>
+        {starting ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <Smartphone size={15} aria-hidden />}
         {label}
       </button>
 
@@ -118,10 +116,9 @@ export function PhoneCaptureButton({
         onClose={() => setOpen(false)}
         title={kind === "detect" ? "Scanner avec ton téléphone" : "Photographier avec ton téléphone"}
         description={
-          <>
-            Flashe ce QR code avec l&apos;appareil photo de ton téléphone, puis
-            {kind === "detect" ? " scanne la carte." : " prends les photos."}
-          </>
+          kind === "detect" ? null : (
+            <>Flashe ce QR code avec l&apos;appareil photo de ton téléphone, puis prends les photos.</>
+          )
         }
       >
         <div className="text-center">

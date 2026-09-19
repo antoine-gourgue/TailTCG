@@ -88,7 +88,6 @@ export function SearchClient({
             label="Scanner"
             className="btn btn-ghost !py-3 shrink-0"
             directHref="/scan"
-            onDetect={(q) => handleChange(q)}
           />
         )}
       </div>

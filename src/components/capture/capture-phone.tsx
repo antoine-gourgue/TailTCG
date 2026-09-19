@@ -13,8 +13,8 @@ async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
 
 /**
  * Côté téléphone, après avoir flashé le QR du desktop :
- * - détection : scanner en continu (reconnaissance d'image), la carte
- *   reconnue est envoyée et s'ouvre sur l'ordinateur ;
+ * - détection : scanner en continu ; chaque carte reconnue est envoyée à
+ *   l'ordinateur et on enchaîne sur la suivante, jusqu'à « Terminer » ;
  * - photos : prises de vue rattachées à un exemplaire.
  */
 export function CapturePhone({
@@ -27,9 +27,9 @@ export function CapturePhone({
   const [shots, setShots] = useState<string[]>([]);
   const [phase, setPhase] = useState<"capture" | "sending" | "done">("capture");
   const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(0);
 
   async function sendDetect(card: ScanCandidate): Promise<ConfirmResult> {
-    setError(null);
     const res = await fetch(`/api/capture/${token}/result`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -37,15 +37,20 @@ export function CapturePhone({
         cardId: card.id,
         lang: card.lang,
         name: card.name,
+        setId: card.setId,
         setName: card.setName,
         localId: card.localId,
         image: card.image,
-        query: `${card.name} ${card.localId}`,
       }),
     });
     if (!res.ok) return { status: "error", error: "Envoi impossible (session expirée ?)" };
+    setSent((n) => n + 1);
+    return { status: "continue" };
+  }
+
+  async function finishDetect() {
+    await fetch(`/api/capture/${token}/finish`, { method: "POST" }).catch(() => {});
     setPhase("done");
-    return { status: "leave" };
   }
 
   async function sendPhotos() {
@@ -72,7 +77,9 @@ export function CapturePhone({
         <p className="display text-xl font-bold">C&apos;est envoyé !</p>
         <p className="max-w-xs text-sm text-muted">
           {kind === "detect"
-            ? "Retourne sur ton ordinateur : la fiche d'ajout s'ouvre automatiquement."
+            ? sent > 0
+              ? `${sent} carte${sent > 1 ? "s" : ""} t'attend${sent > 1 ? "ent" : ""} sur ton ordinateur.`
+              : "Retourne sur ton ordinateur."
             : "Retourne sur ton ordinateur : les photos apparaissent sur la fiche."}
         </p>
       </div>
@@ -87,6 +94,8 @@ export function CapturePhone({
           onConfirm={sendDetect}
           confirmLabel="Envoyer sur l'ordinateur"
           title="Scanner pour l'ordinateur"
+          noun="envoyée"
+          onFinish={finishDetect}
         />
       )}
 

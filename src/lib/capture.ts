@@ -14,6 +14,11 @@ export type CaptureRow = {
   expires_at: string;
 };
 
+/** Une session dont la date d'expiration est passée */
+export function isCaptureExpired(expiresAt: string): boolean {
+  return new Date(expiresAt).getTime() < Date.now();
+}
+
 /** Charge une session par jeton si valide et non expirée (côté serveur) */
 export async function loadCaptureByToken(
   token: string
@@ -26,6 +31,6 @@ export async function loadCaptureByToken(
     .eq("token", token)
     .maybeSingle();
   if (!data) return null;
-  if (new Date(data.expires_at).getTime() < Date.now()) return null;
+  if (isCaptureExpired(data.expires_at)) return null;
   return data as CaptureRow;
 }

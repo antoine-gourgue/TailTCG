@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
+import { addCardUrl } from "@/lib/scan/url";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -134,6 +135,30 @@ export async function createItem(
 
   revalidatePath("/");
   revalidatePath("/wishlist");
+
+  // Carte scannée depuis le téléphone : on la marque ajoutée et on enchaîne
+  // sur la suivante de la session, puis sur le récapitulatif
+  const scanId = strOrNull(formData, "scan_id");
+  if (scanId) {
+    const { data: scan } = await supabase
+      .from("capture_scans")
+      .update({ status: "added", item_id: created.id })
+      .eq("id", scanId)
+      .select("session_id")
+      .maybeSingle();
+    if (scan) {
+      const { data: next } = await supabase
+        .from("capture_scans")
+        .select("id, tcgdex_id, lang")
+        .eq("session_id", scan.session_id)
+        .eq("status", "pending")
+        .order("created_at")
+        .limit(1)
+        .maybeSingle();
+      revalidatePath(`/scan/${scan.session_id}`);
+      redirect(next ? addCardUrl({ id: next.tcgdex_id, lang: next.lang, scan: next.id }) : `/scan/${scan.session_id}`);
+    }
+  }
   redirect("/");
 }
 
@@ -222,14 +247,14 @@ export async function bulkAddToCollection(cards: BulkCard[], language: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Non connecté", added: 0 };
+  if (!user) return { error: "Non connecté", added: 0, items: [] };
 
   const clean = cards
     .filter(
       (c) => c.tcgdex_id && c.card_name && c.set_id && c.set_name && c.local_id
     )
     .slice(0, 500);
-  if (clean.length === 0) return { error: null, added: 0 };
+  if (clean.length === 0) return { error: null, added: 0, items: [] };
 
   const { LANGUAGES } = await import("@/lib/domain");
   const lang = (LANGUAGES as readonly string[]).includes(language)
@@ -256,7 +281,7 @@ export async function bulkAddToCollection(cards: BulkCard[], language: string) {
     .select("id, tcgdex_id");
   if (error) {
     console.error("bulkAddToCollection:", error.message);
-    return { error: "Ajout impossible, réessaie.", added: 0 };
+    return { error: "Ajout impossible, réessaie.", added: 0, items: [] };
   }
 
   // Ces cartes sortent des recherchées et prennent la place de leurs
@@ -275,7 +300,7 @@ export async function bulkAddToCollection(cards: BulkCard[], language: string) {
 
   revalidatePath("/");
   revalidatePath("/wishlist");
-  return { error: null, added: clean.length };
+  return { error: null, added: clean.length, items: created ?? [] };
 }
 
 /** Suppression douce en masse : les exemplaires partent à la corbeille */

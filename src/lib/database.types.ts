@@ -177,6 +177,76 @@ export type Database = {
         }
         Relationships: []
       }
+      capture_scans: {
+        Row: {
+          created_at: string
+          id: string
+          image: string
+          item_id: string | null
+          lang: string
+          local_id: string
+          name: string
+          owner_id: string
+          session_id: string
+          set_id: string
+          set_name: string
+          status: string
+          tcgdex_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image?: string
+          item_id?: string | null
+          lang?: string
+          local_id: string
+          name: string
+          owner_id: string
+          session_id: string
+          set_id: string
+          set_name: string
+          status?: string
+          tcgdex_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image?: string
+          item_id?: string | null
+          lang?: string
+          local_id?: string
+          name?: string
+          owner_id?: string
+          session_id?: string
+          set_id?: string
+          set_name?: string
+          status?: string
+          tcgdex_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "capture_scans_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "collection_value"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "capture_scans_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "capture_scans_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "capture_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       capture_sessions: {
         Row: {
           created_at: string | null

@@ -94,6 +94,8 @@ export function CardScanner({
   detailsHref,
   onClose,
   title = "Scanner",
+  noun = "ajoutée",
+  onFinish,
 }: {
   /** Relais QR : jeton de la session (sinon l'utilisateur connecté fait foi) */
   token?: string;
@@ -103,6 +105,10 @@ export function CardScanner({
   detailsHref?: (card: ScanCandidate) => string;
   onClose?: () => void;
   title?: string;
+  /** Mot de la confirmation et du compteur : « ajoutée » ou « envoyée » */
+  noun?: string;
+  /** Bouton « Terminer » en haut à droite (fin d'une série envoyée à l'ordinateur) */
+  onFinish?: () => void | Promise<void>;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -498,10 +504,24 @@ export function CardScanner({
         </span>
         <p className="display text-base font-semibold drop-shadow">{title}</p>
         <span className="flex min-w-10 justify-end">
-          {added > 0 && (
-            <span className="num whitespace-nowrap rounded-full bg-gain px-2.5 py-1 text-xs font-bold text-black shadow">
-              {added} ajoutée{added > 1 ? "s" : ""}
-            </span>
+          {onFinish ? (
+            <button
+              type="button"
+              onClick={() => void onFinish()}
+              className="btn !px-3.5 !py-2 bg-white text-sm font-semibold text-black shadow"
+            >
+              Terminer
+              {added > 0 && (
+                <span className="num rounded-full bg-black/10 px-1.5 text-xs">{added}</span>
+              )}
+            </button>
+          ) : (
+            added > 0 && (
+              <span className="num whitespace-nowrap rounded-full bg-gain px-2.5 py-1 text-xs font-bold text-black shadow">
+                {added} {noun}
+                {added > 1 ? "s" : ""}
+              </span>
+            )
           )}
         </span>
       </header>
@@ -511,7 +531,7 @@ export function CardScanner({
         <div className="rise-in pointer-events-none relative z-10 mt-4 flex justify-center px-6">
           <span className="inline-flex items-center gap-2 rounded-full bg-gain px-4 py-2 text-sm font-semibold text-black shadow-lg">
             <Check size={15} aria-hidden />
-            {toast} ajoutée
+            {toast} {noun}
           </span>
         </div>
       )}
