@@ -34,7 +34,7 @@ export default async function CapturePage({
         </p>
         <p className="text-sm text-muted">
           {session.kind === "detect"
-            ? "Cadre la carte dans le rectangle et prends la photo."
+            ? "Cadre la carte dans le rectangle : elle est reconnue toute seule."
             : "Cadre bien la carte, prends une ou plusieurs photos."}
         </p>
       </div>

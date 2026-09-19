@@ -16,6 +16,7 @@ export function PhoneCaptureButton({
   label,
   className = "btn btn-ghost",
   onDetect,
+  directHref,
 }: {
   kind: "detect" | "photos";
   itemId?: string;
@@ -23,6 +24,8 @@ export function PhoneCaptureButton({
   className?: string;
   /** Détection : reçoit la requête lue sur le téléphone (sinon navigue) */
   onDetect?: (query: string) => void;
+  /** Sur écran tactile (téléphone), on scanne directement à cette adresse plutôt que via le QR */
+  directHref?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -61,10 +64,13 @@ export function PhoneCaptureButton({
           if (data.status === "done") {
             setDone(true);
             if (kind === "detect") {
+              const cardId = String(data.result?.cardId ?? "");
               const q = String(data.result?.query ?? "");
               setTimeout(() => {
                 setOpen(false);
-                if (onDetect) onDetect(q);
+                // Carte reconnue par image : droit sur sa fiche d'ajout
+                if (cardId) router.push(`/ajouter?card=${encodeURIComponent(cardId)}`);
+                else if (onDetect) onDetect(q);
                 else router.push(`/recherche?q=${encodeURIComponent(q)}`);
               }, 700);
             } else {
@@ -90,6 +96,10 @@ export function PhoneCaptureButton({
       <button
         type="button"
         onClick={() => {
+          if (directHref && window.matchMedia("(pointer: coarse)").matches) {
+            router.push(directHref);
+            return;
+          }
           setQr(null);
           setError(null);
           setDone(false);

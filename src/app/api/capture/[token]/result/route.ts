@@ -13,13 +13,26 @@ export async function POST(
     return NextResponse.json({ error: "invalid" }, { status: 400 });
   }
   const body = await req.json().catch(() => ({}));
-  const query = String(body?.query ?? "").slice(0, 120).trim();
-  if (!query) return NextResponse.json({ error: "empty" }, { status: 400 });
+  const str = (k: string, max: number) => String(body?.[k] ?? "").slice(0, max).trim();
+  const query = str("query", 120);
+  // Carte reconnue par image : son id TCGdex ouvre directement la fiche d'ajout
+  const cardId = str("cardId", 60);
+  if (!query && !cardId) return NextResponse.json({ error: "empty" }, { status: 400 });
 
   const db = createAdminClient();
   const { error } = await db
     .from("capture_sessions")
-    .update({ status: "done", result: { query } })
+    .update({
+      status: "done",
+      result: {
+        query,
+        cardId: cardId || null,
+        name: str("name", 120),
+        setName: str("setName", 120),
+        localId: str("localId", 20),
+        image: str("image", 200),
+      },
+    })
     .eq("id", session.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

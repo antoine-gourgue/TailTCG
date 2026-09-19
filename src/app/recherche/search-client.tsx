@@ -78,15 +78,14 @@ export function SearchClient({
           autoFocus
           className="field !w-auto flex-1 !px-4 !py-3 !text-base"
         />
-        {/* Scan OCR encore imparfait : masqué en production, gardé en dev */}
-        {process.env.NODE_ENV !== "production" && (
-          <PhoneCaptureButton
-            kind="detect"
-            label="Scanner"
-            className="btn btn-ghost !py-3 shrink-0"
-            onDetect={(q) => handleChange(q)}
-          />
-        )}
+        {/* Reconnaissance d'image : direct sur téléphone, relais QR depuis un ordinateur */}
+        <PhoneCaptureButton
+          kind="detect"
+          label="Scanner"
+          className="btn btn-ghost !py-3 shrink-0"
+          directHref="/scan"
+          onDetect={(q) => handleChange(q)}
+        />
       </div>
 
       {status === "idle" && (

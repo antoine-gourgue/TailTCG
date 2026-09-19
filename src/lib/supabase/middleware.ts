@@ -14,6 +14,8 @@ const PUBLIC_PATHS = [
   // Capture depuis le téléphone : accès par jeton, sans connexion
   "/capture/",
   "/api/capture/",
+  // Reconnaissance de carte : le téléphone (relais QR) n'a pas de session, la route vérifie le jeton
+  "/api/scan/",
   // Métadonnées récupérées par des robots non connectés
   "/opengraph-image",
   "/manifest.webmanifest",
