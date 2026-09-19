@@ -23,6 +23,8 @@ export type SetCard = {
   price: number | null;
   /** idProduct Cardmarket, pour le lien produit — null si inconnu */
   cmId: number | null;
+  /** Carte venue d'un autre catalogue (complément anglais) : sa fiche d'ajout s'ouvre dans cette langue */
+  lang?: string;
 };
 
 /** Ordre d'affichage des raretés (inconnues à la fin) */
@@ -426,6 +428,11 @@ export function SetCardsGrid({
               )}
             </div>
 
+            {selected.price == null && (
+              <p className="mt-4 rounded-lg border border-dashed border-edge px-3 py-2 text-xs text-faint">
+                Cote Cardmarket indisponible pour cette carte
+              </p>
+            )}
             {selected.price != null && (
               <a
                 href={cardmarketUrl({ idProduct: selected.cmId, name: selected.name, localId: selected.localId })}
@@ -447,7 +454,7 @@ export function SetCardsGrid({
             )}
 
             <Link
-              href={`/ajouter?card=${encodeURIComponent(selected.id)}${langSuffix}`}
+              href={`/ajouter?card=${encodeURIComponent(selected.id)}${selected.lang ? `&lang=${selected.lang}` : langSuffix}`}
               className="btn btn-primary mt-4 w-full"
             >
               <Plus size={15} aria-hidden />

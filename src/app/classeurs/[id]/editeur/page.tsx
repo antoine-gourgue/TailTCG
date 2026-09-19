@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages, applyRectifiedImages } from "@/lib/images";
-import { fetchSeriesWithSets } from "@/lib/tcgdex";
+import { catalogSeries } from "@/lib/catalog";
 import { binderDesign } from "@/lib/binder-design";
 import { coverLayout, coverStoragePaths } from "@/lib/binder-cover";
 import { AppShell } from "@/components/app-shell";
@@ -41,7 +41,7 @@ export default async function EditeurPage({
       .select("item_id, rectified_path")
       .order("created_at", { ascending: false }),
     // Logos et symboles d'extension (TCGdex, cache 24 h) — vide si injoignable
-    fetchSeriesWithSets("fr").catch(() => []),
+    catalogSeries("fr").catch(() => []),
   ]);
 
   // Cartes du classeur : cartes de couverture, fond ou zones, aperçu ouvert

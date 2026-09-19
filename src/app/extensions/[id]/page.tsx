@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getSet, type CatalogLang } from "@/lib/tcgdex";
+import type { CatalogLang } from "@/lib/tcgdex";
+import { catalogSet } from "@/lib/catalog";
 import { AppShell } from "@/components/app-shell";
 import { SetCardsGrid } from "@/components/set-cards-grid";
 import { fetchGuidePrices } from "@/lib/cardmarket";
@@ -28,7 +29,7 @@ export default async function ExtensionPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const set = await getSet(id, lang);
+  const set = await catalogSet(id, lang);
   if (!set) notFound();
 
   // Cartes déjà dans les recherchées (pour l'étoile de la modale)
@@ -60,6 +61,9 @@ export default async function ExtensionPage({
     : null;
 
   const langSuffix = lang === "ja" ? "&lang=ja" : "";
+  const pricesAvailable = set.cards.some(
+    (c) => (overrideCardmarketId(c.id, c.cmId) != null && guidePrices.has(overrideCardmarketId(c.id, c.cmId)!)) || c.price != null
+  );
 
   return (
     <AppShell>
@@ -96,6 +100,14 @@ export default async function ExtensionPage({
                 return n > 0 ? <span className="num">{n} cartes</span> : null;
               })()}
               {releaseDate && <span>{releaseDate}</span>}
+              {!pricesAvailable && (
+                <span
+                  className="rounded-md border border-edge px-1.5 py-0.5 text-xs text-faint"
+                  title="Aucune cote Cardmarket connue pour les cartes de ce set"
+                >
+                  Cote Cardmarket indisponible
+                </span>
+              )}
             </p>
           </div>
           <div className="ml-auto">
@@ -121,6 +133,7 @@ export default async function ExtensionPage({
               rarity: c.rarity ?? null,
               price: (cmId != null ? guidePrices.get(cmId) : undefined) ?? c.price ?? null,
               cmId,
+              lang: c.lang,
             };
           })}
           officialCount={set.cardCount?.official ?? null}

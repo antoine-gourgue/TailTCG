@@ -98,8 +98,8 @@ export async function createBinderFromSet(setId: string, lang: "fr" | "ja") {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Non connecté" };
 
-  const { getSet } = await import("@/lib/tcgdex");
-  const set = await getSet(setId, lang);
+  const { catalogSet } = await import("@/lib/catalog");
+  const set = await catalogSet(setId, lang);
   if (!set || (set.cards ?? []).length === 0) return { error: "Set introuvable ou vide" };
 
   // Ordre par numéro (les numéros non numériques passent après)

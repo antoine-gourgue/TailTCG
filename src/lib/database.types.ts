@@ -379,6 +379,96 @@ export type Database = {
         }
         Relationships: []
       }
+      catalog_cards: {
+        Row: {
+          card_lang: string | null
+          id: string
+          image: string | null
+          lang: string
+          local_id: string
+          name: string
+          name_en: string | null
+          rarity: string | null
+          set_id: string
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          card_lang?: string | null
+          id: string
+          image?: string | null
+          lang: string
+          local_id: string
+          name: string
+          name_en?: string | null
+          rarity?: string | null
+          set_id: string
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          card_lang?: string | null
+          id?: string
+          image?: string | null
+          lang?: string
+          local_id?: string
+          name?: string
+          name_en?: string | null
+          rarity?: string | null
+          set_id?: string
+          source?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      catalog_sets: {
+        Row: {
+          card_count_official: number | null
+          card_count_total: number | null
+          id: string
+          lang: string
+          logo: string | null
+          name: string
+          release_date: string | null
+          serie_id: string
+          serie_logo: string | null
+          serie_name: string
+          source: string
+          symbol: string | null
+          updated_at: string
+        }
+        Insert: {
+          card_count_official?: number | null
+          card_count_total?: number | null
+          id: string
+          lang: string
+          logo?: string | null
+          name: string
+          release_date?: string | null
+          serie_id?: string
+          serie_logo?: string | null
+          serie_name?: string
+          source?: string
+          symbol?: string | null
+          updated_at?: string
+        }
+        Update: {
+          card_count_official?: number | null
+          card_count_total?: number | null
+          id?: string
+          lang?: string
+          logo?: string | null
+          name?: string
+          release_date?: string | null
+          serie_id?: string
+          serie_logo?: string | null
+          serie_name?: string
+          source?: string
+          symbol?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       custom_cards: {
         Row: {
           created_at: string | null

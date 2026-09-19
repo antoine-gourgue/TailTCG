@@ -4,7 +4,8 @@ import { Smartphone } from "lucide-react";
 import { skipScanAndNext } from "@/app/scan/actions";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCard, cardmarketUrl } from "@/lib/tcgdex";
+import { cardmarketUrl } from "@/lib/tcgdex";
+import { catalogCard } from "@/lib/catalog";
 import { ITEM_LANGUAGE, isScanLang } from "@/lib/scan/url";
 import { resolveCardmarketPrice } from "@/lib/cardmarket";
 import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
@@ -93,7 +94,7 @@ export default async function AjouterPage({
     rarity = "Hors catalogue";
     defaultLanguage = "JP";
   } else {
-    const card = await getCard(cardId, lang);
+    const card = await catalogCard(cardId, lang);
     if (!card) redirect("/recherche");
 
     meta = {

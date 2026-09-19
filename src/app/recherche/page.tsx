@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { FilePlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { fetchSeriesWithSets, type CatalogLang } from "@/lib/tcgdex";
+import type { CatalogLang } from "@/lib/tcgdex";
+import { catalogSeries } from "@/lib/catalog";
 import { AppShell } from "@/components/app-shell";
 import { SearchClient } from "./search-client";
 
@@ -25,7 +26,7 @@ export default async function RecherchePage({
   const lang: CatalogLang = langParam === "ja" ? "ja" : "fr";
 
   const [series, { count: customCount }, { count: pokedexCount }] = await Promise.all([
-    fetchSeriesWithSets(lang),
+    catalogSeries(lang),
     supabase
       .from("custom_cards")
       .select("id", { count: "exact", head: true }),

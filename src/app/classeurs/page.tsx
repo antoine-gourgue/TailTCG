@@ -7,7 +7,7 @@ import { AppShell } from "@/components/app-shell";
 import { BindersGrid } from "@/components/binders-grid";
 import { binderDesign } from "@/lib/binder-design";
 import { coverRenderFor } from "@/lib/binder-cover-server";
-import { fetchSeriesWithSets } from "@/lib/tcgdex";
+import { catalogSeries } from "@/lib/catalog";
 import { loadPokedex } from "@/lib/pokedex-server";
 import { NewBinderButton } from "@/components/new-binder-button";
 
@@ -55,7 +55,7 @@ export default async function ClasseursPage() {
   // Sets pour l'assistant « à partir d'un set » (TCGdex, caché 24 h) et
   // générations du Pokédex (« une génération du Pokédex »)
   const [series, dex] = await Promise.all([
-    fetchSeriesWithSets("fr").catch(() => []),
+    catalogSeries("fr").catch(() => []),
     loadPokedex(supabase),
   ]);
   const sets = series.flatMap((s) =>

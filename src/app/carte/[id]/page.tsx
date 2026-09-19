@@ -3,7 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { Pencil, ExternalLink, X, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCard, cardmarketUrl } from "@/lib/tcgdex";
+import { cardmarketUrl } from "@/lib/tcgdex";
+import { catalogCard } from "@/lib/catalog";
 import { resolveCardmarketPrice } from "@/lib/cardmarket";
 import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
 import { signStorageImages } from "@/lib/images";
@@ -103,7 +104,10 @@ export default async function CartePage({
   // Fiche officielle TCGdex (cache 24 h) — sauf cartes ajoutées à la main
   const isCustom = item.tcgdex_id?.startsWith("custom:") ?? false;
   const tcgdexCard =
-    item.tcgdex_id && !isCustom ? await getCard(item.tcgdex_id) : null;
+    item.tcgdex_id && !isCustom
+      ? (await catalogCard(item.tcgdex_id, "fr")) ??
+        (item.language === "JP" ? await catalogCard(item.tcgdex_id, "ja") : null)
+      : null;
   // Prix de référence Cardmarket (indicatif) — pas la valorisation, qui reste manuelle
   const marketId = overrideCardmarketId(
     item.tcgdex_id,

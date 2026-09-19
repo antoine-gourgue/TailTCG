@@ -1,7 +1,20 @@
 // Client serveur de l'API TCGdex (français, sans clé).
 // Ne jamais appeler TCGdex depuis le navigateur : passer par /api/tcgdex/*.
 
+import setLogos from "@/data/set-logos.json";
+
 const TCGDEX_BASE = "https://api.tcgdex.net/v2/fr";
+
+/** Logo auto-hébergé (scripts/set-logos.mjs) pour un set que TCGdex ne fournit pas */
+function hostedLogo(lang: CatalogLang, setId: string): string | undefined {
+  const table = (setLogos as Record<string, Record<string, string>>)[lang];
+  return table?.[setId];
+}
+
+/** Tri des cartes par numéro (001, 002, … puis TG01, GG01, SV001…) */
+function sortCards<T extends { localId: string }>(cards: T[]): T[] {
+  return [...cards].sort((a, b) => a.localId.localeCompare(b.localId, "en", { numeric: true }));
+}
 const DAY_SECONDS = 86400;
 
 /** Réponse brute de GET /cards?name=like:… */
@@ -17,6 +30,10 @@ export type TcgdexCardBrief = {
   price?: number | null;
   /** idProduct Cardmarket (pour le lien produit) — enrichi sur les pages de set */
   cmId?: number | null;
+  /** Catalogue d'où vient la carte quand ce n'est pas celui demandé (complément anglais d'un set FR incomplet) */
+  lang?: CatalogLang;
+  /** Origine des données : TCGdex, ou Limitless pour les sets japonais que TCGdex n'a pas */
+  source?: "tcgdex" | "limitless";
 };
 
 export type TcgdexSetBrief = {
@@ -178,6 +195,7 @@ export type CatalogSet = {
   logo?: string;
   symbol?: string;
   cardCount?: { total: number; official: number };
+  releaseDate?: string;
 };
 
 export type SerieWithSets = {
@@ -230,7 +248,7 @@ export async function fetchSeriesWithSets(
       name: d.name,
       logo: d.logo ?? null,
       releaseDate: d.releaseDate ?? null,
-      sets: d.sets ?? [],
+      sets: (d.sets ?? []).map((set) => (set.logo ? set : { ...set, logo: hostedLogo(lang, set.id) })),
     }))
     .sort((a, b) => (b.releaseDate ?? "").localeCompare(a.releaseDate ?? ""));
 }
@@ -284,32 +302,61 @@ export async function getSet(
   });
   if (!res.ok) return null;
   const set: TcgdexSetDetail = await res.json();
+  if (!set.logo) set.logo = hostedLogo(lang, set.id);
+
+  // Catalogue FR incomplet (promos surtout) : les cartes que l'anglais a en
+  // plus sont ajoutées, marquées de leur langue (fiche d'ajout en anglais)
+  if (lang === "fr") {
+    try {
+      const enRes = await fetch(`${langBase("en")}/sets/${encodeURIComponent(id)}`, { next: { revalidate: DAY_SECONDS } });
+      if (enRes.ok) {
+        const en: TcgdexSetDetail = await enRes.json();
+        const have = new Set((set.cards ?? []).map((c) => c.localId));
+        const extra = (en.cards ?? []).filter((c) => !have.has(c.localId)).map((c) => ({ ...c, lang: "en" as const }));
+        if (extra.length) set.cards = [...(set.cards ?? []), ...extra];
+      }
+    } catch {
+      // l'anglais est un bonus
+    }
+  }
+  set.cards = sortCards(set.cards ?? []);
 
   if (set.serie?.id) {
     const missing = (set.cards ?? []).filter((c) => !c.image);
-    // Japonais : l'API ne liste presque jamais les scans ; une sonde sur la
-    // première carte manquante dit si le CDN les a (sinon on n'inflige pas
-    // un 404 par carte au navigateur, et la page signale l'absence de scans)
-    let fill = missing.length > 0;
-    if (lang === "ja" && missing.length > 0) {
-      fill = await assetExists(guessAssetBase(lang, set.serie.id, set.id, missing[0].localId));
+    // L'API ne liste pas tous les scans (presque jamais en japonais, parfois
+    // en international) ; une sonde sur la première carte manquante dit si
+    // le CDN les a — sinon on n'inflige pas un 404 par carte au navigateur,
+    // et la page signale l'absence de scans
+    let fill = false;
+    if (missing.length > 0) {
+      const first = missing[0];
+      fill = await assetExists(guessAssetBase(first.lang ?? lang, set.serie.id, set.id, first.localId));
     }
     if (fill) {
-      for (const card of missing) card.image = guessAssetBase(lang, set.serie.id, set.id, card.localId);
+      for (const card of missing) card.image = guessAssetBase(card.lang ?? lang, set.serie.id, set.id, card.localId);
     }
     set.scansMissing = !fill && missing.length === (set.cards ?? []).length && missing.length > 0;
   }
 
-  // Rareté par carte (absente des briefs) : fiches détaillées par lots,
-  // chacune cachée 24 h — seul le premier affichage du set paie le coût
-  const cards = set.cards ?? [];
+  await enrichCardDetails(set.cards ?? [], lang);
+
+  return set;
+}
+
+/**
+ * Rareté, cote et idProduct Cardmarket par carte (absents des briefs) :
+ * fiches détaillées par lots de 25, chacune cachée 24 h — seul le premier
+ * affichage du set paie le coût. Chaque carte est lue dans son catalogue
+ * d'origine (`card.lang`), sinon dans `lang`.
+ */
+export async function enrichCardDetails(cards: TcgdexCardBrief[], lang: CatalogLang): Promise<void> {
   const CHUNK = 25;
   for (let i = 0; i < cards.length; i += CHUNK) {
     await Promise.all(
       cards.slice(i, i + CHUNK).map(async (card) => {
         try {
           const r = await fetch(
-            `${langBase(lang)}/cards/${encodeURIComponent(card.id)}`,
+            `${langBase(card.lang ?? lang)}/cards/${encodeURIComponent(card.id)}`,
             { next: { revalidate: DAY_SECONDS } }
           );
           if (!r.ok) return;
@@ -328,8 +375,8 @@ export async function getSet(
     );
   }
 
-  return set;
 }
+
 
 /**
  * Prix de référence Cardmarket d'une carte, en euros : première valeur de
