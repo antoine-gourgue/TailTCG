@@ -14,14 +14,11 @@ export function SearchClient({
   lang,
   customCount = 0,
   pokedexCount = 0,
-  scanEnabled = false,
 }: {
   series: SerieWithSets[];
   lang: CatalogLang;
   customCount?: number;
   pokedexCount?: number;
-  /** Scan de carte (bêta) : réservé aux comptes autorisés */
-  scanEnabled?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [cards, setCards] = useState<CardSearchResult[]>([]);
@@ -81,15 +78,8 @@ export function SearchClient({
           autoFocus
           className="field !w-auto flex-1 !px-4 !py-3 !text-base"
         />
-        {/* Reconnaissance d'image (bêta, comptes autorisés) : direct sur téléphone, relais QR depuis un ordinateur */}
-        {scanEnabled && (
-          <PhoneCaptureButton
-            kind="detect"
-            label="Scanner"
-            className="btn btn-ghost !py-3 shrink-0"
-            directHref="/scan"
-          />
-        )}
+        {/* Reconnaissance d'image : direct sur téléphone, relais QR depuis un ordinateur */}
+        <PhoneCaptureButton kind="detect" label="Scanner" className="btn btn-ghost !py-3 shrink-0" directHref="/scan" />
       </div>
 
       {status === "idle" && (

@@ -5,10 +5,9 @@ import sharp from "sharp";
 import { hashCardVariants } from "@/lib/scan/phash.mjs";
 import { matchCard } from "@/lib/scan/index";
 
-// Reconnaît une carte à partir d'une image (JPEG recadré sur le cadre-guide).
-// Accessible au téléphone via un jeton de session de capture (relais QR, que
-// seuls les comptes autorisés peuvent ouvrir) ou à un compte autorisé
-// connecté (scan direct sur mobile). ~200 ms bout en bout.
+// Reconnaît une carte à partir d'une image (JPEG de la carte redressée).
+// Accessible au téléphone via un jeton de session de capture (relais QR) ou
+// à un compte connecté (scan direct sur mobile).
 export const maxDuration = 10;
 const MAX_BYTES = 1_500_000;
 

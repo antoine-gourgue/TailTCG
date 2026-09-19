@@ -1,7 +1,6 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { isAdminEmail } from "@/lib/admin";
 
 export type CaptureSession = { id: string; token: string } | { error: string };
 
@@ -15,8 +14,6 @@ export async function createCaptureSession(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Non connecté" };
-  // Scan de carte en bêta : comptes autorisés seulement (les photos restent ouvertes à tous)
-  if (kind === "detect" && !isAdminEmail(user.email)) return { error: "Scan réservé (bêta)" };
 
   const minutes = kind === "detect" ? 30 : 10;
   const expires_at = new Date(Date.now() + minutes * 60 * 1000).toISOString();
