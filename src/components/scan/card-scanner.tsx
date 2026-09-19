@@ -4,60 +4,34 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Check, Loader2, RefreshCw, ScanLine, Sparkles, X } from "lucide-react";
 import { CardImage } from "@/components/card-image";
-import { detectCardQuads, warpCard, CARD_W, CARD_H, type Pt, type QuadCandidate } from "@/lib/scan/detect.mjs";
+import type { Pt } from "@/lib/scan/detect.mjs";
+import { ScanEngine, type Quad } from "@/lib/scan/engine";
 import type { ScanCandidate, ScanResult } from "@/lib/scan/index";
 import { ITEM_LANGUAGE } from "@/lib/scan/url";
 
-/** OpenCV.js (détection de la carte), chargé une fois depuis le CDN et mis en cache par le navigateur */
-const OPENCV_URL = "https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js";
-/** Cadence d'analyse ; largeur de travail pour la détection ; largeur de capture pour le redressement */
-const TICK_MS = 350;
-const DETECT_W = 360;
-const CAPTURE_W = 720;
 /** Candidats de détection départagés par la reconnaissance quand le premier ne donne rien */
 const MAX_QUADS = 3;
-/** Sans carte détectée pendant ce nombre d'analyses, on envoie le centre de l'image (carte plein écran) */
-const FALLBACK_AFTER = 5;
+/** Détections consécutives de la même carte avant de l'envoyer à la reconnaissance */
+const STABLE_HITS = 2;
+/** Délai minimal entre deux reconnaissances */
+const RECOG_EVERY_MS = 250;
+/** Score en dessous duquel une seule reconnaissance suffit à verrouiller (sinon deux d'affilée) */
+const T_LOCK = 0.2;
+/** Le cadre reste affiché ce temps après la dernière détection (une image ratée ne le fait pas clignoter) */
+const HOLD_MS = 450;
+/** Constante de temps du lissage du cadre (ms) : réactif mais sans tremblement */
+const SMOOTH_MS = 55;
+/** Sans carte détectée depuis ce temps, on envoie le centre de l'image (carte plein écran), à cette cadence */
+const FALLBACK_AFTER_MS = 2500;
+const FALLBACK_EVERY_MS = 1200;
 /** Durée d'affichage de la confirmation d'ajout */
 const TOAST_MS = 1600;
 
 type Phase = "scanning" | "found" | "choose";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type CV = any;
+type Track = { corners: Pt[]; hits: number };
 
 /** Résultat de l'action principale : enchaîner sur la carte suivante, quitter, ou erreur à afficher */
 export type ConfirmResult = { status: "continue" | "leave" } | { status: "error"; error: string };
-
-let cvLoader: Promise<CV> | null = null;
-function loadOpenCV(): Promise<CV> {
-  if (cvLoader) return cvLoader;
-  cvLoader = new Promise<CV>((resolve, reject) => {
-    const w = window as unknown as { cv?: CV };
-    const ready = () => {
-      const cv = w.cv;
-      if (!cv) return reject(new Error("opencv"));
-      // Module Emscripten : un « thenable » qui se résout sur lui-même, à ne
-      // jamais await-er (boucle infinie) — on attend l'init par rappel puis on
-      // retire `then` pour que la promesse puisse le livrer.
-      const done = () => {
-        delete cv.then;
-        resolve(cv);
-      };
-      if (cv.Mat) done();
-      else if (typeof cv.then === "function") cv.then(done);
-      else cv.onRuntimeInitialized = done;
-    };
-    if (w.cv) return void ready();
-    const s = document.createElement("script");
-    s.src = OPENCV_URL;
-    s.async = true;
-    s.onload = () => void ready();
-    s.onerror = () => reject(new Error("opencv"));
-    document.head.appendChild(s);
-  });
-  cvLoader.catch(() => (cvLoader = null));
-  return cvLoader;
-}
 
 /** Deux quadrilatères désignent-ils le même objet (coins à moins d'un quart de la diagonale) ? */
 function overlaps(a: Pt[], b: Pt[]): boolean {
@@ -65,6 +39,23 @@ function overlaps(a: Pt[], b: Pt[]): boolean {
   let e = 0;
   for (let i = 0; i < 4; i++) e += Math.hypot(a[i][0] - b[i][0], a[i][1] - b[i][1]);
   return e / 4 < 0.25 * diag;
+}
+
+/**
+ * Prochaine image de la vidéo (ou prochain rafraîchissement d'écran), au
+ * plus tard dans 120 ms : si la vidéo cale, la boucle continue quand même.
+ */
+function nextFrame(video: HTMLVideoElement | null): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(resolve, 120);
+    const done = () => {
+      window.clearTimeout(timer);
+      resolve();
+    };
+    const v = video as (HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => void }) | null;
+    if (v && typeof v.requestVideoFrameCallback === "function") v.requestVideoFrameCallback(done);
+    else requestAnimationFrame(done);
+  });
 }
 
 /** Petit badge de langue, seulement quand la carte n'est pas française */
@@ -78,14 +69,17 @@ function LangBadge({ lang }: { lang: ScanCandidate["lang"] }) {
 }
 
 /**
- * Scanner de carte plein écran, en continu et sans cadre : la caméra filme,
- * OpenCV trouve la carte au premier plan (contour tracé en direct), la
- * redresse en perspective et l'envoie à la reconnaissance. Quand un cadre ou
- * un écran derrière la carte se fait passer pour elle, les candidats suivants
- * sont essayés : c'est la reconnaissance qui tranche. Une carte vue deux fois
- * de suite est verrouillée et proposée ; s'il existe plusieurs versions
- * (réimpressions), on laisse choisir. Après l'action principale, on enchaîne
- * sur la carte suivante.
+ * Scanner de carte plein écran, en continu et sans cadre à viser : la caméra
+ * filme, un worker OpenCV cherche la carte au premier plan à chaque image
+ * (d'abord autour de sa dernière position, pour la suivre), et le cadre
+ * dessiné par-dessus la vidéo la suit en douceur. Dès que la carte est
+ * stable, elle est redressée en perspective et envoyée à la reconnaissance,
+ * en parallèle de la détection qui continue. Quand un cadre ou un écran
+ * derrière la carte se fait passer pour elle, les candidats suivants sont
+ * essayés : c'est la reconnaissance qui tranche. Une carte reconnue sûrement
+ * (ou vue deux fois de suite) est verrouillée et proposée ; s'il existe
+ * plusieurs versions (réimpressions), on laisse choisir. Après l'action
+ * principale, on enchaîne sur la carte suivante.
  */
 export function CardScanner({
   token,
@@ -113,18 +107,21 @@ export function CardScanner({
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const cvRef = useRef<CV>(null);
-  const captureCanvas = useRef<HTMLCanvasElement | null>(null);
-  const detectCanvas = useRef<HTMLCanvasElement | null>(null);
-  const cardCanvas = useRef<HTMLCanvasElement | null>(null);
-  const inflight = useRef(false);
-  const missCount = useRef(0);
-  const failures = useRef(0);
-  /** Quadrilatère de la dernière carte reconnue : on le suit tant qu'il donne quelque chose */
-  const track = useRef<Pt[] | null>(null);
-  /** Candidat à essayer quand rien ne matche (on tourne parmi les candidats) */
+  const engineRef = useRef<ScanEngine | null>(null);
+  /** Carte suivie (coins dans le repère vidéo) et nombre de détections consécutives */
+  const track = useRef<Track | null>(null);
+  /** Candidat à essayer quand la reconnaissance ne donne rien (on tourne parmi les candidats) */
   const altIndex = useRef(0);
-  const lastSent = useRef<Pt[] | null>(null);
+  /** Dernière détection : cadre à afficher et instant */
+  const target = useRef<{ corners: Pt[]; at: number } | null>(null);
+  /** Cadre lissé effectivement dessiné */
+  const shown = useRef<Pt[] | null>(null);
+  const lastDrawAt = useRef(0);
+  const lastHitAt = useRef(0);
+  const recogInflight = useRef(false);
+  const lastRecogAt = useRef(0);
+  const lastFallbackAt = useRef(0);
+  const failures = useRef(0);
   const lastId = useRef<string | null>(null);
   const lastAmbig = useRef<string>("");
   const glimpseRef = useRef(false);
@@ -150,28 +147,44 @@ export function CardScanner({
     glimpseRef.current = glimpse !== null;
   }, [glimpse]);
 
-  // Moteur de détection
+  // Moteur de détection (worker OpenCV)
   useEffect(() => {
+    const eng = new ScanEngine();
+    engineRef.current = eng;
     let alive = true;
-    loadOpenCV()
-      .then((cv) => {
-        if (!alive) return;
-        cvRef.current = cv;
-        setEngine("ready");
-      })
+    eng
+      .init()
+      .then(() => alive && setEngine("ready"))
       .catch(() => alive && setEngine("error"));
     return () => {
       alive = false;
+      eng.terminate();
+      engineRef.current = null;
     };
   }, []);
 
-  // Caméra arrière
+  // Caméra arrière (en développement, ?fakecam=<vidéo> rejoue une vidéo à la place)
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        const fake = process.env.NODE_ENV !== "production" ? new URLSearchParams(window.location.search).get("fakecam") : null;
+        if (fake && videoRef.current) {
+          const v = videoRef.current;
+          v.muted = true;
+          v.src = fake;
+          v.loop = true;
+          await v.play().catch(() => {});
+          setCamera("ready");
+          return;
+        }
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            frameRate: { ideal: 30 },
+          },
           audio: false,
         });
         if (cancelled) {
@@ -180,6 +193,7 @@ export function CardScanner({
         }
         streamRef.current = stream;
         if (videoRef.current) {
+          videoRef.current.muted = true;
           videoRef.current.srcObject = stream;
           await videoRef.current.play().catch(() => {});
           setCamera("ready");
@@ -202,7 +216,7 @@ export function CardScanner({
   }, [toast]);
 
   /** Dessine (ou efface) le contour de la carte par-dessus la vidéo : coins marqués, liseré fin */
-  function drawOverlay(corners: Pt[] | null, scale: number, tone: "seek" | "lock") {
+  function drawOverlay(corners: Pt[] | null, tone: "seek" | "lock", alpha = 1) {
     const video = videoRef.current;
     const canvas = overlayRef.current;
     if (!video || !canvas) return;
@@ -215,14 +229,15 @@ export function CardScanner({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, elW, elH);
-    if (!corners) return;
-    // image capturée (pleine) → affichage object-cover
+    if (!corners || !video.videoWidth) return;
+    // repère vidéo → affichage object-cover
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     const cover = Math.max(elW / vw, elH / vh);
     const offX = (vw * cover - elW) / 2;
     const offY = (vh * cover - elH) / 2;
-    const pts = corners.map(([x, y]) => [(x / scale) * cover - offX, (y / scale) * cover - offY] as Pt);
+    const pts = corners.map(([x, y]) => [x * cover - offX, y * cover - offY] as Pt);
+    ctx.globalAlpha = alpha;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     // liseré
@@ -247,162 +262,202 @@ export function CardScanner({
       }
     }
     ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
   }
 
-  /** La carte trouvée dans l'image courante, redressée en JPEG — ou le centre de l'image en repli */
-  function grabCard(): Promise<{ blob: Blob | null; found: boolean }> {
-    const video = videoRef.current;
-    const cv = cvRef.current;
-    if (!video || !video.videoWidth) return Promise.resolve({ blob: null, found: false });
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    const cap = (captureCanvas.current ??= document.createElement("canvas"));
-    const capScale = CAPTURE_W / vw;
-    cap.width = CAPTURE_W;
-    cap.height = Math.round(vh * capScale);
-    const cctx = cap.getContext("2d");
-    if (!cctx) return Promise.resolve({ blob: null, found: false });
-    cctx.drawImage(video, 0, 0, cap.width, cap.height);
-
-    let hit = false;
-    const out = (cardCanvas.current ??= document.createElement("canvas"));
-    out.width = CARD_W;
-    out.height = CARD_H;
-
-    if (cv) {
-      const det = (detectCanvas.current ??= document.createElement("canvas"));
-      const detScale = DETECT_W / vw;
-      det.width = DETECT_W;
-      det.height = Math.round(vh * detScale);
-      det.getContext("2d")?.drawImage(cap, 0, 0, det.width, det.height);
-      let src: CV = null;
-      let cardMat: CV = null;
-      let full: CV = null;
-      try {
-        src = cv.imread(det);
-        const quads: QuadCandidate[] = detectCardQuads(cv, src, MAX_QUADS);
-        let chosen: QuadCandidate | undefined;
-        if (quads.length) {
-          // On suit la carte déjà reconnue ; sinon on tourne parmi les candidats
-          const tracked = track.current;
-          chosen = tracked ? quads.find((q) => overlaps(q.corners, tracked)) : undefined;
-          if (!chosen) {
-            track.current = null;
-            chosen = quads[altIndex.current % quads.length];
-          }
+  // Rendu du cadre à chaque rafraîchissement d'écran : il glisse vers la
+  // dernière détection (lissage exponentiel) et s'efface en fondu quand la
+  // carte a disparu depuis un moment.
+  useEffect(() => {
+    if (camera !== "ready") return;
+    let raf = 0;
+    const loop = (now: number) => {
+      raf = requestAnimationFrame(loop);
+      const dt = lastDrawAt.current ? Math.min(100, now - lastDrawAt.current) : 16;
+      lastDrawAt.current = now;
+      const t = target.current;
+      if (phaseRef.current !== "scanning" || !t) {
+        if (shown.current) {
+          shown.current = null;
+          drawOverlay(null, "seek");
         }
-        if (chosen) {
-          hit = true;
-          lastSent.current = chosen.corners;
-          drawOverlay(chosen.corners, detScale, glimpseRef.current ? "lock" : "seek");
-          const k = capScale / detScale;
-          const corners = chosen.corners.map(([x, y]) => [x * k, y * k] as Pt);
-          full = cv.imread(cap);
-          cardMat = warpCard(cv, full, corners);
-          cv.imshow(out, cardMat);
-        } else {
-          lastSent.current = null;
-          drawOverlay(null, 1, "seek");
-        }
-      } catch {
-        hit = false;
-      } finally {
-        src?.delete();
-        cardMat?.delete();
-        full?.delete();
+        return;
       }
-    }
+      const age = now - t.at;
+      if (age > HOLD_MS + 250) {
+        target.current = null;
+        shown.current = null;
+        drawOverlay(null, "seek");
+        return;
+      }
+      const cur = shown.current;
+      if (!cur) shown.current = t.corners.map((p) => [p[0], p[1]] as Pt);
+      else {
+        const a = 1 - Math.exp(-dt / SMOOTH_MS);
+        shown.current = cur.map((p, i) => [p[0] + (t.corners[i][0] - p[0]) * a, p[1] + (t.corners[i][1] - p[1]) * a] as Pt);
+      }
+      const alpha = age <= HOLD_MS ? 1 : 1 - (age - HOLD_MS) / 250;
+      drawOverlay(shown.current, glimpseRef.current ? "lock" : "seek", alpha);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [camera]);
 
-    if (!hit) {
-      // repli : la carte remplit peut-être déjà l'écran
-      missCount.current += 1;
-      if (missCount.current < FALLBACK_AFTER) return Promise.resolve({ blob: null, found: false });
-      const octx = out.getContext("2d");
-      if (!octx) return Promise.resolve({ blob: null, found: false });
-      const gW = cap.width * 0.8;
-      const gH = gW / (CARD_W / CARD_H);
-      octx.drawImage(cap, (cap.width - gW) / 2, (cap.height - gH) / 2, gW, gH, 0, 0, CARD_W, CARD_H);
-    } else {
-      missCount.current = 0;
+  /** Envoie une carte redressée à la reconnaissance et applique le verdict */
+  async function recognize(blob: Blob) {
+    recogInflight.current = true;
+    lastRecogAt.current = performance.now();
+    try {
+      const res = await fetch(`/api/scan/match${token ? `?token=${encodeURIComponent(token)}` : ""}`, {
+        method: "POST",
+        headers: { "content-type": "image/jpeg" },
+        body: blob,
+      });
+      if (!res.ok) {
+        failures.current += 1;
+        if (failures.current >= 3) setApiDown(true);
+        return;
+      }
+      failures.current = 0;
+      setApiDown(false);
+      const data: ScanResult = await res.json();
+      setTicks((t) => t + 1);
+      if (phaseRef.current !== "scanning") return;
+      if (data.status === "match") {
+        const top = data.candidates[0];
+        setGlimpse(top);
+        altIndex.current = 0;
+        if (top.score <= T_LOCK || lastId.current === top.id) {
+          // Sûre, ou stable sur deux analyses : on verrouille
+          navigator.vibrate?.(30);
+          setFound(top);
+          setPhase("found");
+        }
+        lastId.current = top.id;
+        lastAmbig.current = "";
+      } else if (data.status === "ambiguous") {
+        const key = data.candidates.map((c) => c.id).join("|");
+        setGlimpse(data.candidates[0]);
+        altIndex.current = 0;
+        if (lastAmbig.current === key) {
+          navigator.vibrate?.(20);
+          setChoices(data.candidates);
+          setPhase("choose");
+        }
+        lastAmbig.current = key;
+        lastId.current = null;
+      } else {
+        // Rien : ce candidat n'est pas une carte connue, au suivant
+        track.current = null;
+        altIndex.current += 1;
+        lastId.current = null;
+        lastAmbig.current = "";
+        setGlimpse(null);
+      }
+    } catch {
+      // réseau : on réessaie à la prochaine carte stable
+    } finally {
+      recogInflight.current = false;
     }
-    return new Promise((res) => out.toBlob((blob) => res({ blob, found: hit }), "image/jpeg", 0.8));
   }
 
-  // Boucle d'analyse
+  // Boucle de détection : une analyse par image de la caméra, dans le
+  // worker ; le cadre suit la carte, la reconnaissance part en parallèle dès
+  // que la carte est stable.
   useEffect(() => {
     if (camera !== "ready" || engine === "loading") return;
-    const id = window.setInterval(async () => {
-      if (phaseRef.current !== "scanning" || inflight.current) return;
-      inflight.current = true;
-      try {
-        const { blob, found: hit } = await grabCard();
-        setSeen(hit);
-        if (!blob) return;
-        const sent = lastSent.current;
-        const res = await fetch(`/api/scan/match${token ? `?token=${encodeURIComponent(token)}` : ""}`, {
-          method: "POST",
-          headers: { "content-type": "image/jpeg" },
-          body: blob,
-        });
-        if (!res.ok) {
-          failures.current += 1;
-          if (failures.current >= 3) setApiDown(true);
-          return;
+    let alive = true;
+    (async () => {
+      while (alive) {
+        const video = videoRef.current;
+        const eng = engineRef.current;
+        if (!video || phaseRef.current !== "scanning") {
+          await nextFrame(video);
+          continue;
         }
-        failures.current = 0;
-        setApiDown(false);
-        const data: ScanResult = await res.json();
-        setTicks((t) => t + 1);
-        if (data.status === "match") {
-          const top = data.candidates[0];
-          setGlimpse(top);
-          track.current = sent;
-          altIndex.current = 0;
-          if (lastId.current === top.id) {
-            // Stable sur deux analyses : on verrouille
-            navigator.vibrate?.(30);
-            setFound(top);
-            setPhase("found");
+        const now = performance.now();
+        if (engine === "error" || !eng) {
+          // Détection indisponible : le centre de l'image, à cadence lente
+          if (!recogInflight.current && now - lastFallbackAt.current > FALLBACK_EVERY_MS && eng) {
+            lastFallbackAt.current = now;
+            const blob = await eng.centerCrop(video);
+            if (blob) void recognize(blob);
           }
-          lastId.current = top.id;
-          lastAmbig.current = "";
-        } else if (data.status === "ambiguous") {
-          const key = data.candidates.map((c) => c.id).join("|");
-          setGlimpse(data.candidates[0]);
-          track.current = sent;
-          altIndex.current = 0;
-          if (lastAmbig.current === key) {
-            navigator.vibrate?.(20);
-            setChoices(data.candidates);
-            setPhase("choose");
-          }
-          lastAmbig.current = key;
-          lastId.current = null;
-        } else {
-          // Rien : ce candidat n'est pas une carte connue, au suivant
-          track.current = null;
-          altIndex.current += 1;
-          lastId.current = null;
-          lastAmbig.current = "";
-          setGlimpse(null);
+          await nextFrame(video);
+          continue;
         }
-      } catch {
-        // réseau : on réessaie au tick suivant
-      } finally {
-        inflight.current = false;
+        const prev = track.current;
+        const wantCrop =
+          !!prev && prev.hits >= STABLE_HITS - 1 && !recogInflight.current && now - lastRecogAt.current > RECOG_EVERY_MS;
+        let res: Awaited<ReturnType<ScanEngine["detect"]>>;
+        try {
+          res = await eng.detect(video, { prev: prev?.corners ?? null, k: MAX_QUADS, crop: wantCrop });
+        } catch {
+          await nextFrame(video);
+          continue;
+        }
+        if (!alive) break;
+        const at = performance.now();
+        if (process.env.NODE_ENV !== "production") {
+          // Compteurs de mise au point (window.__scan) : images analysées, temps cumulé dans le worker, suivis, détections
+          const w = window as unknown as { __scan?: { frames?: number; ms?: number; tracked?: number; hits?: number; last?: unknown } };
+          const st = (w.__scan ??= {});
+          st.frames = (st.frames ?? 0) + 1;
+          st.ms = (st.ms ?? 0) + res.ms;
+          st.tracked = (st.tracked ?? 0) + (res.tracked ? 1 : 0);
+          st.hits = (st.hits ?? 0) + (res.quads.length ? 1 : 0);
+          st.last = { quads: res.quads.length, tracked: res.tracked, ms: Math.round(res.ms), crop: !!res.card, at: Math.round(at) };
+        }
+        let next: Track | null = null;
+        let chosen: Quad | undefined;
+        if (res.quads.length) {
+          const same = prev ? res.quads.find((q) => overlaps(q.corners, prev.corners)) : undefined;
+          if (same) {
+            chosen = same;
+            next = { corners: same.corners, hits: prev!.hits + 1 };
+          } else {
+            chosen = res.quads[altIndex.current % res.quads.length];
+            next = { corners: chosen.corners, hits: 1 };
+          }
+        }
+        track.current = next;
+        if (next) {
+          // Le cadre n'apparaît qu'à la deuxième image d'affilée : un
+          // rectangle vu une seule fois (reflet, bord de table) ne clignote pas
+          if (next.hits >= 2 || target.current) target.current = { corners: next.corners, at };
+          lastHitAt.current = at;
+          setSeen(true);
+        } else if (at - lastHitAt.current > HOLD_MS) {
+          setSeen(false);
+        }
+        // Carte stable et redressée : reconnaissance en parallèle
+        if (res.card && chosen === res.quads[0] && next && next.hits >= STABLE_HITS && !recogInflight.current) {
+          void recognize(res.card);
+        }
+        // Rien depuis un moment : la carte remplit peut-être déjà l'écran
+        if (!next && at - lastHitAt.current > FALLBACK_AFTER_MS && !recogInflight.current && at - lastFallbackAt.current > FALLBACK_EVERY_MS) {
+          lastFallbackAt.current = at;
+          const blob = await eng.centerCrop(video);
+          if (blob) void recognize(blob);
+        }
+        await nextFrame(video);
       }
-    }, TICK_MS);
-    return () => window.clearInterval(id);
+    })();
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera, engine, token]);
 
   function rescan() {
     lastId.current = null;
     lastAmbig.current = "";
-    missCount.current = 0;
     failures.current = 0;
     track.current = null;
+    target.current = null;
+    shown.current = null;
     altIndex.current = 0;
+    lastHitAt.current = performance.now();
     setApiDown(false);
     setFound(null);
     setChoices([]);

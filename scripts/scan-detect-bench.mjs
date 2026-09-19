@@ -10,9 +10,18 @@
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import sharp from "sharp";
-import { detectCardQuads, warpCard } from "../src/lib/scan/detect.mjs";
+import { detectCardQuads, warpCard, TUNE } from "../src/lib/scan/detect.mjs";
 import { hashCardVariants, hamming, HASH_BITS } from "../src/lib/scan/phash.mjs";
 
+// --tune clé=valeur[,clé=valeur] : réglages de détection à essayer (voir TUNE dans detect.mjs)
+const tuneArg = process.argv.find((a) => a.startsWith("--tune="));
+if (tuneArg) {
+  for (const kv of tuneArg.slice(7).split(",")) {
+    const [k, v] = kv.split("=");
+    TUNE[k] = v === "true" ? true : v === "false" ? false : Number.isNaN(Number(v)) ? v : Number(v);
+  }
+  console.log("réglages :", JSON.stringify(TUNE));
+}
 const cv = createRequire(import.meta.url)("@techstark/opencv-js");
 // Module Emscripten : un « thenable » qui se résout sur lui-même, à ne jamais await-er
 await new Promise((r) => (cv.Mat ? r() : cv.then(() => r())));

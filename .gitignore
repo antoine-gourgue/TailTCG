@@ -46,3 +46,4 @@ next-env.d.ts
 
 # banc de détection du scan (images de test)
 .scan-bench/
+.scan-real/

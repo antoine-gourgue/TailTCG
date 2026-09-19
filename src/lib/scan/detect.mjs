@@ -32,6 +32,8 @@ const AREA_EXP = 1;
 /** Format accepté (court / long) ; 63/88 = 0,716, vu en perspective */
 const RATIO_MIN = 0.58;
 const RATIO_MAX = 0.85;
+/** Surface minimale d'une carte, en part de l'image (une carte tenue devant le téléphone en couvre 10 à 40 %) */
+const MIN_AREA = 0.04;
 /** Écart-type de l'a priori sur le format, en ratio */
 const SHAPE_SIGMA = 0.08;
 /** Pénalité maximale d'un candidat décentré (la carte scannée est au milieu de l'écran) */
@@ -40,11 +42,41 @@ const CENTER_PENALTY = 0.35;
 const CONTAINED_RATIO = 0.6;
 /** Facteur appliqué à un candidat qui contient un tel objet (cadre, écran, pochette derrière la carte) ; 1 = désactivé */
 const CONTAINER_PENALTY = 0.1;
+/** Facteur appliqué à un morceau d'un plus grand candidat (moitié de carte) ; 1 = désactivé */
+const FRAGMENT_PENALTY = 0.3;
 /** Écart de direction maximal entre côtés opposés (perspective), et minimal entre côtés adjacents, en degrés */
 const MAX_SKEW_DEG = 12;
 const MIN_PERP_DEG = 76;
 /** Marge tolérée hors image pour un coin, en part du grand côté de l'image */
 const CORNER_MARGIN = 0.005;
+const FAMILY_DEG = 2;
+/**
+ * Réglages de la transformée de Hough, modifiables par le banc : pas angulaire
+ * (degrés) et image de contours utilisée (brute ou dilatée). La dilatation
+ * triple les pixels de contour, donc le coût de Hough, sans droite en plus.
+ */
+export const TUNE = {
+  houghStepDeg: 0.5,
+  houghOnRaw: true,
+  /** Droites d'une même famille (bord de carte + bord de pochette) : écart max en part du grand côté de l'image ; 0 = désactivé */
+  familyDist: 0.015,
+  /** Trou toléré dans le suivi d'un contour le long d'une droite, en part du grand côté de l'image */
+  traceGap: 0.02,
+  /** Côté caché reconstruit : "always", "fallback" (seulement si rien d'autre n'est trouvé) ou "off" */
+  hiddenSide: "fallback",
+  /** Tronçons propres (sur 5) exigés sur chacun des trois côtés visibles d'une carte au côté caché */
+  hiddenClean: 3,
+  /** Facteur appliqué à une carte au côté caché */
+  hiddenPenalty: 0.6,
+  /**
+   * Côté caché : en plus de la profondeur donnée par l'étendue des deux côtés
+   * visibles, essayer celles du format 63/88. Trouve un peu plus de cartes
+   * mais invente des rectangles dans les images sans carte.
+   */
+  hiddenRatioGuess: true,
+  /** Côté caché : part du chemin vers lui que les deux côtés visibles opposés doivent couvrir */
+  hiddenReach: 0.75,
+};
 
 /** Coins ordonnés haut-gauche, haut-droit, bas-droit, bas-gauche, côté long vertical */
 function orderCorners(pts) {
@@ -185,25 +217,35 @@ function rimUniformity(gray, q, area) {
 }
 
 /** Note d'un candidat, ou null s'il est rejeté */
-function evaluate(edges, gray, q, imgArea, verbose) {
+function evaluate(edges, gray, q, imgArea, verbose, skip = -1) {
   const why = (r) => (verbose ? { rejected: r, q } : null);
   if (!isConvex(q)) return why("convex");
   const area = quadArea(q);
-  if (area < 0.05 * imgArea || area > 0.95 * imgArea) return why(`area ${(area / imgArea).toFixed(2)}`);
+  if (area < MIN_AREA * imgArea || area > 0.95 * imgArea) return why(`area ${(area / imgArea).toFixed(2)}`);
   const ratio = aspectOf(q);
   // format 63/88 (0,716) vu en perspective — un écran 16/9 (0,56) est exclu
   if (ratio < RATIO_MIN || ratio > RATIO_MAX) return why(`ratio ${ratio.toFixed(2)}`);
   const sides = [0, 1, 2, 3].map((i) => sideSupport(edges, q[i], q[(i + 1) % 4]));
   const clean = sides.map((sg) => sg.filter((v) => v >= 0.6).length);
-  const cleanCount = clean.filter((c) => c >= 4).length;
-  const cleanTotal = clean.reduce((t, c) => t + c, 0);
-  // deux côtés propres au moins, les deux autres en grande partie visibles :
-  // la main qui tient la carte cache un coin, donc un bout de deux côtés
-  if (cleanCount < 2 || Math.min(...clean) < 2 || cleanTotal < 15) {
-    return why(`clean ${clean.join("/")} sides ${sides.map((sg) => sg.map((v) => v.toFixed(1)).join(",")).join(" | ")}`);
+  if (skip >= 0) {
+    // Côté reconstruit (caché par la main) : les trois autres doivent être
+    // nets, deux d'entre eux propres sur toute leur longueur
+    const rest = clean.filter((_, i) => i !== skip);
+    if (rest.filter((c) => c >= 4).length < 2 || Math.min(...rest) < TUNE.hiddenClean) {
+      return why(`clean ${clean.join("/")} (côté ${skip} reconstruit)`);
+    }
+  } else {
+    const cleanCount = clean.filter((c) => c >= 4).length;
+    const cleanTotal = clean.reduce((t, c) => t + c, 0);
+    // deux côtés propres au moins, les deux autres en grande partie visibles :
+    // la main qui tient la carte cache un coin, donc un bout de deux côtés
+    if (cleanCount < 2 || Math.min(...clean) < 2 || cleanTotal < 15) {
+      return why(`clean ${clean.join("/")} sides ${sides.map((sg) => sg.map((v) => v.toFixed(1)).join(",")).join(" | ")}`);
+    }
   }
   const sideMeans = sides.map((sg) => sg.reduce((u, v) => u + v, 0) / sg.length);
-  const support = sideMeans.reduce((t, v) => t + v, 0) / 4;
+  const support =
+    skip >= 0 ? sideMeans.filter((_, i) => i !== skip).reduce((t, v) => t + v, 0) / 3 : sideMeans.reduce((t, v) => t + v, 0) / 4;
   const minSide = Math.min(...sideMeans);
   const rim = rimUniformity(gray, q, area);
   // La carte entière est le plus grand quadrilatère soutenu par de vrais
@@ -220,8 +262,8 @@ function evaluate(edges, gray, q, imgArea, verbose) {
   const cy = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4;
   const off = Math.min(1, Math.hypot((cx - W / 2) / (W / 2), (cy - H / 2) / (H / 2)));
   const center = 1 - CENTER_PENALTY * off;
-  const score = Math.pow(area / imgArea, AREA_EXP) * support * (0.4 + 0.6 * rim) * shape * center;
-  return { corners: q, area, ratio, support, minSide, rim, through: 0, score };
+  const score = Math.pow(area / imgArea, AREA_EXP) * support * (0.4 + 0.6 * rim) * shape * center * (skip >= 0 ? TUNE.hiddenPenalty : 1);
+  return { corners: q, area, ratio, support, minSide, rim, through: 0, score, hidden: skip >= 0 };
 }
 
 /** Stratégie A : contour fermé à quatre côtés */
@@ -232,7 +274,7 @@ function closedContours(cv, edges, gray, imgArea) {
   cv.findContours(edges, contours, hier, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
   for (let i = 0; i < contours.size(); i++) {
     const c = contours.get(i);
-    if (cv.contourArea(c) >= 0.05 * imgArea) {
+    if (cv.contourArea(c) >= MIN_AREA * imgArea) {
       const approx = new cv.Mat();
       cv.approxPolyDP(c, approx, 0.03 * cv.arcLength(c, true), true);
       if (approx.rows === 4) {
@@ -360,12 +402,12 @@ function snapLine(l, samples) {
 }
 
 /** Stratégie B : droites de Hough → paires de côtés à peu près parallèles, deux à deux perpendiculaires */
-function houghQuads(cv, edges, gray, imgArea, debug) {
+function houghQuads(cv, edges, gray, imgArea, debug, raw) {
   const W = edges.cols;
   const H = edges.rows;
   const minDim = Math.min(W, H);
   const lines = new cv.Mat();
-  cv.HoughLinesP(edges, lines, 1, Math.PI / 360, 20, 0.08 * minDim, 6);
+  cv.HoughLinesP(raw ?? edges, lines, 1, (TUNE.houghStepDeg * Math.PI) / 180, 20, 0.08 * minDim, 6);
   const segs = [];
   for (let i = 0; i < lines.rows; i++) {
     const x1 = lines.data32S[i * 4];
@@ -408,7 +450,7 @@ function houghQuads(cv, edges, gray, imgArea, debug) {
   // Réajustement de chaque droite (régression orthogonale pondérée sur les
   // extrémités de ses segments) et étendue réelle le long de la droite : là
   // où le contour existe vraiment, un vrai coin de carte doit s'y trouver.
-  const maxGap = 0.02 * Math.max(W, H);
+  const maxGap = TUNE.traceGap * Math.max(W, H);
   for (const m of merged) {
     let sw = 0;
     let mx = 0;
@@ -462,6 +504,40 @@ function houghQuads(cv, edges, gray, imgArea, debug) {
     m.tmin = traced.tmin;
     m.tmax = traced.tmax;
     m.weight = traced.length;
+  }
+  // Famille : les droites parallèles et très proches (bord de la carte et
+  // bord de sa pochette, bord extérieur et intérieur de la bordure) décrivent
+  // le même côté ; leurs étendues se complètent quand l'une est coupée par un
+  // reflet ou une arête qui la croise. Chaque droite hérite de l'étendue de
+  // sa famille pour l'ancrage des coins.
+  const famTol = TUNE.familyDist * Math.max(W, H);
+  const famPhi = (FAMILY_DEG * Math.PI) / 180;
+  for (const m of merged) {
+    m.fmin = m.tmin;
+    m.fmax = m.tmax;
+  }
+  for (let i = 0; i < merged.length; i++) {
+    const a = merged[i];
+    if (a.weight < 0.1 * minDim) continue;
+    for (let j = i + 1; j < merged.length; j++) {
+      const b = merged[j];
+      if (b.weight < 0.1 * minDim || angDiff(a.phi, b.phi) > famPhi) continue;
+      // distance entre les deux droites, mesurée au milieu de l'étendue de b
+      const tb = (b.tmin + b.tmax) / 2;
+      const px = Math.cos(b.phi) * b.rho + b.dx * tb;
+      const py = Math.sin(b.phi) * b.rho + b.dy * tb;
+      if (distTo(a, px, py) > famTol) continue;
+      // abscisses de b exprimées le long de a (directions quasi égales)
+      const same = a.dx * b.dx + a.dy * b.dy > 0;
+      const bmin = same ? b.tmin : -b.tmax;
+      const bmax = same ? b.tmax : -b.tmin;
+      const amin = same ? a.tmin : -a.tmax;
+      const amax = same ? a.tmax : -a.tmin;
+      a.fmin = Math.min(a.fmin, bmin);
+      a.fmax = Math.max(a.fmax, bmax);
+      b.fmin = Math.min(b.fmin, same ? amin : -amax);
+      b.fmax = Math.max(b.fmax, same ? amax : -amin);
+    }
   }
   // Isolement : un vrai bord a au moins un côté sans contours à 5 px (le
   // fond, ou la bande unie de la bordure) ; une « droite » née de la texture
@@ -547,7 +623,7 @@ function houghQuads(cv, edges, gray, imgArea, debug) {
           const other = lineOf.findIndex((pair, idx) => idx !== c && pair.includes(li));
           const side = other >= 0 ? Math.hypot(p[other][0] - x, p[other][1] - y) : minDim;
           const slack = 0.08 * side;
-          if (t < l.tmin - slack || t > l.tmax + slack) {
+          if (t < l.fmin - slack || t > l.fmax + slack) {
             loose++;
             break;
           }
@@ -566,7 +642,87 @@ function houghQuads(cv, edges, gray, imgArea, debug) {
       if (ev) out.push({ ...ev, through });
     }
   }
+  if (TUNE.hiddenSide === "always" || (TUNE.hiddenSide === "fallback" && out.length === 0)) {
+    hiddenSideQuads(L, pairs, edges, gray, imgArea, out);
+  }
   return out;
+}
+
+/**
+ * Stratégie C : la main qui tient la carte cache un côté entier (le pouce
+ * sur le bas, les doigts sur la droite). Deux côtés opposés et un côté
+ * perpendiculaire suffisent : le quatrième est posé parallèle au troisième,
+ * là où s'arrêtent les deux côtés opposés (leur étendue tracée) si elle est
+ * nette, sinon d'après le format 63/88 (les deux hypothèses : côté court ou
+ * côté long visible). Le quadrilatère est noté sans ce côté, et pénalisé.
+ */
+function hiddenSideQuads(L, pairs, edges, gray, imgArea, out) {
+  const W = edges.cols;
+  const H = edges.rows;
+  const margin = 0.04 * Math.max(W, H);
+  const minPerp = (MIN_PERP_DEG * Math.PI) / 180;
+  const seen = [];
+  for (const [i, j] of pairs) {
+    for (let k = 0; k < L.length; k++) {
+      if (k === i || k === j) continue;
+      const lk = L[k];
+      if (angDiff(L[i].phi, lk.phi) < minPerp || angDiff(L[j].phi, lk.phi) < minPerp) continue;
+      const p0 = intersect(L[i], lk);
+      const p1 = intersect(L[j], lk);
+      if (!p0 || !p1) continue;
+      // les deux coins doivent être dans l'étendue de leurs droites
+      const within = (l, p, slack) => {
+        const t = p[0] * l.dx + p[1] * l.dy;
+        return t >= l.fmin - slack && t <= l.fmax + slack;
+      };
+      const s = dist(p0, p1);
+      if (s < 0.2 * Math.min(W, H)) continue;
+      if (!within(lk, p0, 0.08 * s) || !within(lk, p1, 0.08 * s) || !within(L[i], p0, 0.08 * s) || !within(L[j], p1, 0.08 * s)) continue;
+      // de quel côté de k s'étendent i et j (vers l'intérieur de la carte) ?
+      const far = (l, p) => {
+        const t = p[0] * l.dx + p[1] * l.dy;
+        const a = l.fmax - t;
+        const b = t - l.fmin;
+        return a >= b ? { dir: 1, len: a } : { dir: -1, len: b };
+      };
+      const fi = far(L[i], p0);
+      const fj = far(L[j], p1);
+      // direction perpendiculaire à k, orientée vers l'intérieur
+      let nx = Math.cos(lk.phi);
+      let ny = Math.sin(lk.phi);
+      const mi = [p0[0] + L[i].dx * fi.dir * fi.len, p0[1] + L[i].dy * fi.dir * fi.len];
+      const mid = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2];
+      if ((mi[0] - mid[0]) * nx + (mi[1] - mid[1]) * ny < 0) {
+        nx = -nx;
+        ny = -ny;
+      }
+      // hypothèses de profondeur : étendue des deux côtés si elles concordent, puis le format
+      const ds = [];
+      const li = Math.abs((L[i].dx * fi.dir) * nx + (L[i].dy * fi.dir) * ny) * fi.len;
+      const lj = Math.abs((L[j].dx * fj.dir) * nx + (L[j].dy * fj.dir) * ny) * fj.len;
+      if (li > 0.3 * s && lj > 0.3 * s && Math.abs(li - lj) < 0.12 * Math.max(li, lj)) ds.push((li + lj) / 2);
+      if (TUNE.hiddenRatioGuess) ds.push(s * 0.716, s / 0.716);
+      for (const d of ds) {
+        // droite du quatrième côté : parallèle à k, à la distance d
+        const l4 = { phi: lk.phi, rho: lk.rho + (nx * Math.cos(lk.phi) + ny * Math.sin(lk.phi)) * d };
+        const p2 = intersect(L[j], l4);
+        const p3 = intersect(L[i], l4);
+        if (!p2 || !p3) continue;
+        if ([p2, p3].some(([x, y]) => x < -margin || y < -margin || x > W + margin || y > H + margin)) continue;
+        // les deux côtés opposés doivent couvrir au moins 60 % du chemin vers le côté caché
+        if (li < TUNE.hiddenReach * d || lj < TUNE.hiddenReach * d) continue;
+        const q = orderCorners([p0, p1, p2, p3]);
+        // le côté reconstruit est celui qui porte p2 et p3
+        const onL4 = (p) => Math.abs(p[0] * Math.cos(l4.phi) + p[1] * Math.sin(l4.phi) - l4.rho) < 1e-3;
+        const skip = [0, 1, 2, 3].find((c) => onL4(q[c]) && onL4(q[(c + 1) % 4]));
+        if (skip === undefined) continue;
+        if (seen.some((o) => sameQuad(o, q))) continue;
+        seen.push(q);
+        const ev = evaluate(edges, gray, q, imgArea, false, skip);
+        if (ev) out.push({ ...ev, through: 0 });
+      }
+    }
+  }
 }
 
 /**
@@ -578,6 +734,7 @@ function houghQuads(cv, edges, gray, imgArea, debug) {
 function edgeMap(cv, src, blur, withColor) {
   const edges = new cv.Mat();
   cv.Canny(blur, edges, CANNY_LO, CANNY_HI);
+  const raw = TUNE.houghOnRaw ? edges.clone() : null;
   if (withColor) {
     const chans = new cv.MatVector();
     cv.split(src, chans);
@@ -589,6 +746,7 @@ function edgeMap(cv, src, blur, withColor) {
     cv.GaussianBlur(mn, cb, new cv.Size(5, 5), 0);
     cv.Canny(cb, ce, CANNY_LO, CANNY_HI);
     cv.bitwise_or(edges, ce, edges);
+    if (raw) cv.bitwise_or(raw, ce, raw);
     mn.delete();
     cb.delete();
     ce.delete();
@@ -597,7 +755,7 @@ function edgeMap(cv, src, blur, withColor) {
   const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
   cv.dilate(edges, edges, kernel);
   kernel.delete();
-  return edges;
+  return { edges, raw };
 }
 
 /** Le point est-il dans le quadrilatère convexe (coins ordonnés) ? */
@@ -639,9 +797,65 @@ function demoteContainers(candidates) {
       const cy = (b.corners[0][1] + b.corners[1][1] + b.corners[2][1] + b.corners[3][1]) / 4;
       if (!inside(a.corners, [cx, cy])) continue;
       const within = b.corners.filter((p) => inside(a.corners, p)).length;
-      if (within >= 2) {
+      // Un rectangle qui partage deux côtés ou plus avec son contenant en
+      // est un morceau (moitié basse d'une carte : bord de l'illustration +
+      // trois bords de la carte), pas un objet posé devant
+      if (within >= 2 && sharedSides(a.corners, b.corners) < 2) {
         a.score *= CONTAINER_PENALTY;
         a.contains = true;
+        break;
+      }
+    }
+  }
+}
+
+/** Distance d'un point à la droite (a, b) */
+function lineDist(p, a, b) {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  return Math.abs(dy * p[0] - dx * p[1] + b[0] * a[1] - b[1] * a[0]) / (Math.hypot(dx, dy) || 1);
+}
+
+/**
+ * Nombre de côtés de `inner` portés par un côté de `outer`, à la largeur
+ * d'une bordure de carte près (5 % de la diagonale) : la moitié basse d'une
+ * carte s'arrête au bord intérieur de sa bordure, pas à son bord extérieur.
+ */
+function sharedSides(outer, inner) {
+  const diag = Math.hypot(outer[2][0] - outer[0][0], outer[2][1] - outer[0][1]);
+  const tol = 0.05 * diag;
+  let n = 0;
+  for (let i = 0; i < 4; i++) {
+    const p = inner[i];
+    const q = inner[(i + 1) % 4];
+    for (let j = 0; j < 4; j++) {
+      const a = outer[j];
+      const b = outer[(j + 1) % 4];
+      if (lineDist(p, a, b) <= tol && lineDist(q, a, b) <= tol) {
+        n++;
+        break;
+      }
+    }
+  }
+  return n;
+}
+
+/**
+ * Un candidat dont deux côtés ou plus sont portés par les côtés d'un candidat
+ * plus grand et bien soutenu n'est qu'un morceau de celui-ci (moitié de
+ * carte découpée par le bord de l'illustration ou de la zone de texte) : il
+ * ne doit pas passer devant la carte entière.
+ */
+function demoteFragments(candidates) {
+  for (const b of candidates) {
+    for (const a of candidates) {
+      // le contenant doit être un rectangle solide (ses quatre côtés soutenus)
+      // et nettement plus grand : la moitié d'une carte, pas un quadrilatère
+      // à peine plus large qui prend l'ombre d'un doigt pour un bord
+      if (a === b || a.area <= 1.5 * b.area || a.minSide < 0.75) continue;
+      if (sharedSides(a.corners, b.corners) >= 2) {
+        b.score *= FRAGMENT_PENALTY;
+        b.fragment = true;
         break;
       }
     }
@@ -676,12 +890,14 @@ export function detectCardQuads(cv, src, k = 3, debug) {
   cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
   gray.delete();
   let edges = null;
+  let raw = null;
   let candidates = [];
   const collect = (withColor) => {
     edges?.delete();
-    edges = edgeMap(cv, src, blur, withColor);
+    raw?.delete();
+    ({ edges, raw } = edgeMap(cv, src, blur, withColor));
     const a = closedContours(cv, edges, blur, imgArea);
-    const b = houghQuads(cv, edges, blur, imgArea, debug);
+    const b = houghQuads(cv, edges, blur, imgArea, debug, raw);
     if (debug) {
       debug.closed = a.length;
       debug.hough = b.length;
@@ -698,12 +914,14 @@ export function detectCardQuads(cv, src, k = 3, debug) {
       debug.evaluate = (q) => evaluate(e, blur, orderCorners(q), imgArea, true);
     }
   } finally {
+    raw?.delete();
     if (!debug) {
       edges?.delete();
       blur.delete();
     }
   }
   demoteContainers(candidates);
+  demoteFragments(candidates);
   candidates.sort((a, b) => b.score - a.score);
   const out = [];
   for (const c of candidates) {
@@ -740,4 +958,36 @@ export function warpCard(cv, src, corners) {
   to.delete();
   M.delete();
   return dst;
+}
+
+/**
+ * Suivi : cherche la carte autour de sa dernière position (fenêtre élargie
+ * de `margin` de chaque côté), donc plus vite et sans se laisser distraire
+ * par le reste de l'image. Coins renvoyés dans le repère de l'image entière.
+ * Renvoie [] si la fenêtre est trop petite ; l'appelant retombe alors sur
+ * une recherche complète.
+ * @param {any} cv OpenCV.js
+ * @param {any} src cv.Mat RGBA
+ * @param {Pt[]} prev coins de la carte à l'image précédente
+ * @param {number} [k]
+ * @param {number} [margin]
+ */
+export function trackCardQuad(cv, src, prev, k = 3, margin = 0.35) {
+  const xs = prev.map((p) => p[0]);
+  const ys = prev.map((p) => p[1]);
+  const w = Math.max(...xs) - Math.min(...xs);
+  const h = Math.max(...ys) - Math.min(...ys);
+  const x0 = Math.max(0, Math.floor(Math.min(...xs) - margin * w));
+  const y0 = Math.max(0, Math.floor(Math.min(...ys) - margin * h));
+  const x1 = Math.min(src.cols, Math.ceil(Math.max(...xs) + margin * w));
+  const y1 = Math.min(src.rows, Math.ceil(Math.max(...ys) + margin * h));
+  if (x1 - x0 < 48 || y1 - y0 < 48) return [];
+  const roi = src.roi(new cv.Rect(x0, y0, x1 - x0, y1 - y0));
+  let found = [];
+  try {
+    found = detectCardQuads(cv, roi, k);
+  } finally {
+    roi.delete();
+  }
+  return found.map((q) => ({ ...q, corners: q.corners.map(([x, y]) => [x + x0, y + y0]) }));
 }
