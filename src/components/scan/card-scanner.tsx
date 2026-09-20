@@ -21,15 +21,15 @@ const RECOG_EVERY_MS = 140;
 /** Reconnaissance neurale locale : verrou immédiat, sans serveur, quand c'est très sûr et stable */
 const NEURAL_MATCH = 0.78;
 const NEURAL_MARGIN = 0.04;
-const NEURAL_STABLE = 3;
+const NEURAL_STABLE = 2;
 /** Sous ce cosinus, ce n'est pas une carte (visage, fenêtre, décor) : on
  *  n'appelle même pas le repli pHash serveur, qui verrouillerait à tort */
 const NEURAL_FLOOR = 0.6;
 /** Le cadre reste affiché ce temps après la dernière carte vue par le neural :
  *  sans carte récente, on n'affiche aucun cadre (il ne saute plus partout) */
 const FRAME_HOLD_MS = 900;
-/** Cadrages essayés (part rognée sur chaque bord) : robustesse au bord de carte */
-const NEURAL_INSETS = [0, 0.05];
+/** Cadrages essayés (part rognée sur chaque bord) : un seul = plus réactif */
+const NEURAL_INSETS = [0];
 /** Modèle + index hébergés sur Supabase Storage (bucket public scan-assets) */
 const SCAN_ASSETS = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/scan-assets`;
 const NEURAL_MODEL_URL = `${SCAN_ASSETS}/mobileclip-s0.onnx`;
