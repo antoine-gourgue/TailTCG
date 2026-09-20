@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   LayoutGrid,
@@ -122,6 +122,114 @@ function Stat({
   );
 }
 
+/**
+ * Sélecteur à choix multiple (cases à cocher) présenté comme les autres
+ * filtres : un bouton « Tous les sets / N sets » qui ouvre un panneau avec une
+ * recherche et la liste. Sert au filtre par set (on peut en cocher plusieurs).
+ */
+function MultiSelect({
+  options,
+  selected,
+  onChange,
+  allLabel,
+  cls,
+}: {
+  options: [string, string][];
+  selected: Set<string>;
+  onChange: (next: Set<string>) => void;
+  allLabel: string;
+  cls: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const box = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const label =
+    selected.size === 0
+      ? allLabel
+      : selected.size === 1
+        ? options.find(([id]) => id === [...selected][0])?.[1] ?? `${selected.size} set`
+        : `${selected.size} sets`;
+  const needle = normalize(q.trim());
+  const shown = needle ? options.filter(([, name]) => normalize(name).includes(needle)) : options;
+
+  function toggle(id: string) {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onChange(next);
+  }
+
+  return (
+    <div ref={box} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`${cls} flex items-center justify-between gap-2 text-left ${selected.size > 0 ? "!border-accent/50 !text-accent-strong" : ""}`}
+        aria-expanded={open}
+      >
+        <span className="truncate">{label}</span>
+        <ArrowDown size={13} className="shrink-0 opacity-60" aria-hidden />
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 max-h-72 w-64 max-w-[80vw] overflow-hidden rounded-xl border border-edge bg-raised shadow-xl">
+          <div className="flex items-center gap-2 border-b border-edge p-2">
+            <input
+              type="search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Filtrer les sets…"
+              className="field !w-full !py-1.5 text-sm"
+              autoFocus
+            />
+            {selected.size > 0 && (
+              <button
+                type="button"
+                onClick={() => onChange(new Set())}
+                className="shrink-0 text-xs text-muted underline-offset-2 hover:underline"
+              >
+                Aucun
+              </button>
+            )}
+          </div>
+          <ul className="max-h-56 overflow-y-auto py-1">
+            {shown.map(([id, name]) => {
+              const on = selected.has(id);
+              return (
+                <li key={id}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(id)}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-surface"
+                  >
+                    <span
+                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${on ? "border-transparent bg-accent text-accent-ink" : "border-edge-strong"}`}
+                      aria-hidden
+                    >
+                      {on && <Check size={11} strokeWidth={3} />}
+                    </span>
+                    <span className="truncate">{name}</span>
+                  </button>
+                </li>
+              );
+            })}
+            {shown.length === 0 && <li className="px-3 py-2 text-sm text-muted">Aucun set</li>}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export type BinderRef = { id: string; name: string };
 
 export function CollectionClient({
@@ -171,7 +279,7 @@ export function CollectionClient({
   } | null>(null);
   const [q, setQ] = useState("");
   const [fSold, setFSold] = useState<"active" | "sold" | "all">("active");
-  const [fSet, setFSet] = useState(initialSet);
+  const [fSet, setFSet] = useState<Set<string>>(() => (initialSet ? new Set([initialSet]) : new Set()));
   const [fCondition, setFCondition] = useState("");
   const [fType, setFType] = useState("");
   const [fLanguage, setFLanguage] = useState("");
@@ -222,7 +330,7 @@ export function CollectionClient({
           normalize(`${i.card_name} ${i.set_name} ${i.local_id}`).includes(
             needle
           )) &&
-        (!fSet || i.set_id === fSet) &&
+        (fSet.size === 0 || fSet.has(i.set_id)) &&
         (!fCondition || i.condition === fCondition) &&
         (!fType || i.card_type === fType) &&
         (!fLanguage || i.language === fLanguage) &&
@@ -467,14 +575,7 @@ export function CollectionClient({
         <option value="sold">Vendues</option>
         <option value="all">Toutes</option>
       </select>
-      <select value={fSet} onChange={(e) => setFSet(e.target.value)} className={cls} aria-label="Set">
-        <option value="">Tous les sets</option>
-        {sets.map(([id, name]) => (
-          <option key={id} value={id}>
-            {name}
-          </option>
-        ))}
-      </select>
+      <MultiSelect options={sets} selected={fSet} onChange={setFSet} allLabel="Tous les sets" cls={cls} />
       <select
         value={fCondition}
         onChange={(e) => setFCondition(e.target.value)}
@@ -568,7 +669,7 @@ export function CollectionClient({
   );
   const activeFilters =
     (fSold !== "active" ? 1 : 0) +
-    (fSet ? 1 : 0) +
+    (fSet.size > 0 ? 1 : 0) +
     (fCondition ? 1 : 0) +
     (fType ? 1 : 0) +
     (fLanguage ? 1 : 0) +
@@ -576,7 +677,7 @@ export function CollectionClient({
     (fGraded ? 1 : 0);
   function resetFilters() {
     setFSold("active");
-    setFSet("");
+    setFSet(new Set());
     setFCondition("");
     setFType("");
     setFLanguage("");
