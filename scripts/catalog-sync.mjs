@@ -296,7 +296,13 @@ async function syncInternationalImages() {
     if (Array.isArray(ptcg) && ptcg.length) {
       const first = ptcg[0]?.images?.large ?? ptcg[0]?.images?.small;
       if (first && (await head(first))) {
-        sources.push({ name: "pokemontcg.io", byNo: new Map(ptcg.map((c) => [normNo(c.number), c.images?.large ?? c.images?.small])), byName: new Map(ptcg.map((c) => [normName(c.name), c.images?.large ?? c.images?.small])) });
+        // par nom : une file par nom, pour deux cartes homonymes (Darkrai & Cresselia LÉGENDE 99 et 100) prises dans l'ordre
+        const byName = new Map();
+        for (const c of ptcg) {
+          const k = normName(c.name);
+          byName.set(k, [...(byName.get(k) ?? []), c.images?.large ?? c.images?.small]);
+        }
+        sources.push({ name: "pokemontcg.io", byNo: new Map(ptcg.map((c) => [normNo(c.number), c.images?.large ?? c.images?.small])), byName });
       }
     }
     // Limitless : code par table, sinon par nom (sans le suffixe de sous-set)
@@ -317,13 +323,25 @@ async function syncInternationalImages() {
       console.log(`  fr/${setId.padEnd(12)} aucune source (${cards.length} cartes)`);
       continue;
     }
+    // Numérotation comparable ? Dans une collection de rééditions (Collection
+    // Classique), les numéros sont ceux des cartes d'origine et ne suivent pas
+    // 001…N : le n° 4 y est Dracaufeu 4/102, pas la 4ᵉ carte. On associe alors
+    // par nom d'abord.
+    const tcgdexNos = new Set((en?.cards ?? []).map((c) => normNo(c.localId)));
+    const byNameFirst = sources.some((s) => {
+      const nos = [...s.byNo.keys()];
+      return nos.length > 0 && nos.filter((n) => tcgdexNos.has(n)).length < 0.8 * nos.length;
+    });
     const rows = [];
     const used = {};
     for (const c of cards) {
       let url = null;
       let src = null;
       for (const s of sources) {
-        url = s.byNo.get(normNo(c.local_id)) ?? (enNames.get(c.local_id) ? s.byName.get(enNames.get(c.local_id)) : null) ?? null;
+        const queue = enNames.get(c.local_id) ? s.byName.get(enNames.get(c.local_id)) : null;
+        const byName = queue?.length ? queue[0] : null;
+        url = (byNameFirst ? byName ?? s.byNo.get(normNo(c.local_id)) : s.byNo.get(normNo(c.local_id)) ?? byName) ?? null;
+        if (url && url === byName) queue.shift();
         if (url) {
           src = s.name;
           break;

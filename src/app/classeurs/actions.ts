@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/database.types";
+import { MERGED_CHILDREN } from "@/lib/set-merge";
 import {
   dexNumber,
   generationLabel,
@@ -102,19 +103,24 @@ export async function createBinderFromSet(setId: string, lang: "fr" | "ja") {
   const set = await catalogSet(setId, lang);
   if (!set || (set.cards ?? []).length === 0) return { error: "Set introuvable ou vide" };
 
-  // Ordre par numéro (les numéros non numériques passent après)
-  const cards = [...set.cards].sort((a, b) => {
-    const na = Number.parseInt(a.localId, 10);
-    const nb = Number.parseInt(b.localId, 10);
-    if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
-    return a.localId.localeCompare(b.localId, "fr");
-  });
+  // Ordre par numéro (les numéros non numériques, et les numéros imprimés
+  // « 47/127 » des rééditions d'un set fusionné, passent après, dans l'ordre du catalogue)
+  const cards = set.cards
+    .map((card, index) => ({ card, index }))
+    .sort((a, b) => {
+      const na = a.card.localId.includes("/") ? Number.NaN : Number.parseInt(a.card.localId, 10);
+      const nb = b.card.localId.includes("/") ? Number.NaN : Number.parseInt(b.card.localId, 10);
+      if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+      if (Number.isNaN(na) && Number.isNaN(nb)) return a.index - b.index;
+      return Number.isNaN(na) ? 1 : -1;
+    })
+    .map(({ card }) => card);
 
-  // Exemplaires possédés de ce set (actifs, non vendus)
+  // Exemplaires possédés de ce set et des sets fusionnés dedans (actifs, non vendus)
   const { data: owned } = await supabase
     .from("items")
     .select("id, tcgdex_id")
-    .eq("set_id", set.id)
+    .in("set_id", [set.id, ...(MERGED_CHILDREN[set.id] ?? [])])
     .is("deleted_at", null)
     .is("sold_at", null);
   const ownedByTcgdex = new Map<string, string>();

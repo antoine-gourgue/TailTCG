@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { CatalogLang } from "@/lib/tcgdex";
 import { catalogSet } from "@/lib/catalog";
-import { MERGED_INTO } from "@/lib/set-merge";
+import { MERGED_CHILDREN, MERGED_INTO } from "@/lib/set-merge";
 import { AppShell } from "@/components/app-shell";
 import { SetCardsGrid } from "@/components/set-cards-grid";
 import { fetchGuidePrices } from "@/lib/cardmarket";
@@ -39,11 +39,11 @@ export default async function ExtensionPage({
   const { data: wishes } = await supabase.from("wishlist").select("tcgdex_id");
   const wishedIds = (wishes ?? []).map((w) => w.tcgdex_id);
 
-  // Exemplaires possédés de ce set (actifs, non vendus) → complétion + repères
+  // Exemplaires possédés de ce set et des sets fusionnés dedans (actifs, non vendus) → complétion + repères
   const { data: owned } = await supabase
     .from("collection_value")
     .select("tcgdex_id, quantity, sold_at")
-    .eq("set_id", id);
+    .in("set_id", [id, ...(MERGED_CHILDREN[id] ?? [])]);
   const ownedQty: Record<string, number> = {};
   for (const o of owned ?? []) {
     if (o.sold_at == null && o.tcgdex_id) {
