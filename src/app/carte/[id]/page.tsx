@@ -56,10 +56,12 @@ export default async function CartePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<{ edit?: string; from?: string }>;
 }) {
-  const [{ id }, { edit }] = await Promise.all([params, searchParams]);
+  const [{ id }, { edit, from }] = await Promise.all([params, searchParams]);
   const editing = edit != null;
+  // Ouverte depuis le scan mobile : le retour ramène à la liste des cartes scannées
+  const back = from === "scan" ? { href: "/scan", label: "← Scan" } : { href: "/", label: "← Collection" };
 
   const supabase = await createClient();
   const {
@@ -193,10 +195,10 @@ export default async function CartePage({
       <main className="mx-auto w-full max-w-6xl px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
           <Link
-            href="/"
+            href={back.href}
             className="inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground"
           >
-            ← Collection
+            {back.label}
           </Link>
           <div className="flex items-center gap-1">
             {prevId ? (
