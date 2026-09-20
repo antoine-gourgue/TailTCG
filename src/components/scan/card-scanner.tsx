@@ -157,6 +157,9 @@ export function CardScanner({
   /** Verrou neural : mêmes id consécutifs avant de valider */
   const neuralStreak = useRef(0);
   const neuralLastId = useRef<string | null>(null);
+  /** Débogage neural (dev, ?scandebug) : affiche le cosinus/marge en direct pour régler les seuils */
+  const scanDebug = useRef(false);
+  const [neuralDebug, setNeuralDebug] = useState<{ name: string; cos: number; margin: number; streak: number } | null>(null);
   /** Carte suivie (coins dans le repère vidéo) et nombre de détections consécutives */
   const track = useRef<Track | null>(null);
   /** Candidat à essayer quand la reconnaissance ne donne rien (on tourne parmi les candidats) */
@@ -189,6 +192,11 @@ export function CardScanner({
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
+
+  // Débogage neural en dev : ?scandebug affiche le cosinus/marge en direct
+  useEffect(() => {
+    scanDebug.current = process.env.NODE_ENV !== "production" && new URLSearchParams(window.location.search).has("scandebug");
+  }, []);
 
   // Moteur de détection (worker OpenCV)
   useEffect(() => {
@@ -428,6 +436,8 @@ export function CardScanner({
       }
     }
     if (!top) return false;
+    if (scanDebug.current)
+      setNeuralDebug({ name: top.name, cos: Number(top.cos.toFixed(3)), margin: Number(margin.toFixed(3)), streak: neuralStreak.current });
     if (top.cos < NEURAL_MATCH || margin < NEURAL_MARGIN) {
       neuralStreak.current = 0;
       neuralLastId.current = null;
@@ -858,6 +868,19 @@ export function CardScanner({
             Rescanner
           </button>
         </section>
+      )}
+
+      {/* Débogage neural (dev, ?scandebug) : régler NEURAL_MATCH / NEURAL_MARGIN */}
+      {neuralDebug && (
+        <div className="pointer-events-none fixed left-2 top-2 z-[60] rounded bg-black/75 px-2 py-1.5 font-mono text-[11px] leading-tight text-green-400">
+          <div className="font-bold">{neuralDebug.name}</div>
+          <div>
+            cos {neuralDebug.cos} · marge {neuralDebug.margin}
+          </div>
+          <div className="text-green-300/70">
+            seuil {NEURAL_MATCH}/{NEURAL_MARGIN} · série {neuralDebug.streak}/{NEURAL_STABLE}
+          </div>
+        </div>
       )}
     </div>
   );
