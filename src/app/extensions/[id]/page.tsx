@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { CatalogLang } from "@/lib/tcgdex";
 import { catalogSet } from "@/lib/catalog";
+import { MERGED_INTO } from "@/lib/set-merge";
 import { AppShell } from "@/components/app-shell";
 import { SetCardsGrid } from "@/components/set-cards-grid";
 import { fetchGuidePrices } from "@/lib/cardmarket";
@@ -22,6 +23,8 @@ export default async function ExtensionPage({
 }) {
   const [{ id }, { lang: langParam }] = await Promise.all([params, searchParams]);
   const lang: CatalogLang = langParam === "ja" ? "ja" : "fr";
+  // Set présenté au sein d'un autre (Collection Classique → 30ᵉ Anniversaire)
+  if (MERGED_INTO[id]) redirect(`/extensions/${MERGED_INTO[id]}${langParam === "ja" ? "?lang=ja" : ""}`);
 
   const supabase = await createClient();
   const {

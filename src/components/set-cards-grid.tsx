@@ -362,7 +362,7 @@ export function SetCardsGrid({
                   </p>
                   <p className="num mt-0.5 text-xs text-faint">
                     {card.localId}
-                    {officialCount ? ` / ${officialCount}` : ""}
+                    {officialCount && !card.localId.includes("/") ? ` / ${officialCount}` : ""}
                   </p>
                 </div>
               </button>
@@ -418,7 +418,7 @@ export function SetCardsGrid({
                 {setName}{" "}
                 <span className="num text-faint">
                   · {selected.localId}
-                  {officialCount ? ` / ${officialCount}` : ""}
+                  {officialCount && !selected.localId.includes("/") ? ` / ${officialCount}` : ""}
                 </span>
               </p>
               {selected.rarity && (

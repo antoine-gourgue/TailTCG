@@ -4,9 +4,10 @@
 // ses deux empreintes (src/lib/scan/phash.mjs). Les illustrations sont les
 // mêmes d'une langue à l'autre mais pas les cadres ni les textes : indexer
 // chaque langue permet de reconnaître une carte anglaise ou japonaise.
-// Puis les cartes japonaises dont le scan vient de Limitless (catalogue en
-// base, scripts/catalog-sync.mjs : sets absents de TCGdex, ou cartes TCGdex
-// sans visuel) : leur scan est une URL finale, stockée telle quelle.
+// Puis les cartes dont le scan ne vient pas de TCGdex (catalogue en base,
+// scripts/catalog-sync.mjs : sets japonais absents de TCGdex, cartes sans
+// visuel TCGdex prises chez Limitless ou pokemontcg.io) : leur scan est une
+// URL finale, stockée telle quelle.
 // Incrémental : les cartes déjà indexées ne sont pas retéléchargées, un
 // nouveau set ne coûte que ses cartes. Sauvegarde toutes les 1000 cartes.
 //   node scripts/scan-index.mjs               # complète l'index
@@ -141,26 +142,33 @@ for (const lang of onlyLang ? [onlyLang] : LANGS) {
   }
 }
 
-// ---- cartes japonaises connues de Limitless seulement (catalogue en base) ----
+// ---- cartes dont le scan n'est connu que du catalogue en base (Limitless,
+// pokemontcg.io/scrydex…) : sets japonais absents de TCGdex, cartes sans
+// visuel TCGdex (ex. Collection Classique 30 ans) ----
 const sb = supabaseAdminEnv();
-if (sb && (!onlyLang || onlyLang === "ja") && !onlySet) {
+if (sb) {
   const db = createClient(sb.url, sb.key, { auth: { persistSession: false } });
-  const { data: sets } = await db.from("catalog_sets").select("id, name, serie_id").eq("lang", "ja");
-  for (const st of sets ?? []) index.sets[`ja/${st.id}`] ??= [st.name, st.serie_id];
+  let q = db.from("catalog_sets").select("lang, id, name, serie_id");
+  if (onlyLang) q = q.eq("lang", onlyLang);
+  const { data: sets } = await q;
+  for (const st of sets ?? []) index.sets[`${st.lang}/${st.id}`] ??= [st.name, st.serie_id];
   const rows = [];
   for (let from = 0; ; from += 1000) {
-    const { data } = await db
+    let qc = db
       .from("catalog_cards")
-      .select("id, set_id, name, image")
-      .eq("lang", "ja")
-      .like("image", "%limitlesstcg%")
+      .select("lang, id, set_id, name, image")
+      .not("image", "is", null)
+      .not("image", "like", "%assets.tcgdex.net%")
       .range(from, from + 999);
+    if (onlyLang) qc = qc.eq("lang", onlyLang);
+    if (onlySet) qc = qc.eq("set_id", onlySet);
+    const { data } = await qc;
     if (!data?.length) break;
     rows.push(...data);
     if (data.length < 1000) break;
   }
-  const cards = rows.filter((c) => !known.has(`ja/${c.id}`));
-  console.log(`\n[ja · Limitless] ${rows.length} cartes avec scan Limitless en base, ${cards.length} à indexer`);
+  const cards = rows.filter((c) => !known.has(`${c.lang}/${c.id}`));
+  console.log(`\n[catalogue en base] ${rows.length} cartes avec un scan hors TCGdex, ${cards.length} à indexer`);
   let i = 0;
   const worker = async () => {
     while (i < cards.length) {
@@ -175,7 +183,7 @@ if (sb && (!onlyLang || onlyLang === "ja") && !onlySet) {
         const packed = new Uint8Array(64);
         packed.set(whole, 0);
         packed.set(art, 32);
-        known.set(`ja/${c.id}`, [c.id, "ja", c.name, c.set_id, toB64(packed), c.image]);
+        known.set(`${c.lang}/${c.id}`, [c.id, c.lang, c.name, c.set_id, toB64(packed), c.image]);
         added++;
         sinceSave++;
         if (sinceSave >= SAVE_EVERY) {
@@ -188,9 +196,9 @@ if (sb && (!onlyLang || onlyLang === "ja") && !onlySet) {
     }
   };
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-  console.log(`  Limitless : +${cards.length} | total ${known.size} | ${((Date.now() - t0) / 1000).toFixed(0)}s`);
-} else if (!sb) {
-  console.log("\n[ja · Limitless] ignoré : pas d'accès Supabase (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY)");
+  console.log(`  catalogue : +${cards.length} | total ${known.size} | ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+} else {
+  console.log("\n[catalogue en base] ignoré : pas d'accès Supabase (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY)");
 }
 
 await save();

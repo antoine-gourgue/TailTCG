@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { MERGED_CHILDREN, MERGED_INTO, displayLocalId } from "@/lib/set-merge";
 import {
   enrichCardDetails,
   fetchSeriesWithSets,
@@ -27,13 +28,17 @@ const sortByNumber = <T extends { localId: string }>(cards: T[]) =>
 /** Toutes les séries avec leurs sets, plus récentes d'abord : TCGdex, complété par les sets que seule la base connaît */
 export async function catalogSeries(lang: CatalogLang): Promise<SerieWithSets[]> {
   const db = createAdminClient();
-  const [live, { data }] = await Promise.all([
+  const [live, { data }, { data: extraRows }] = await Promise.all([
     fetchSeriesWithSets(lang).catch(() => [] as SerieWithSets[]),
     db
       .from("catalog_sets")
       .select("id, name, serie_id, serie_name, serie_logo, logo, symbol, release_date, card_count_total, card_count_official")
       .eq("lang", lang),
+    // cartes ajoutées depuis pokemontcg.io à des sets TCGdex (comptées dans le total)
+    db.from("catalog_cards").select("set_id").eq("lang", lang).eq("source", "pokemontcg"),
   ]);
+  const extras = new Map<string, number>();
+  for (const r of extraRows ?? []) extras.set(r.set_id, (extras.get(r.set_id) ?? 0) + 1);
   const series = new Map<string, SerieWithSets>(live.map((s) => [s.id, { ...s, sets: [...s.sets] }]));
   const known = new Set(live.flatMap((s) => s.sets.map((x) => x.id)));
   for (const s of data ?? []) {
@@ -59,11 +64,27 @@ export async function catalogSeries(lang: CatalogLang): Promise<SerieWithSets[]>
       releaseDate: s.release_date ?? undefined,
     });
   }
+  const all = [...series.values()].flatMap((s) => s.sets);
+  for (const x of all) {
+    const n = extras.get(x.id);
+    if (n && x.cardCount) x.cardCount = { total: x.cardCount.total + n, official: x.cardCount.official };
+  }
+  // Sets fusionnés : l'enfant disparaît de la liste, ses cartes comptent dans le parent
+  for (const [child, parent] of Object.entries(MERGED_INTO)) {
+    const c = all.find((x) => x.id === child);
+    const p = all.find((x) => x.id === parent);
+    if (c && p && p.cardCount && c.cardCount) {
+      p.cardCount = { total: p.cardCount.total + c.cardCount.total, official: p.cardCount.official };
+    }
+  }
   return [...series.values()]
     .map((serie) => ({
       ...serie,
-      sets: [...serie.sets].sort((a, b) => (b.releaseDate ?? "").localeCompare(a.releaseDate ?? "")),
+      sets: serie.sets
+        .filter((x) => !MERGED_INTO[x.id])
+        .sort((a, b) => (b.releaseDate ?? "").localeCompare(a.releaseDate ?? "")),
     }))
+    .filter((serie) => serie.sets.length > 0)
     .sort((a, b) => (b.releaseDate ?? "").localeCompare(a.releaseDate ?? ""));
 }
 
@@ -73,6 +94,23 @@ export async function catalogSeries(lang: CatalogLang): Promise<SerieWithSets[]>
  * logo — ou tout le set si TCGdex ne le connaît pas.
  */
 export async function catalogSet(id: string, lang: CatalogLang): Promise<TcgdexSetDetail | null> {
+  const set = await catalogSetAlone(id, lang);
+  const children = MERGED_CHILDREN[id];
+  if (!set || !children) return set;
+  // Sets fusionnés : les cartes des enfants à la suite du set, avec leur numéro imprimé
+  const extra = (await Promise.all(children.map((child) => catalogSetAlone(child, lang)))).flatMap((c) =>
+    sortByNumber(c?.cards ?? []).map((card) => ({ ...card, localId: displayLocalId(card.id, card.localId) })),
+  );
+  const cards = [...set.cards, ...extra];
+  return {
+    ...set,
+    cards,
+    cardCount: set.cardCount ? { total: Math.max(set.cardCount.total + extra.length, cards.length), official: set.cardCount.official } : undefined,
+    scansMissing: cards.length > 0 && cards.every((c) => !c.image),
+  };
+}
+
+async function catalogSetAlone(id: string, lang: CatalogLang): Promise<TcgdexSetDetail | null> {
   const db = createAdminClient();
   const [live, { data: set }, { data: rows }] = await Promise.all([
     getSet(id, lang).catch(() => null),
@@ -96,7 +134,7 @@ export async function catalogSet(id: string, lang: CatalogLang): Promise<TcgdexS
     image: c.image ?? undefined,
     rarity: c.rarity ?? undefined,
     lang: (c.card_lang as CatalogLang | null) ?? undefined,
-    source: c.source as "tcgdex" | "limitless",
+    source: c.source as "tcgdex" | "limitless" | "pokemontcg",
   }));
 
   if (live) {
@@ -117,7 +155,7 @@ export async function catalogSet(id: string, lang: CatalogLang): Promise<TcgdexS
   }
 
   const cards = sortByNumber(stored);
-  await enrichCardDetails(cards.filter((c) => c.source !== "limitless"), lang);
+  await enrichCardDetails(cards.filter((c) => c.source === "tcgdex" || !c.source), lang);
   return {
     id: set!.id,
     name: set!.name,
@@ -137,7 +175,7 @@ export async function catalogSet(id: string, lang: CatalogLang): Promise<TcgdexS
 /** Une carte : TCGdex d'abord, sinon le catalogue en base (sets japonais absents de TCGdex) */
 export async function catalogCard(id: string, lang: CatalogLang): Promise<TcgdexCard | null> {
   const card = await getCard(id, lang);
-  if (card) return card;
+  if (card) return { ...card, localId: displayLocalId(card.id, card.localId) };
   const db = createAdminClient();
   const { data: c } = await db
     .from("catalog_cards")
@@ -154,7 +192,7 @@ export async function catalogCard(id: string, lang: CatalogLang): Promise<Tcgdex
     .maybeSingle();
   return {
     id: c.id,
-    localId: c.local_id,
+    localId: displayLocalId(c.id, c.local_id),
     name: c.name,
     image: c.image ?? undefined,
     rarity: c.rarity ?? undefined,

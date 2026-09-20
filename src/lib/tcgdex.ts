@@ -33,7 +33,7 @@ export type TcgdexCardBrief = {
   /** Catalogue d'où vient la carte quand ce n'est pas celui demandé (complément anglais d'un set FR incomplet) */
   lang?: CatalogLang;
   /** Origine des données : TCGdex, ou Limitless pour les sets japonais que TCGdex n'a pas */
-  source?: "tcgdex" | "limitless";
+  source?: "tcgdex" | "limitless" | "pokemontcg";
 };
 
 export type TcgdexSetBrief = {

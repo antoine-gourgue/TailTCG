@@ -253,7 +253,13 @@ const pokemontcgId = (id) => POKEMONTCG_ID[id] ?? id.replace(/^([a-z]+)0*(\d+)(\
 const LIMITLESS_EN_CODE = { svp: "SVP", swshp: "SP", smp: "SMP", xyp: "XYP", bwp: "BWP", dpp: "DPP", hgssp: "HSP", np: "NP", basep: "WP", "30th": "30C" };
 /** Numéro comparable : « TG01 » ≡ « TG1 », « SV001 » ≡ « SV1 », « 001 » ≡ « 1 » */
 const normNo = (n) => String(n).toUpperCase().replace(/^([A-Z]*)0*(\d+)([A-Z]*)$/, "$1$2$3");
-const normName = (n) => String(n).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "");
+/** Nom comparable : minuscules sans accents ni ponctuation, sans le niveau « LV.X » que TCGdex omet parfois */
+const normName = (n) =>
+  String(n)
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/\blv\.?\s*x\b/g, "")
+    .replace(/[^a-z0-9]+/g, "");
 
 async function syncInternationalImages() {
   // sets FR dont des cartes TCGdex n'ont pas de visuel
@@ -334,10 +340,65 @@ async function syncInternationalImages() {
   console.log(`International : ${filled} visuels complétés`);
 }
 
+/**
+ * Cartes que pokemontcg.io connaît et que TCGdex n'a pas (ex. les trois Mew
+ * R/G/B des 30 ans) : ajoutées au set FR avec le visuel et le nom anglais,
+ * source « pokemontcg ». Garde-fou : au plus 10 % du set (sinon c'est une
+ * numérotation différente, pas des cartes manquantes). DRY_EXTRAS=1 : liste
+ * sans écrire.
+ */
+async function syncInternationalExtras() {
+  const { data: sets } = await db.from("catalog_sets").select("id, serie_id").eq("lang", "fr").eq("source", "tcgdex");
+  let addedTotal = 0;
+  for (const st of sets ?? []) {
+    if (ONLY_SET && st.id !== ONLY_SET) continue;
+    const ptcg = await get(`https://raw.githubusercontent.com/PokemonTCG/pokemon-tcg-data/master/cards/en/${pokemontcgId(st.id)}.json`);
+    if (!Array.isArray(ptcg) || !ptcg.length) continue;
+    const { data: have } = await db.from("catalog_cards").select("id, local_id").eq("lang", "fr").eq("set_id", st.id);
+    if (!have?.length) continue;
+    const known = new Set(have.map((c) => normNo(c.local_id)));
+    const extras = ptcg.filter((c) => !known.has(normNo(c.number)));
+    if (!extras.length) continue;
+    if (extras.length > Math.max(3, Math.ceil(0.1 * ptcg.length))) {
+      console.log(`  fr/${st.id.padEnd(12)} ${extras.length} cartes en plus chez pokemontcg.io : numérotation différente, ignoré`);
+      continue;
+    }
+    const rows = [];
+    for (const c of extras) {
+      const image = c.images?.large ?? c.images?.small ?? null;
+      if (!image || !(await head(image))) continue;
+      const n = String(c.number).toUpperCase();
+      rows.push({
+        lang: "fr",
+        id: `${st.id}-${n}`,
+        set_id: st.id,
+        local_id: n,
+        name: c.name,
+        name_en: c.name,
+        image,
+        rarity: c.rarity ?? null,
+        source: "pokemontcg",
+        card_lang: "en",
+        updated_at: new Date().toISOString(),
+      });
+    }
+    if (!rows.length) continue;
+    console.log(`  fr/${st.id.padEnd(12)} +${rows.length} cartes pokemontcg.io : ${rows.map((r) => `${r.local_id} ${r.name}`).join(", ")}${process.env.DRY_EXTRAS ? " (essai)" : ""}`);
+    if (!process.env.DRY_EXTRAS) {
+      await upsert("catalog_cards", rows);
+      addedTotal += rows.length;
+    }
+  }
+  console.log(`International : ${addedTotal} cartes ajoutées depuis pokemontcg.io`);
+}
+
 const t0 = Date.now();
 for (const lang of LANGS) {
   const { listed, series } = await syncTcgdex(lang);
   if (lang === "ja" && !NO_LIMITLESS) await syncLimitless(listed, series);
-  if (lang === "fr" && !NO_LIMITLESS) await syncInternationalImages();
+  if (lang === "fr" && !NO_LIMITLESS) {
+    await syncInternationalImages();
+    await syncInternationalExtras();
+  }
 }
 console.log(`terminé en ${((Date.now() - t0) / 60000).toFixed(1)} min`);
