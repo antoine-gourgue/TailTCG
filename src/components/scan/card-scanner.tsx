@@ -25,6 +25,9 @@ const NEURAL_STABLE = 3;
 /** Sous ce cosinus, ce n'est pas une carte (visage, fenêtre, décor) : on
  *  n'appelle même pas le repli pHash serveur, qui verrouillerait à tort */
 const NEURAL_FLOOR = 0.6;
+/** Le cadre reste affiché ce temps après la dernière carte vue par le neural :
+ *  sans carte récente, on n'affiche aucun cadre (il ne saute plus partout) */
+const FRAME_HOLD_MS = 900;
 /** Cadrages essayés (part rognée sur chaque bord) : robustesse au bord de carte */
 const NEURAL_INSETS = [0, 0.05];
 /** Modèle + index hébergés sur Supabase Storage (bucket public scan-assets) */
@@ -160,6 +163,8 @@ export function CardScanner({
   /** Verrou neural : mêmes id consécutifs avant de valider */
   const neuralStreak = useRef(0);
   const neuralLastId = useRef<string | null>(null);
+  /** Dernier instant où le neural a vu une carte (cos ≥ NEURAL_FLOOR) : gère l'affichage du cadre */
+  const cardSeenAt = useRef(0);
   /** Débogage neural (dev, ?scandebug) : affiche le cosinus/marge en direct pour régler les seuils */
   const scanDebug = useRef(false);
   const [neuralDebug, setNeuralDebug] = useState<{ name: string; cos: number; margin: number; streak: number } | null>(null);
@@ -382,7 +387,10 @@ export function CardScanner({
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
       const t = target.current;
-      if (phaseRef.current !== "scanning" || !t) {
+      // Neural prêt : pas de cadre tant qu'aucune carte n'a été vue récemment
+      // (le cadre ne saute plus sur un visage, une fenêtre, le décor).
+      const noCard = neuralReady.current && now - cardSeenAt.current > FRAME_HOLD_MS;
+      if (phaseRef.current !== "scanning" || !t || noCard) {
         if (shown.current) {
           shown.current = null;
           drawOverlay(null, "seek");
@@ -447,6 +455,8 @@ export function CardScanner({
     if (!top) return "fallback";
     if (scanDebug.current)
       setNeuralDebug({ name: top.name, cos: Number(top.cos.toFixed(3)), margin: Number(margin.toFixed(3)), streak: neuralStreak.current });
+    // Une carte est plausiblement là : autorise l'affichage du cadre
+    if (top.cos >= NEURAL_FLOOR) cardSeenAt.current = performance.now();
     // Candidat sûr : on construit la stabilité, puis on verrouille en local
     if (top.cos >= NEURAL_MATCH && margin >= NEURAL_MARGIN) {
       neuralStreak.current = neuralLastId.current === top.id ? neuralStreak.current + 1 : 1;
