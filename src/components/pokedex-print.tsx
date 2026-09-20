@@ -9,23 +9,23 @@ import { PrintToolbar } from "@/components/print-toolbar";
 function PrintCard({ p }: { p: PokedexEntry }) {
   return (
     <div className="@container h-full w-full">
-      <div className="relative flex aspect-[63/88] w-full flex-col overflow-hidden rounded-[4.5%/3.5%] bg-[#0e0d10] text-white">
+      <div className="relative flex aspect-[63/88] w-full flex-col overflow-hidden border border-neutral-300 bg-white text-neutral-900">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`/api/pokedex/print/${p.id}`}
+          src={`/api/pokedex/print/${p.id}?v=2`}
           alt=""
           loading="eager"
           className="absolute inset-0 h-full w-full object-cover"
         />
-        <div className="relative z-10 px-[9cqw] pt-[8cqw]">
-          <p className="display truncate text-center text-[9cqw] font-bold leading-none tracking-tight">
+        <div className="relative z-10 px-[6cqw] pt-[7cqw]">
+          <p className="display line-clamp-2 text-center text-[7.5cqw] font-bold leading-[1.05] tracking-tight">
             {p.name}
           </p>
         </div>
         <div className="min-h-0 flex-1" />
-        <div className="relative z-10 px-[9cqw] pb-[8cqw]">
-          <p className="num text-center text-[7.5cqw] font-semibold leading-none text-white/85">
-            <span className="text-white/45">N°</span> {dexNumber(p.id)}
+        <div className="relative z-10 px-[6cqw] pb-[7cqw]">
+          <p className="num text-center text-[6.5cqw] font-semibold leading-none text-neutral-500">
+            <span className="text-neutral-400">N°</span> {dexNumber(p.id)}
           </p>
         </div>
       </div>
