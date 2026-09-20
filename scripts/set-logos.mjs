@@ -10,10 +10,10 @@
 //        pokemontcg.io (images.pokemontcg.io/<id>/logo.png, identifiants sans
 //        zéros de tête, « .5 » → « pt5 ») → Limitless (codes à la main) →
 //        Bulbapedia (fichier « <nom anglais> Logo.png », API MediaWiki)
-//   JA : Limitless (s3.limitlesstcg.com/sets/jp/<code>.png, mêmes codes que
-//        TCGdex, logos corrects) → Pokécardex (…/logos_jp/<code>.png, en
-//        secours pour les sets que Limitless n'a pas) → Bulbapedia (liste des
-//        extensions japonaises)
+//   JA : Pokécardex (…/logos_jp/<code>.png, code = id TCGdex en majuscules :
+//        de VRAIS logos) → Bulbapedia (liste des extensions) → Limitless en
+//        dernier (s3.limitlesstcg.com/sets/jp/<code>.png : un SYMBOLE, le
+//        numéro du set — mieux que rien quand aucun vrai logo n'existe).
 //
 //   node scripts/set-logos.mjs [--force] [--lang fr|ja]
 import { mkdir, readFile, writeFile, access } from "node:fs/promises";
@@ -306,33 +306,34 @@ if (!ONLY || ONLY === "ja") {
       ok++;
       continue;
     }
-    // Limitless d'abord (source curée, codes = ids TCGdex : logos corrects),
-    // Pokécardex en secours pour les sets que Limitless n'a pas (ceux qui
-    // affichaient un numéro) — codes dérivés, donc en second pour éviter une
-    // mauvaise correspondance là où Limitless est déjà bon.
-    const code = LIMITLESS_JA[s.id] ?? s.id;
-    const cands = [["Limitless", `https://s3.limitlesstcg.com/sets/jp/${encodeURIComponent(code)}.png`]];
-    for (const pc of pokecardexJaCodes(s.id)) {
-      cands.push([`Pokécardex ${pc}`, `${PCX}/logos_jp/${encodeURIComponent(pc)}.png`, PCX_HEADERS]);
-    }
-    if (await fetchLogo("ja", s.id, cands)) ok++;
+    // Pokécardex : de vrais logos (Limitless ne donne que des symboles en JA).
+    // Ce qu'il n'a pas passe au repli Bulbapedia (liste des extensions).
+    const cands = pokecardexJaCodes(s.id).map((pc) => [
+      `Pokécardex ${pc}`,
+      `${PCX}/logos_jp/${encodeURIComponent(pc)}.png`,
+      PCX_HEADERS,
+    ]);
+    if (cands.length && (await fetchLogo("ja", s.id, cands))) ok++;
     else left.push(s);
   }
-  // Bulbapedia par nom japonais pour ce qui reste
+  // Repli pour ce que Pokécardex n'a pas : Bulbapedia (vrai logo par nom/date),
+  // puis Limitless en dernier — c'est un symbole (le numéro du set), mais mieux
+  // que rien quand aucun vrai logo n'existe.
   const bulba = left.length ? await bulbaJapaneseLogos() : { byName: new Map(), byDate: new Map() };
   console.log(`Bulbapedia : ${bulba.byName.size} noms et ${bulba.byDate.size} dates référencés, ${left.length} sets à tenter`);
   for (const s of left) {
-    if (s.limitlessOnly) {
-      missing.push(s.id);
-      continue;
+    const cands = [];
+    // Bulbapedia par NOM seulement (sauf sets connus de Limitless seulement).
+    // Pas par date : plusieurs sets sortent le même jour et récupéraient alors
+    // le logo d'un autre (ex. les collections CS prenaient celui de Triplet Beat).
+    if (!s.limitlessOnly) {
+      const url = bulba.byName.get(normJa(s.name)) ?? null;
+      if (url) cands.push([`Bulbapedia ${url.split("/").pop()}`, url, { "user-agent": BULBA_UA }]);
     }
-    let url = bulba.byName.get(normJa(s.name)) ?? null;
-    if (!url) {
-      // nom ambigu ou différent : par date de sortie
-      const detail = await j(`https://api.tcgdex.net/v2/ja/sets/${encodeURIComponent(s.id)}`);
-      if (detail?.releaseDate) url = bulba.byDate.get(detail.releaseDate) ?? null;
-    }
-    if (url && (await fetchLogo("ja", s.id, [[`Bulbapedia ${url.split("/").pop()}`, url, { "user-agent": BULBA_UA }]]))) ok++;
+    // Limitless en dernier recours (symbole = numéro du set)
+    const code = LIMITLESS_JA[s.id] ?? s.id;
+    cands.push([`Limitless (symbole) ${code}`, `https://s3.limitlesstcg.com/sets/jp/${encodeURIComponent(code)}.png`]);
+    if (await fetchLogo("ja", s.id, cands)) ok++;
     else missing.push(s.id);
   }
   summary.ja = { total: todo.length, ok, missing };
