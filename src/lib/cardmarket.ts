@@ -1,6 +1,8 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { CM_REFERENCE_ORDER, cardmarketReference, type CardmarketPricing } from "@/lib/tcgdex";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
+import { CM_REFERENCE_ORDER, cardmarketReference, pickCardmarket, type CardmarketPricing } from "@/lib/tcgdex";
 
 /**
  * Prix Cardmarket servi depuis le miroir local du fichier public quotidien
@@ -64,4 +66,64 @@ export async function resolveCardmarketPrice(
     if (v != null) return v;
   }
   return cardmarketReference(block);
+}
+
+/**
+ * Relève la cote Cardmarket de cartes et l'écrit dans price_snapshots (même
+ * calcul que le cron quotidien : guide local par idProduct, repli TCGdex).
+ * Appelé à l'ajout d'une carte pour que sa valeur Cardmarket apparaisse tout
+ * de suite, sans attendre le cron du lendemain. Silencieux : un échec réseau
+ * ne bloque pas l'ajout (le cron rattrapera).
+ */
+export async function snapshotPrices(tcgdexIds: (string | null | undefined)[]): Promise<void> {
+  const ids = [
+    ...new Set(tcgdexIds.filter((id): id is string => !!id && !id.startsWith("custom:"))),
+    // borne : un très gros ajout en masse ne doit pas retarder la réponse ;
+    // le cron quotidien relèvera le reste.
+  ].slice(0, 60);
+  if (ids.length === 0) return;
+  const admin = createAdminClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const rows: {
+    tcgdex_id: string;
+    captured_at: string;
+    trend: number | null;
+    low: number | null;
+    avg30: number | null;
+    reference: number | null;
+  }[] = [];
+
+  const CHUNK = 6;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    await Promise.all(
+      ids.slice(i, i + CHUNK).map(async (id) => {
+        try {
+          const res = await fetch(`https://api.tcgdex.net/v2/fr/cards/${encodeURIComponent(id)}`, {
+            next: { revalidate: 3600 },
+          });
+          if (!res.ok) return;
+          const card: {
+            pricing?: { cardmarket?: CardmarketPricing };
+            variants?: { normal?: boolean; holo?: boolean };
+          } = await res.json();
+          const cm = card.pricing?.cardmarket;
+          const { trend, low, avg30 } = pickCardmarket(cm, card.variants);
+          const idProduct = overrideCardmarketId(id, cm?.idProduct);
+          let reference = cardmarketReference(cm);
+          if (idProduct != null) {
+            const guide = await fetchGuidePrices([idProduct]);
+            const gr = guide.get(idProduct);
+            if (gr != null) reference = gr;
+          }
+          if (trend == null && low == null && avg30 == null && reference == null) return;
+          rows.push({ tcgdex_id: id, captured_at: today, trend, low, avg30, reference });
+        } catch {
+          // réseau : le cron quotidien rattrapera
+        }
+      })
+    );
+  }
+  if (rows.length > 0) {
+    await admin.from("price_snapshots").upsert(rows, { onConflict: "tcgdex_id,captured_at" });
+  }
 }

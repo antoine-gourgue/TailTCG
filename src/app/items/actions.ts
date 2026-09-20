@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { adoptPlaceholders } from "@/lib/binder-adopt";
+import { snapshotPrices } from "@/lib/cardmarket";
 import { geocodeAddress } from "@/lib/geocode";
 import {
   CONDITION_CODES,
@@ -132,6 +133,9 @@ export async function createItem(
     adoptPlaceholders(supabase, [{ id: created.id, tcgdex_id }]),
   ]);
   revalidateBinders(binders);
+
+  // Cote Cardmarket tout de suite (sinon la carte n'a de valeur qu'au cron du lendemain)
+  await snapshotPrices([tcgdex_id]);
 
   revalidatePath("/");
   revalidatePath("/wishlist");
@@ -297,6 +301,9 @@ export async function bulkAddToCollection(cards: BulkCard[], language: string) {
     adoptPlaceholders(supabase, created ?? []),
   ]);
   revalidateBinders(binders);
+
+  // Cote Cardmarket tout de suite pour les cartes ajoutées
+  await snapshotPrices((created ?? []).map((c) => c.tcgdex_id));
 
   revalidatePath("/");
   revalidatePath("/wishlist");

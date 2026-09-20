@@ -64,6 +64,18 @@ export type CollectionItem = {
   market_price?: number | null;
 };
 
+/**
+ * Valeur estimée d'un exemplaire : le prix estimé saisi à la main, ou à défaut
+ * la cote Cardmarket (dernier relevé). Sert partout où on montrait le prix
+ * estimé, pour qu'une carte sans prix saisi affiche quand même sa cote.
+ */
+const estimatedOf = (i: CollectionItem) => i.current_price ?? i.market_price ?? null;
+/** Plus-value d'un exemplaire d'après sa valeur estimée (prix saisi ou Cardmarket) */
+const gainOf = (i: CollectionItem) => {
+  const est = estimatedOf(i);
+  return est != null && i.purchase_price != null ? (est - i.purchase_price) * i.quantity : null;
+};
+
 /** minuscules sans accents, pour la recherche texte */
 function normalize(s: string): string {
   return s
@@ -223,9 +235,9 @@ export function CollectionClient({
     const cmp: Record<SortKey, (a: CollectionItem, b: CollectionItem) => number> = {
       name: (a, b) => a.card_name.localeCompare(b.card_name, "fr"),
       paid: (a, b) => (a.purchase_price ?? -1) - (b.purchase_price ?? -1),
-      price: (a, b) => (a.current_price ?? -1) - (b.current_price ?? -1),
+      price: (a, b) => (estimatedOf(a) ?? -1) - (estimatedOf(b) ?? -1),
       gain: (a, b) =>
-        (a.gain ?? Number.NEGATIVE_INFINITY) - (b.gain ?? Number.NEGATIVE_INFINITY),
+        (gainOf(a) ?? Number.NEGATIVE_INFINITY) - (gainOf(b) ?? Number.NEGATIVE_INFINITY),
       date: (a, b) =>
         (a.purchase_date ?? a.created_at).localeCompare(b.purchase_date ?? b.created_at),
       custom: (a, b) => {
@@ -250,8 +262,9 @@ export function CollectionClient({
     for (const i of filtered) {
       count += i.quantity;
       if (i.purchase_price != null) invested += i.purchase_price * i.quantity;
-      if (i.current_price != null) {
-        value += i.current_price * i.quantity;
+      const est = estimatedOf(i);
+      if (est != null) {
+        value += est * i.quantity;
         hasValue = true;
       }
       if (i.market_price != null) {
@@ -776,9 +789,9 @@ export function CollectionClient({
                     <p className="mt-1 flex items-baseline gap-1.5 text-xs">
                       <span className="num text-faint">{formatEur(item.purchase_price)}</span>
                       <span className="text-faint">→</span>
-                      <span className="num font-medium">{formatEur(item.current_price)}</span>
+                      <span className="num font-medium">{formatEur(estimatedOf(item))}</span>
                       <span className="ml-auto">
-                        <GainText value={item.gain} />
+                        <GainText value={gainOf(item)} />
                       </span>
                     </p>
                   )}
@@ -884,10 +897,10 @@ export function CollectionClient({
                     <>
                       <td className="num px-4 py-2.5 text-right">{formatEur(item.purchase_price)}</td>
                       <td className="num px-4 py-2.5 text-right font-medium">
-                        {formatEur(item.current_price)}
+                        {formatEur(estimatedOf(item))}
                       </td>
                       <td className="px-4 py-2.5 text-right">
-                        <GainText value={item.gain} />
+                        <GainText value={gainOf(item)} />
                       </td>
                       <td className="px-4 py-2.5 text-muted">
                         {item.source_id ? sourceName.get(item.source_id) ?? "—" : "—"}
