@@ -47,3 +47,10 @@ next-env.d.ts
 # banc de détection du scan (images de test)
 .scan-bench/
 .scan-real/
+
+# Modèle + index neural (volumineux, hébergés hors git en prod)
+public/scan-model/
+public/scan-index/
+
+# Runtime WASM onnxruntime-web (copié depuis node_modules au build)
+public/ort/

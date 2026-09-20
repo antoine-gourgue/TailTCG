@@ -7,6 +7,8 @@ import { CardImage } from "@/components/card-image";
 import { formatEur } from "@/lib/domain";
 import type { Pt } from "@/lib/scan/detect.mjs";
 import { ScanEngine, type Quad } from "@/lib/scan/engine";
+import { NeuralScanner } from "@/lib/scan/embed-engine";
+import { NeuralIndex, type NeuralHit } from "@/lib/scan/embed-match";
 import type { ScanCandidate, ScanResult } from "@/lib/scan/index";
 import { ITEM_LANGUAGE } from "@/lib/scan/url";
 
@@ -16,6 +18,17 @@ const MAX_QUADS = 3;
 const STABLE_HITS = 2;
 /** Délai minimal entre deux reconnaissances (retente vite quand la 1re n'aboutit pas) */
 const RECOG_EVERY_MS = 140;
+/** Reconnaissance neurale locale : verrou immédiat, sans serveur, quand c'est très sûr et stable */
+const NEURAL_MATCH = 0.78;
+const NEURAL_MARGIN = 0.04;
+const NEURAL_STABLE = 2;
+/** Cadrages essayés (part rognée sur chaque bord) : robustesse au bord de carte */
+const NEURAL_INSETS = [0, 0.05];
+/** Modèle + index hébergés sur Supabase Storage (bucket public scan-assets) */
+const SCAN_ASSETS = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/scan-assets`;
+const NEURAL_MODEL_URL = `${SCAN_ASSETS}/mobileclip-s0.onnx`;
+const NEURAL_INDEX_BIN = `${SCAN_ASSETS}/embed.bin`;
+const NEURAL_INDEX_JSON = `${SCAN_ASSETS}/embed.json`;
 /** Le cadre reste affiché ce temps après la dernière détection (une image ratée ne le fait pas clignoter) */
 const HOLD_MS = 450;
 /**
@@ -137,6 +150,13 @@ export function CardScanner({
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const engineRef = useRef<ScanEngine | null>(null);
+  /** Reconnaissance neurale locale (worker ONNX + index d'embeddings) */
+  const neuralRef = useRef<NeuralScanner | null>(null);
+  const neuralIndexRef = useRef<NeuralIndex | null>(null);
+  const neuralReady = useRef(false);
+  /** Verrou neural : mêmes id consécutifs avant de valider */
+  const neuralStreak = useRef(0);
+  const neuralLastId = useRef<string | null>(null);
   /** Carte suivie (coins dans le repère vidéo) et nombre de détections consécutives */
   const track = useRef<Track | null>(null);
   /** Candidat à essayer quand la reconnaissance ne donne rien (on tourne parmi les candidats) */
@@ -183,6 +203,41 @@ export function CardScanner({
       alive = false;
       eng.terminate();
       engineRef.current = null;
+    };
+  }, []);
+
+  // Reconnaissance neurale locale : index d'embeddings + modèle ONNX, chargés
+  // en tâche de fond. Tant qu'ils ne sont pas prêts, la reconnaissance passe
+  // par le serveur (pHash) ; une fois prêts, une carte très sûre se verrouille
+  // instantanément côté client, sans aller-retour réseau.
+  useEffect(() => {
+    if (!NeuralScanner.supported()) return;
+    let alive = true;
+    let ns: NeuralScanner | null = null;
+    (async () => {
+      try {
+        const idx = new NeuralIndex();
+        await idx.load(NEURAL_INDEX_BIN, NEURAL_INDEX_JSON);
+        if (!alive) return;
+        neuralIndexRef.current = idx;
+        ns = new NeuralScanner();
+        await ns.init(NEURAL_MODEL_URL, "/ort/");
+        if (!alive) {
+          ns.terminate();
+          return;
+        }
+        neuralRef.current = ns;
+        neuralReady.current = true;
+      } catch {
+        neuralReady.current = false;
+      }
+    })();
+    return () => {
+      alive = false;
+      neuralReady.current = false;
+      ns?.terminate();
+      neuralRef.current = null;
+      neuralIndexRef.current = null;
     };
   }, []);
 
@@ -338,10 +393,72 @@ export function CardScanner({
     return () => cancelAnimationFrame(raf);
   }, [camera]);
 
+  /** Un résultat de l'index neural → candidat affichable (score : 0 = identique) */
+  function neuralToCandidate(h: NeuralHit): ScanCandidate {
+    return {
+      id: h.id,
+      lang: h.lang as ScanCandidate["lang"],
+      name: h.name,
+      setId: h.setId,
+      setName: h.setName,
+      localId: h.localId,
+      image: h.image,
+      score: 1 - h.cos,
+    };
+  }
+
+  /**
+   * Reconnaissance neurale locale de la carte redressée : renvoie true si elle
+   * verrouille (carte très sûre et stable sur plusieurs images), sans réseau.
+   */
+  async function recognizeNeural(blob: Blob): Promise<boolean> {
+    const ns = neuralRef.current;
+    const idx = neuralIndexRef.current;
+    if (!neuralReady.current || !ns || !idx) return false;
+    const vecs = await ns.embedBlobVariants(blob, NEURAL_INSETS);
+    if (!vecs.length || phaseRef.current !== "scanning") return false;
+    // Meilleur candidat parmi les cadrages essayés
+    let top: NeuralHit | null = null;
+    let margin = 0;
+    for (const v of vecs) {
+      const hits = idx.search(v, 2);
+      if (hits[0] && (!top || hits[0].cos > top.cos)) {
+        top = hits[0];
+        margin = hits[0].cos - (hits[1]?.cos ?? 0);
+      }
+    }
+    if (!top) return false;
+    if (top.cos < NEURAL_MATCH || margin < NEURAL_MARGIN) {
+      neuralStreak.current = 0;
+      neuralLastId.current = null;
+      return false;
+    }
+    neuralStreak.current = neuralLastId.current === top.id ? neuralStreak.current + 1 : 1;
+    neuralLastId.current = top.id;
+    if (neuralStreak.current < NEURAL_STABLE) return false;
+    neuralStreak.current = 0;
+    altIndex.current = 0;
+    navigator.vibrate?.(30);
+    setFound(neuralToCandidate(top));
+    setTicks((t) => t + 1);
+    setPhase("found");
+    return true;
+  }
+
   /** Envoie une carte redressée à la reconnaissance et applique le verdict */
   async function recognize(blob: Blob) {
     recogInflight.current = true;
     lastRecogAt.current = performance.now();
+    // Voie rapide locale : si le neural est prêt et très sûr, on verrouille
+    // sans serveur. Sinon on retombe sur le pHash serveur (comportement acquis).
+    try {
+      if (await recognizeNeural(blob)) {
+        recogInflight.current = false;
+        return;
+      }
+    } catch {
+      // erreur neurale : on continue vers le serveur
+    }
     try {
       const res = await fetch(`/api/scan/match${token ? `?token=${encodeURIComponent(token)}` : ""}`, {
         method: "POST",

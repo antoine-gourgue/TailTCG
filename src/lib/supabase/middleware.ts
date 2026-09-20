@@ -16,6 +16,11 @@ const PUBLIC_PATHS = [
   "/api/capture/",
   // Reconnaissance de carte : le téléphone (relais QR) n'a pas de session, la route vérifie le jeton
   "/api/scan/",
+  // Runtime WASM d'onnxruntime-web pour le scan neural : fichiers statiques
+  // non sensibles, chargés par le client (y compris le téléphone en relais QR,
+  // sans session). Le modèle et l'index, eux, viennent de Supabase Storage.
+  "/ort/",
+
   // Métadonnées récupérées par des robots non connectés
   "/opengraph-image",
   "/manifest.webmanifest",
