@@ -65,16 +65,16 @@ export type CollectionItem = {
 };
 
 /**
- * Valeur estimée d'un exemplaire : le prix estimé saisi à la main, ou à défaut
- * la cote Cardmarket (dernier relevé). Sert partout où on montrait le prix
- * estimé, pour qu'une carte sans prix saisi affiche quand même sa cote.
+ * Prix estimé affiché sous une carte : le prix saisi à la main, ou à défaut
+ * la cote Cardmarket (dernier relevé), pour qu'une carte sans prix saisi
+ * affiche quand même une valeur. Sert à la LIGNE de chaque carte et au tri.
+ * Le total « Valeur estimée » et la plus-value, eux, ne comptent QUE les prix
+ * saisis à la main (voir summary et gainOf).
  */
 const estimatedOf = (i: CollectionItem) => i.current_price ?? i.market_price ?? null;
-/** Plus-value d'un exemplaire d'après sa valeur estimée (prix saisi ou Cardmarket) */
-const gainOf = (i: CollectionItem) => {
-  const est = estimatedOf(i);
-  return est != null ? (est - (i.purchase_price ?? 0)) * i.quantity : null;
-};
+/** Plus-value d'un exemplaire d'après le prix saisi à la main seulement (— sans prix saisi) */
+const gainOf = (i: CollectionItem) =>
+  i.current_price != null ? (i.current_price - (i.purchase_price ?? 0)) * i.quantity : null;
 
 /** minuscules sans accents, pour la recherche texte */
 function normalize(s: string): string {
@@ -262,9 +262,9 @@ export function CollectionClient({
     for (const i of filtered) {
       count += i.quantity;
       invested += (i.purchase_price ?? 0) * i.quantity;
-      const est = estimatedOf(i);
-      if (est != null) {
-        value += est * i.quantity;
+      // « Valeur estimée » = prix saisis à la main seulement (pas Cardmarket)
+      if (i.current_price != null) {
+        value += i.current_price * i.quantity;
         hasValue = true;
       }
       if (i.market_price != null) {
