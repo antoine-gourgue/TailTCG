@@ -193,9 +193,11 @@ export function CardScanner({
     phaseRef.current = phase;
   }, [phase]);
 
-  // Débogage neural en dev : ?scandebug affiche le cosinus/marge en direct
+  // Débogage neural : ?scandebug affiche le cosinus/marge en direct (opt-in,
+  // par le paramètre d'URL ; invisible pour qui ne l'ajoute pas). Utile pour
+  // régler les seuils sur de vraies cartes, y compris sur le site déployé.
   useEffect(() => {
-    scanDebug.current = process.env.NODE_ENV !== "production" && new URLSearchParams(window.location.search).has("scandebug");
+    scanDebug.current = new URLSearchParams(window.location.search).has("scandebug");
   }, []);
 
   // Moteur de détection (worker OpenCV)
