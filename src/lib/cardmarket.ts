@@ -69,11 +69,57 @@ export async function resolveCardmarketPrice(
 }
 
 /**
- * Relève la cote Cardmarket de cartes et l'écrit dans price_snapshots (même
- * calcul que le cron quotidien : guide local par idProduct, repli TCGdex).
- * Appelé à l'ajout d'une carte pour que sa valeur Cardmarket apparaisse tout
- * de suite, sans attendre le cron du lendemain. Silencieux : un échec réseau
- * ne bloque pas l'ajout (le cron rattrapera).
+ * Cote Cardmarket brute d'une carte, essayée en français PUIS en japonais :
+ * les cartes japonaises (id « SV4a-347 », set japonais) n'existent pas dans
+ * TCGdex FR mais ont bien un idProduct Cardmarket côté JA. Renvoie null si
+ * aucune langue ne connaît la carte.
+ */
+async function fetchCardPricing(
+  id: string
+): Promise<{ cm: CardmarketPricing | undefined; variants: { normal?: boolean; holo?: boolean } | undefined } | null> {
+  for (const lang of ["fr", "ja"] as const) {
+    try {
+      const res = await fetch(`https://api.tcgdex.net/v2/${lang}/cards/${encodeURIComponent(id)}`, {
+        next: { revalidate: 3600 },
+      });
+      if (res.status === 404) continue;
+      if (!res.ok) return null;
+      const card: {
+        pricing?: { cardmarket?: CardmarketPricing };
+        variants?: { normal?: boolean; holo?: boolean };
+      } = await res.json();
+      return { cm: card.pricing?.cardmarket, variants: card.variants };
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/** Cote Cardmarket de référence d'une carte (guide local par idProduct, repli TCGdex), ou null */
+export async function cardMarketSnapshot(
+  id: string
+): Promise<{ trend: number | null; low: number | null; avg30: number | null; reference: number | null } | null> {
+  const pricing = await fetchCardPricing(id);
+  if (!pricing) return null;
+  const { cm, variants } = pricing;
+  const { trend, low, avg30 } = pickCardmarket(cm, variants);
+  const idProduct = overrideCardmarketId(id, cm?.idProduct);
+  let reference = cardmarketReference(cm);
+  if (idProduct != null) {
+    const guide = await fetchGuidePrices([idProduct]);
+    const gr = guide.get(idProduct);
+    if (gr != null) reference = gr;
+  }
+  if (trend == null && low == null && avg30 == null && reference == null) return null;
+  return { trend, low, avg30, reference };
+}
+
+/**
+ * Relève la cote Cardmarket de cartes et l'écrit dans price_snapshots (guide
+ * local par idProduct, repli TCGdex ; FR puis JA). Appelé à l'ajout pour que
+ * la valeur Cardmarket apparaisse tout de suite, sans attendre le cron du
+ * lendemain. Silencieux : un échec réseau ne bloque pas l'ajout.
  */
 export async function snapshotPrices(tcgdexIds: (string | null | undefined)[]): Promise<void> {
   const ids = [
@@ -97,29 +143,8 @@ export async function snapshotPrices(tcgdexIds: (string | null | undefined)[]): 
   for (let i = 0; i < ids.length; i += CHUNK) {
     await Promise.all(
       ids.slice(i, i + CHUNK).map(async (id) => {
-        try {
-          const res = await fetch(`https://api.tcgdex.net/v2/fr/cards/${encodeURIComponent(id)}`, {
-            next: { revalidate: 3600 },
-          });
-          if (!res.ok) return;
-          const card: {
-            pricing?: { cardmarket?: CardmarketPricing };
-            variants?: { normal?: boolean; holo?: boolean };
-          } = await res.json();
-          const cm = card.pricing?.cardmarket;
-          const { trend, low, avg30 } = pickCardmarket(cm, card.variants);
-          const idProduct = overrideCardmarketId(id, cm?.idProduct);
-          let reference = cardmarketReference(cm);
-          if (idProduct != null) {
-            const guide = await fetchGuidePrices([idProduct]);
-            const gr = guide.get(idProduct);
-            if (gr != null) reference = gr;
-          }
-          if (trend == null && low == null && avg30 == null && reference == null) return;
-          rows.push({ tcgdex_id: id, captured_at: today, trend, low, avg30, reference });
-        } catch {
-          // réseau : le cron quotidien rattrapera
-        }
+        const snap = await cardMarketSnapshot(id).catch(() => null);
+        if (snap) rows.push({ tcgdex_id: id, captured_at: today, ...snap });
       })
     );
   }

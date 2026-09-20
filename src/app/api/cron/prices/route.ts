@@ -1,18 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { cardmarketReference, pickCardmarket, type CardmarketPricing } from "@/lib/tcgdex";
-import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
-import { guideReference } from "@/lib/cardmarket";
+import { cardMarketSnapshot } from "@/lib/cardmarket";
 
 // Cron Vercel quotidien (vercel.json, 0 6 * * *) : relève les cotes Cardmarket
-// via TCGdex pour chaque carte possédée et alimente price_snapshots.
-// Sert aussi de ping quotidien à Supabase (évite la pause du projet gratuit).
+// (TCGdex FR puis JA — les cartes japonaises n'existent pas en FR) pour chaque
+// carte possédée et alimente price_snapshots. Sert aussi de ping quotidien à
+// Supabase (évite la pause du projet gratuit).
 
 export const maxDuration = 60;
 
-const TCGDEX_BASE = "https://api.tcgdex.net/v2/fr";
-const DELAY_MS = 200;
-
+const DELAY_MS = 150;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function GET(request: NextRequest) {
@@ -27,10 +24,7 @@ export async function GET(request: NextRequest) {
   await admin
     .from("items")
     .delete()
-    .lt(
-      "deleted_at",
-      new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
-    );
+    .lt("deleted_at", new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString());
 
   const { data: rows, error } = await admin.from("items").select("tcgdex_id");
   if (error) {
@@ -47,42 +41,13 @@ export async function GET(request: NextRequest) {
 
   for (const id of ids) {
     try {
-      const res = await fetch(`${TCGDEX_BASE}/cards/${encodeURIComponent(id)}`, {
-        cache: "no-store",
-      });
-      if (!res.ok) {
-        skipped++;
-        continue;
-      }
-      const card: {
-        pricing?: { cardmarket?: CardmarketPricing };
-        variants?: { normal?: boolean; holo?: boolean };
-      } = await res.json();
-      const cm = card.pricing?.cardmarket;
-      const { trend, low, avg30 } = pickCardmarket(cm, card.variants);
-
-      // Prix de référence : idProduct corrigé → guide public → repli TCGdex
-      const idProduct = overrideCardmarketId(id, cm?.idProduct);
-      let reference = cardmarketReference(cm);
-      if (idProduct != null) {
-        const { data: g } = await admin
-          .from("cardmarket_price_guide")
-          .select("trend, avg7, avg30, avg1, avg")
-          .eq("id_product", idProduct)
-          .maybeSingle();
-        const gr = g ? guideReference(g) : null;
-        if (gr != null) reference = gr;
-      }
-
-      if (trend == null && low == null && avg30 == null && reference == null) {
+      const snap = await cardMarketSnapshot(id);
+      if (!snap) {
         skipped++;
       } else {
         const { error: upsertError } = await admin
           .from("price_snapshots")
-          .upsert(
-            { tcgdex_id: id, captured_at: today, trend, low, avg30, reference },
-            { onConflict: "tcgdex_id,captured_at" }
-          );
+          .upsert({ tcgdex_id: id, captured_at: today, ...snap }, { onConflict: "tcgdex_id,captured_at" });
         if (upsertError) skipped++;
         else updated++;
       }

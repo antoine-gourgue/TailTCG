@@ -73,7 +73,7 @@ const estimatedOf = (i: CollectionItem) => i.current_price ?? i.market_price ?? 
 /** Plus-value d'un exemplaire d'après sa valeur estimée (prix saisi ou Cardmarket) */
 const gainOf = (i: CollectionItem) => {
   const est = estimatedOf(i);
-  return est != null && i.purchase_price != null ? (est - i.purchase_price) * i.quantity : null;
+  return est != null ? (est - (i.purchase_price ?? 0)) * i.quantity : null;
 };
 
 /** minuscules sans accents, pour la recherche texte */
@@ -261,7 +261,7 @@ export function CollectionClient({
     let hasMarket = false;
     for (const i of filtered) {
       count += i.quantity;
-      if (i.purchase_price != null) invested += i.purchase_price * i.quantity;
+      invested += (i.purchase_price ?? 0) * i.quantity;
       const est = estimatedOf(i);
       if (est != null) {
         value += est * i.quantity;
@@ -787,7 +787,7 @@ export function CollectionClient({
                   </p>
                   {!hideValues && (
                     <p className="mt-1 flex items-baseline gap-1.5 text-xs">
-                      <span className="num text-faint">{formatEur(item.purchase_price)}</span>
+                      <span className="num text-faint">{formatEur(item.purchase_price ?? 0)}</span>
                       <span className="text-faint">→</span>
                       <span className="num font-medium">{formatEur(estimatedOf(item))}</span>
                       <span className="ml-auto">
@@ -895,7 +895,7 @@ export function CollectionClient({
                   <td className="num px-4 py-2.5">{item.quantity}</td>
                   {!hideValues && (
                     <>
-                      <td className="num px-4 py-2.5 text-right">{formatEur(item.purchase_price)}</td>
+                      <td className="num px-4 py-2.5 text-right">{formatEur(item.purchase_price ?? 0)}</td>
                       <td className="num px-4 py-2.5 text-right font-medium">
                         {formatEur(estimatedOf(item))}
                       </td>
