@@ -1,7 +1,9 @@
 # Chaque nuit : régénère l'instantané des sets jouables (liste + cartes de
 # chaque set) depuis TCGdex, les logos de sets que TCGdex n'a pas, le
-# catalogue en base (TCGdex + Limitless + pokemontcg.io) et l'index du scan,
-# puis committe ce qui a changé. Vercel redéploie sur le push.
+# catalogue en base (TCGdex + Limitless + pokemontcg.io), l'index pHash du
+# scan (src/data, committé) et l'index neural du scan (embeddings MobileCLIP
+# téléversés sur Supabase Storage), puis committe ce qui a changé. Vercel
+# redéploie sur le push.
 name: Sets jouables, catalogue, logos et index du scan
 
 on:
@@ -50,3 +52,8 @@ jobs:
           else
             echo "Aucun changement."
           fi
+      # Après le commit pHash (découplé) : l'index neural va sur Supabase
+      # Storage, pas dans git ; un échec ici ne doit pas bloquer le reste.
+      - name: Compléter l'index neural du scan (nouvelles cartes → Supabase Storage)
+        continue-on-error: true
+        run: node scripts/scan-embed-index.mjs --max=8000
