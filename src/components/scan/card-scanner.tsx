@@ -21,7 +21,7 @@ const RECOG_EVERY_MS = 140;
 /** Reconnaissance neurale locale : verrou immédiat, sans serveur, quand c'est très sûr et stable */
 const NEURAL_MATCH = 0.78;
 const NEURAL_MARGIN = 0.04;
-const NEURAL_STABLE = 2;
+const NEURAL_STABLE = 3;
 /** Cadrages essayés (part rognée sur chaque bord) : robustesse au bord de carte */
 const NEURAL_INSETS = [0, 0.05];
 /** Modèle + index hébergés sur Supabase Storage (bucket public scan-assets) */
