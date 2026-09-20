@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { adoptPlaceholders } from "@/lib/binder-adopt";
 import { snapshotPrices } from "@/lib/cardmarket";
+import { fetchCardRarity } from "@/lib/tcgdex";
 import { geocodeAddress } from "@/lib/geocode";
 import {
   CONDITION_CODES,
@@ -103,6 +104,8 @@ export async function createItem(
     if (!own) return { message: "Visuel invalide." };
   }
 
+  // Rareté intrinsèque (TCGdex), posée automatiquement — pas un choix utilisateur
+  const rarity = await fetchCardRarity(tcgdex_id);
   const { data: created, error: dbError } = await supabase
     .from("items")
     .insert({
@@ -113,6 +116,7 @@ export async function createItem(
       set_name,
       local_id,
       image_url,
+      rarity,
     })
     .select("id")
     .single();
@@ -239,7 +243,27 @@ export type BulkCard = {
   set_name: string;
   local_id: string;
   image_url: string;
+  /** Rareté connue de l'appelant (page set) ; sinon relevée sur TCGdex */
+  rarity?: string | null;
 };
+
+/** Rareté intrinsèque (TCGdex) par identifiant, relevée pour les cartes qui ne l'ont pas déjà */
+async function raritiesFor(cards: BulkCard[]): Promise<Map<string, string | null>> {
+  const map = new Map<string, string | null>();
+  for (const c of cards) if (c.rarity != null) map.set(c.tcgdex_id, c.rarity);
+  const need = [
+    ...new Set(cards.map((c) => c.tcgdex_id).filter((id) => !map.has(id) && !id.startsWith("custom:"))),
+  ].slice(0, 60);
+  const CHUNK = 6;
+  for (let i = 0; i < need.length; i += CHUNK) {
+    await Promise.all(
+      need.slice(i, i + CHUNK).map(async (id) => {
+        map.set(id, await fetchCardRarity(id).catch(() => null));
+      })
+    );
+  }
+  return map;
+}
 
 /**
  * Ajoute plusieurs cartes d'un coup depuis un set : chaque exemplaire est
@@ -265,6 +289,7 @@ export async function bulkAddToCollection(cards: BulkCard[], language: string) {
     ? language
     : "FR";
 
+  const rarityById = await raritiesFor(clean);
   const rows: ItemInsert[] = clean.map((c) => ({
     tcgdex_id: c.tcgdex_id,
     card_name: c.card_name,
@@ -276,6 +301,7 @@ export async function bulkAddToCollection(cards: BulkCard[], language: string) {
     condition: "NM",
     language: lang,
     quantity: 1,
+    rarity: rarityById.get(c.tcgdex_id) ?? null,
     needs_review: true,
   }));
 

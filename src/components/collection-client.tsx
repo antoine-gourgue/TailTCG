@@ -41,6 +41,7 @@ export type CollectionItem = {
   local_id: string;
   image_url: string;
   card_type: string | null;
+  rarity: string | null;
   language: string;
   condition: string;
   quantity: number;
@@ -282,6 +283,7 @@ export function CollectionClient({
   const [fSet, setFSet] = useState<Set<string>>(() => (initialSet ? new Set([initialSet]) : new Set()));
   const [fCondition, setFCondition] = useState("");
   const [fType, setFType] = useState("");
+  const [fRarity, setFRarity] = useState<Set<string>>(new Set());
   const [fLanguage, setFLanguage] = useState("");
   const [fSource, setFSource] = useState(initialSource);
   const [fGraded, setFGraded] = useState("");
@@ -319,6 +321,13 @@ export function CollectionClient({
     () => [...new Set(items.map((i) => i.language))],
     [items]
   );
+  const rarities = useMemo(
+    () =>
+      [...new Set(items.map((i) => i.rarity).filter(Boolean))]
+        .sort((a, b) => (a as string).localeCompare(b as string, "fr"))
+        .map((r) => [r as string, r as string] as [string, string]),
+    [items]
+  );
 
   const filtered = useMemo(() => {
     const needle = normalize(q.trim());
@@ -333,6 +342,7 @@ export function CollectionClient({
         (fSet.size === 0 || fSet.has(i.set_id)) &&
         (!fCondition || i.condition === fCondition) &&
         (!fType || i.card_type === fType) &&
+        (fRarity.size === 0 || (i.rarity != null && fRarity.has(i.rarity))) &&
         (!fLanguage || i.language === fLanguage) &&
         (!fSource || i.source_id === fSource) &&
         (!fGraded || (fGraded === "oui" ? i.graded : !i.graded))
@@ -358,7 +368,7 @@ export function CollectionClient({
       },
     };
     return [...list].sort((a, b) => dir * cmp[sortKey](a, b));
-  }, [items, q, fSold, fSet, fCondition, fType, fLanguage, fSource, fGraded, sortKey, sortAsc, manualIds]);
+  }, [items, q, fSold, fSet, fCondition, fType, fRarity, fLanguage, fSource, fGraded, sortKey, sortAsc, manualIds]);
 
   const summary = useMemo(() => {
     let count = 0;
@@ -599,6 +609,9 @@ export function CollectionClient({
           ))}
         </select>
       )}
+      {rarities.length > 1 && (
+        <MultiSelect options={rarities} selected={fRarity} onChange={setFRarity} allLabel="Toutes raretés" cls={cls} />
+      )}
       {languages.length > 1 && (
         <select
           value={fLanguage}
@@ -672,6 +685,7 @@ export function CollectionClient({
     (fSet.size > 0 ? 1 : 0) +
     (fCondition ? 1 : 0) +
     (fType ? 1 : 0) +
+    (fRarity.size > 0 ? 1 : 0) +
     (fLanguage ? 1 : 0) +
     (fSource ? 1 : 0) +
     (fGraded ? 1 : 0);
@@ -680,6 +694,7 @@ export function CollectionClient({
     setFSet(new Set());
     setFCondition("");
     setFType("");
+    setFRarity(new Set());
     setFLanguage("");
     setFSource("");
     setFGraded("");

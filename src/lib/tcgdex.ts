@@ -153,6 +153,29 @@ export type CatalogLang = "fr" | "en" | "ja" | "de" | "es" | "it";
 
 const langBase = (lang: CatalogLang) => `https://api.tcgdex.net/v2/${lang}`;
 
+/**
+ * Rareté d'une carte d'après TCGdex (Commune, Rare, Double rare, Ultra Rare…),
+ * essayée en FR puis en JA — les cartes japonaises n'existent pas en FR.
+ * Renvoie null si aucune langue ne connaît la carte ou n'a de rareté.
+ */
+export async function fetchCardRarity(tcgdexId: string): Promise<string | null> {
+  if (!tcgdexId || tcgdexId.startsWith("custom:")) return null;
+  for (const lang of ["fr", "ja"] as const) {
+    try {
+      const res = await fetch(`${langBase(lang)}/cards/${encodeURIComponent(tcgdexId)}`, {
+        next: { revalidate: DAY_SECONDS },
+      });
+      if (res.status === 404) continue;
+      if (!res.ok) return null;
+      const card: { rarity?: string } = await res.json();
+      return card.rarity ?? null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export async function getCard(
   id: string,
   lang: CatalogLang = "fr"

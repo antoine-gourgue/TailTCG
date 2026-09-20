@@ -835,6 +835,7 @@ export type Database = {
           purchase_date: string | null
           purchase_price: number | null
           quantity: number
+          rarity: string | null
           set_id: string
           set_name: string
           sold_at: string | null
@@ -862,6 +863,7 @@ export type Database = {
           purchase_date?: string | null
           purchase_price?: number | null
           quantity?: number
+          rarity?: string | null
           set_id: string
           set_name: string
           sold_at?: string | null
@@ -889,6 +891,7 @@ export type Database = {
           purchase_date?: string | null
           purchase_price?: number | null
           quantity?: number
+          rarity?: string | null
           set_id?: string
           set_name?: string
           sold_at?: string | null
@@ -1091,6 +1094,7 @@ export type Database = {
           purchase_date: string | null
           purchase_price: number | null
           quantity: number | null
+          rarity: string | null
           set_id: string | null
           set_name: string | null
           sold_at: string | null
