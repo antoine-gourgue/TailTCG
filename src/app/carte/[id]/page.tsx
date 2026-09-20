@@ -524,7 +524,6 @@ export default async function CartePage({
                         )}
                       </span>
                     </Field>
-                    <Field label="Type">{item.card_type ?? "—"}</Field>
                     <Field label="Langue">{item.language}</Field>
                     <Field label="Quantité">
                       <span className="num">×{item.quantity}</span>
