@@ -3,12 +3,17 @@
 // public/set-logos/<lang>/<id>.webp ; la table src/data/set-logos.json est
 // injectée par src/lib/tcgdex.ts quand TCGdex n'a pas de logo.
 //
-// Sources, dans l'ordre :
-//   FR : logo anglais de TCGdex → pokemontcg.io (images.pokemontcg.io/<id>/logo.png,
-//        identifiants sans zéros de tête, « .5 » → « pt5 ») → Limitless (codes à la main)
-//        → Bulbapedia (fichier « <nom anglais> Logo.png », API MediaWiki)
-//   JA : Limitless (s3.limitlesstcg.com/sets/jp/<code>.png, mêmes codes que TCGdex)
-//        → Bulbapedia (liste des extensions japonaises : logo ↔ nom japonais)
+// Sources, dans l'ordre (Pokécardex d'abord : ce sont de vrais logos, pas des
+// symboles ou des numéros) :
+//   FR : Pokécardex (pokecardex.b-cdn.net/assets/images/logos/<code>.png, code =
+//        ptcgoCode de pokemontcg.io, ex. 30th → 30C) → logo anglais de TCGdex →
+//        pokemontcg.io (images.pokemontcg.io/<id>/logo.png, identifiants sans
+//        zéros de tête, « .5 » → « pt5 ») → Limitless (codes à la main) →
+//        Bulbapedia (fichier « <nom anglais> Logo.png », API MediaWiki)
+//   JA : Limitless (s3.limitlesstcg.com/sets/jp/<code>.png, mêmes codes que
+//        TCGdex, logos corrects) → Pokécardex (…/logos_jp/<code>.png, en
+//        secours pour les sets que Limitless n'a pas) → Bulbapedia (liste des
+//        extensions japonaises)
 //
 //   node scripts/set-logos.mjs [--force] [--lang fr|ja]
 import { mkdir, readFile, writeFile, access } from "node:fs/promises";
@@ -32,6 +37,47 @@ const POKEMONTCG_ID = {
 const LIMITLESS_EN = { "30th": "30C", "30th-c": "30C", mee: "MEE", mep: "MEP", cel25cc: "CEL", "swsh4.5sv": "SHF" };
 /** Codes Limitless (japonais) quand ils diffèrent de TCGdex (promos, sets « + ») */
 const LIMITLESS_JA = { "SV-P": "SVP", "S-P": "SP", "SM-P": "SMP", "M-P": "MP", "XY-P": "XYP", "BW-P": "BWP", "SM1+": "SM1p" };
+
+// ------------------------------------------------------------ Pokécardex
+// De vrais logos (pas des symboles/numéros) ; codes = ptcgoCode (FR) ou dérivés
+// de l'id TCGdex (JA). Sondés en premier : si le code ne renvoie pas d'image,
+// on retombe sur les autres sources.
+const PCX = "https://pokecardex.b-cdn.net/assets/images";
+const PCX_HEADERS = { "user-agent": "Mozilla/5.0 (compatible; TailTCG-logos)" };
+/** Exceptions FR : id TCGdex → code Pokécardex (quand le ptcgoCode ne suffit pas) */
+const POKECARDEX_FR = {
+  "2011bw": "MC1", "2012bw": "MC2", "2013bw": "MC3", "2014xy": "MC4", "2015xy": "MC5",
+  "2016xy": "MC6", "2017sm": "MC7", "2018sm-fr": "MC8", "2019sm-fr": "MC9", "2021swsh": "MC10", "2022swsh": "MC11",
+};
+/** Exceptions JA : id TCGdex → code Pokécardex */
+const POKECARDEX_JA = { "SV-P": "SV-P", "M-P": "M-P", "SM1+": "SM1+", "SM3+": "SM3+" };
+/**
+ * Codes Pokécardex à NE PAS utiliser en JA : la numérotation Pokécardex diffère
+ * de TCGdex et le code renvoie le logo d'un AUTRE set (ex. Pokécardex XY1B =
+ * Collection X, alors que TCGdex XY1b = Collection Y). Ces sets gardent le
+ * logo Limitless (correct), Pokécardex ne sert qu'en secours.
+ */
+const POKECARDEX_JA_BLOCK = new Set(["XY1b", "CS1a", "CS1b"]);
+/** Codes Pokécardex candidats pour un set FR (le premier qui renvoie une image gagne) */
+function pokecardexFrCodes(id, ptcgoCode) {
+  const out = [];
+  if (POKECARDEX_FR[id]) out.push(POKECARDEX_FR[id]);
+  if (ptcgoCode) out.push(ptcgoCode);
+  out.push(id.toUpperCase());
+  return [...new Set(out)];
+}
+/**
+ * Codes Pokécardex candidats pour un set JA : l'id tel quel puis en majuscules
+ * (Pokécardex majuscule tout). Pas de dérivation « sans lettre finale » : elle
+ * renvoyait le logo d'un set voisin (CS1a → CS1 = Collection Sheet BW).
+ */
+function pokecardexJaCodes(id) {
+  if (POKECARDEX_JA_BLOCK.has(id)) return [];
+  const out = [];
+  if (POKECARDEX_JA[id]) out.push(POKECARDEX_JA[id]);
+  out.push(id, id.toUpperCase());
+  return [...new Set(out)];
+}
 
 const j = async (u, tries = 4) => {
   for (let i = 0; i < tries; i++) {
@@ -196,6 +242,9 @@ const summary = {};
 if (!ONLY || ONLY === "fr") {
   const sets = (await j("https://api.tcgdex.net/v2/fr/sets")) ?? [];
   const todo = sets.filter((s) => !s.logo);
+  // ptcgoCode (= code Pokécardex international) par identifiant pokemontcg.io
+  const ptcgSets = (await j("https://raw.githubusercontent.com/PokemonTCG/pokemon-tcg-data/master/sets/en.json")) ?? [];
+  const ptcgoByPokemontcgId = new Map(ptcgSets.map((s) => [s.id, s.ptcgoCode]));
   console.log(`FR : ${todo.length} sets sans logo chez TCGdex`);
   let ok = 0;
   const missing = [];
@@ -206,6 +255,11 @@ if (!ONLY || ONLY === "fr") {
     }
     const en = await j(`https://api.tcgdex.net/v2/en/sets/${encodeURIComponent(s.id)}`);
     const cands = [];
+    // Pokécardex d'abord (vrais logos)
+    const ptcgoCode = ptcgoByPokemontcgId.get(POKEMONTCG_ID[s.id] ?? pokemontcgId(s.id));
+    for (const code of pokecardexFrCodes(s.id, ptcgoCode)) {
+      cands.push([`Pokécardex ${code}`, `${PCX}/logos/${encodeURIComponent(code)}.png`, PCX_HEADERS]);
+    }
     if (en?.logo) cands.push(["TCGdex en", `${en.logo}.webp`], ["TCGdex en", `${en.logo}.png`]);
     cands.push(["pokemontcg.io", `https://images.pokemontcg.io/${POKEMONTCG_ID[s.id] ?? pokemontcgId(s.id)}/logo.png`]);
     if (LIMITLESS_EN[s.id]) cands.push(["Limitless", `https://s3.limitlesstcg.com/sets/en/${LIMITLESS_EN[s.id]}.png`]);
@@ -252,8 +306,16 @@ if (!ONLY || ONLY === "ja") {
       ok++;
       continue;
     }
+    // Limitless d'abord (source curée, codes = ids TCGdex : logos corrects),
+    // Pokécardex en secours pour les sets que Limitless n'a pas (ceux qui
+    // affichaient un numéro) — codes dérivés, donc en second pour éviter une
+    // mauvaise correspondance là où Limitless est déjà bon.
     const code = LIMITLESS_JA[s.id] ?? s.id;
-    if (await fetchLogo("ja", s.id, [["Limitless", `https://s3.limitlesstcg.com/sets/jp/${encodeURIComponent(code)}.png`]])) ok++;
+    const cands = [["Limitless", `https://s3.limitlesstcg.com/sets/jp/${encodeURIComponent(code)}.png`]];
+    for (const pc of pokecardexJaCodes(s.id)) {
+      cands.push([`Pokécardex ${pc}`, `${PCX}/logos_jp/${encodeURIComponent(pc)}.png`, PCX_HEADERS]);
+    }
+    if (await fetchLogo("ja", s.id, cands)) ok++;
     else left.push(s);
   }
   // Bulbapedia par nom japonais pour ce qui reste
