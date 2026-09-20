@@ -18,8 +18,38 @@ const STABLE_HITS = 2;
 const RECOG_EVERY_MS = 250;
 /** Le cadre reste affiché ce temps après la dernière détection (une image ratée ne le fait pas clignoter) */
 const HOLD_MS = 450;
-/** Constante de temps du lissage du cadre (ms) : réactif mais sans tremblement */
-const SMOOTH_MS = 55;
+/**
+ * Lissage ADAPTATIF du cadre (coins en pixels vidéo) : sous le deadband, la
+ * carte est immobile et ce que renvoie le détecteur n'est que du bruit → on
+ * FIGE le cadre (fini le rectangle qui tremble/change de taille sans raison) ;
+ * au-delà, le poids du lerp monte avec le déplacement réel (suit la main sans
+ * traîner ni jitter) ; au-delà d'un gros saut, on colle direct (nouvelle scène).
+ */
+const SMOOTH_DEADBAND_FRAC = 0.008;
+const SMOOTH_LERP_MIN = 0.22;
+const SMOOTH_LERP_MAX = 0.85;
+const SCENE_CHANGE_FRAC = 0.22;
+
+/** Déplacement moyen des coins entre deux quadrilatères (px) */
+function cornerDrift(a: Pt[], b: Pt[]): number {
+  let s = 0;
+  for (let i = 0; i < 4; i++) s += Math.hypot(a[i][0] - b[i][0], a[i][1] - b[i][1]);
+  return s / 4;
+}
+
+/** Coins lissés à afficher : figés si immobile, lerp proportionnel au mouvement, collés sur un gros saut */
+function smoothCorners(prev: Pt[] | null, next: Pt[], longEdge: number): Pt[] {
+  if (!prev) return next.map((p) => [p[0], p[1]] as Pt);
+  const drift = cornerDrift(prev, next);
+  if (drift > longEdge * SCENE_CHANGE_FRAC) return next.map((p) => [p[0], p[1]] as Pt);
+  if (drift < longEdge * SMOOTH_DEADBAND_FRAC) return prev;
+  const span = longEdge * (SCENE_CHANGE_FRAC - SMOOTH_DEADBAND_FRAC);
+  const ramp = Math.min(1, (drift - longEdge * SMOOTH_DEADBAND_FRAC) / span);
+  const w = SMOOTH_LERP_MIN + (SMOOTH_LERP_MAX - SMOOTH_LERP_MIN) * ramp;
+  return [0, 1, 2, 3].map(
+    (i) => [prev[i][0] + (next[i][0] - prev[i][0]) * w, prev[i][1] + (next[i][1] - prev[i][1]) * w] as Pt,
+  );
+}
 /** Sans carte détectée depuis ce temps, on envoie le centre de l'image (carte plein écran), à cette cadence */
 const FALLBACK_AFTER_MS = 2500;
 const FALLBACK_EVERY_MS = 1200;
@@ -115,7 +145,6 @@ export function CardScanner({
   const target = useRef<{ corners: Pt[]; at: number } | null>(null);
   /** Cadre lissé effectivement dessiné */
   const shown = useRef<Pt[] | null>(null);
-  const lastDrawAt = useRef(0);
   const lastHitAt = useRef(0);
   const recogInflight = useRef(false);
   const lastRecogAt = useRef(0);
@@ -284,8 +313,6 @@ export function CardScanner({
     let raf = 0;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
-      const dt = lastDrawAt.current ? Math.min(100, now - lastDrawAt.current) : 16;
-      lastDrawAt.current = now;
       const t = target.current;
       if (phaseRef.current !== "scanning" || !t) {
         if (shown.current) {
@@ -301,12 +328,9 @@ export function CardScanner({
         drawOverlay(null, "seek");
         return;
       }
-      const cur = shown.current;
-      if (!cur) shown.current = t.corners.map((p) => [p[0], p[1]] as Pt);
-      else {
-        const a = 1 - Math.exp(-dt / SMOOTH_MS);
-        shown.current = cur.map((p, i) => [p[0] + (t.corners[i][0] - p[0]) * a, p[1] + (t.corners[i][1] - p[1]) * a] as Pt);
-      }
+      const video = videoRef.current;
+      const longEdge = video ? Math.max(video.videoWidth, video.videoHeight) || 1080 : 1080;
+      shown.current = smoothCorners(shown.current, t.corners, longEdge);
       const alpha = age <= HOLD_MS ? 1 : 1 - (age - HOLD_MS) / 250;
       drawOverlay(shown.current, "seek", alpha);
     };
