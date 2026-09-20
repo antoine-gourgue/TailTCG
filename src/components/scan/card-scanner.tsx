@@ -22,6 +22,9 @@ const RECOG_EVERY_MS = 140;
 const NEURAL_MATCH = 0.78;
 const NEURAL_MARGIN = 0.04;
 const NEURAL_STABLE = 3;
+/** Sous ce cosinus, ce n'est pas une carte (visage, fenêtre, décor) : on
+ *  n'appelle même pas le repli pHash serveur, qui verrouillerait à tort */
+const NEURAL_FLOOR = 0.6;
 /** Cadrages essayés (part rognée sur chaque bord) : robustesse au bord de carte */
 const NEURAL_INSETS = [0, 0.05];
 /** Modèle + index hébergés sur Supabase Storage (bucket public scan-assets) */
@@ -418,15 +421,19 @@ export function CardScanner({
   }
 
   /**
-   * Reconnaissance neurale locale de la carte redressée : renvoie true si elle
-   * verrouille (carte très sûre et stable sur plusieurs images), sans réseau.
+   * Reconnaissance neurale locale de la carte redressée. Renvoie :
+   * - "lock"     : carte sûre et stable → verrouillée en local, sans réseau ;
+   * - "skip"     : le neural gère (verrou en cours) OU ce n'est pas une carte
+   *                (cosinus sous NEURAL_FLOOR : visage, fenêtre) → ne PAS
+   *                appeler le pHash serveur, qui verrouillerait à tort ;
+   * - "fallback" : neural pas prêt, ou carte incertaine → laisser le pHash.
    */
-  async function recognizeNeural(blob: Blob): Promise<boolean> {
+  async function recognizeNeural(blob: Blob): Promise<"lock" | "skip" | "fallback"> {
     const ns = neuralRef.current;
     const idx = neuralIndexRef.current;
-    if (!neuralReady.current || !ns || !idx) return false;
+    if (!neuralReady.current || !ns || !idx) return "fallback";
     const vecs = await ns.embedBlobVariants(blob, NEURAL_INSETS);
-    if (!vecs.length || phaseRef.current !== "scanning") return false;
+    if (!vecs.length || phaseRef.current !== "scanning") return "fallback";
     // Meilleur candidat parmi les cadrages essayés
     let top: NeuralHit | null = null;
     let margin = 0;
@@ -437,39 +444,45 @@ export function CardScanner({
         margin = hits[0].cos - (hits[1]?.cos ?? 0);
       }
     }
-    if (!top) return false;
+    if (!top) return "fallback";
     if (scanDebug.current)
       setNeuralDebug({ name: top.name, cos: Number(top.cos.toFixed(3)), margin: Number(margin.toFixed(3)), streak: neuralStreak.current });
-    if (top.cos < NEURAL_MATCH || margin < NEURAL_MARGIN) {
+    // Candidat sûr : on construit la stabilité, puis on verrouille en local
+    if (top.cos >= NEURAL_MATCH && margin >= NEURAL_MARGIN) {
+      neuralStreak.current = neuralLastId.current === top.id ? neuralStreak.current + 1 : 1;
+      neuralLastId.current = top.id;
+      if (neuralStreak.current < NEURAL_STABLE) return "skip";
       neuralStreak.current = 0;
-      neuralLastId.current = null;
-      return false;
+      altIndex.current = 0;
+      navigator.vibrate?.(30);
+      setFound(neuralToCandidate(top));
+      setTicks((t) => t + 1);
+      setPhase("found");
+      return "lock";
     }
-    neuralStreak.current = neuralLastId.current === top.id ? neuralStreak.current + 1 : 1;
-    neuralLastId.current = top.id;
-    if (neuralStreak.current < NEURAL_STABLE) return false;
     neuralStreak.current = 0;
-    altIndex.current = 0;
-    navigator.vibrate?.(30);
-    setFound(neuralToCandidate(top));
-    setTicks((t) => t + 1);
-    setPhase("found");
-    return true;
+    neuralLastId.current = null;
+    // Cosinus très bas = pas une carte : on coupe le pHash. Sinon carte
+    // incertaine (mauvais angle, reflet…) → le pHash serveur peut rattraper.
+    return top.cos < NEURAL_FLOOR ? "skip" : "fallback";
   }
 
   /** Envoie une carte redressée à la reconnaissance et applique le verdict */
   async function recognize(blob: Blob) {
     recogInflight.current = true;
     lastRecogAt.current = performance.now();
-    // Voie rapide locale : si le neural est prêt et très sûr, on verrouille
-    // sans serveur. Sinon on retombe sur le pHash serveur (comportement acquis).
+    // Voie rapide locale : le neural verrouille lui-même s'il est sûr, et
+    // coupe le pHash quand ce n'est pas une carte. On n'appelle le serveur que
+    // s'il n'a pas tranché (neural pas prêt, ou carte incertaine).
+    let verdict: "lock" | "skip" | "fallback" = "fallback";
     try {
-      if (await recognizeNeural(blob)) {
-        recogInflight.current = false;
-        return;
-      }
+      verdict = await recognizeNeural(blob);
     } catch {
-      // erreur neurale : on continue vers le serveur
+      verdict = "fallback";
+    }
+    if (verdict !== "fallback") {
+      recogInflight.current = false;
+      return;
     }
     try {
       const res = await fetch(`/api/scan/match${token ? `?token=${encodeURIComponent(token)}` : ""}`, {
