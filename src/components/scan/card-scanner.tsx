@@ -12,10 +12,10 @@ import { ITEM_LANGUAGE } from "@/lib/scan/url";
 
 /** Candidats de détection départagés par la reconnaissance quand le premier ne donne rien */
 const MAX_QUADS = 3;
-/** Détections consécutives de la même carte avant de l'envoyer à la reconnaissance */
+/** Détections consécutives de la même carte avant de l'envoyer à la reconnaissance (1 = dès qu'on la voit : le matcher refuse les images incertaines) */
 const STABLE_HITS = 2;
-/** Délai minimal entre deux reconnaissances */
-const RECOG_EVERY_MS = 250;
+/** Délai minimal entre deux reconnaissances (retente vite quand la 1re n'aboutit pas) */
+const RECOG_EVERY_MS = 140;
 /** Le cadre reste affiché ce temps après la dernière détection (une image ratée ne le fait pas clignoter) */
 const HOLD_MS = 450;
 /**

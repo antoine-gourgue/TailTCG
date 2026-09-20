@@ -117,8 +117,17 @@ export class ScanEngine {
       k: opts.k ?? 3,
       cropIndex: opts.cropIndex ?? 0,
     };
+    // Garde-fou : si le worker cale sur une image, la promesse ne doit jamais
+    // rester en suspens (sinon toute la boucle de détection se fige).
     const res = await new Promise<Extract<WorkerOut, { type: "result" }>>((resolve) => {
-      this.pending.set(id, resolve);
+      const timer = window.setTimeout(() => {
+        this.pending.delete(id);
+        resolve({ type: "result", id, quads: [], tracked: false, ms: 0 });
+      }, 2000);
+      this.pending.set(id, (r) => {
+        window.clearTimeout(timer);
+        resolve(r);
+      });
       w.postMessage(msg, [small.data.buffer, ...(full ? [full.data.buffer] : [])]);
     });
     this.busy = false;
@@ -126,6 +135,24 @@ export class ScanEngine {
     let card: Blob | null = null;
     if (res.card) card = await this.encode(res.card);
     return { quads, card, tracked: res.tracked, ms: res.ms };
+  }
+
+  /** Canvas → JPEG, avec garde-fou : un toBlob qui ne rappelle pas ne fige pas la boucle */
+  private toBlobSafe(c: HTMLCanvasElement): Promise<Blob | null> {
+    return new Promise((res) => {
+      let done = false;
+      const settle = (b: Blob | null) => {
+        if (!done) {
+          done = true;
+          res(b);
+        }
+      };
+      const timer = window.setTimeout(() => settle(null), 1000);
+      c.toBlob((b) => {
+        window.clearTimeout(timer);
+        settle(b);
+      }, "image/jpeg", 0.8);
+    });
   }
 
   /** Carte redressée RGBA → JPEG */
@@ -136,7 +163,7 @@ export class ScanEngine {
     const ctx = c.getContext("2d");
     if (!ctx) return Promise.resolve(null);
     ctx.putImageData(new ImageData(new Uint8ClampedArray(rgba), CARD_W, CARD_H), 0, 0);
-    return new Promise((res) => c.toBlob((b) => res(b), "image/jpeg", 0.8));
+    return this.toBlobSafe(c);
   }
 
   /** Le centre de l'image au format carte, en JPEG (repli quand rien n'est détecté : la carte remplit l'écran) */
@@ -151,6 +178,6 @@ export class ScanEngine {
     const gW = this.full.width * 0.8;
     const gH = gW / (CARD_W / CARD_H);
     ctx.drawImage(this.full, (this.full.width - gW) / 2, (this.full.height - gH) / 2, gW, gH, 0, 0, CARD_W, CARD_H);
-    return new Promise((res) => c.toBlob((b) => res(b), "image/jpeg", 0.8));
+    return this.toBlobSafe(c);
   }
 }
