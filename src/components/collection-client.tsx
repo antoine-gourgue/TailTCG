@@ -282,7 +282,6 @@ export function CollectionClient({
   const [fSold, setFSold] = useState<"active" | "sold" | "all">("active");
   const [fSet, setFSet] = useState<Set<string>>(() => (initialSet ? new Set([initialSet]) : new Set()));
   const [fCondition, setFCondition] = useState("");
-  const [fType, setFType] = useState("");
   const [fRarity, setFRarity] = useState<Set<string>>(new Set());
   const [fLanguage, setFLanguage] = useState("");
   const [fSource, setFSource] = useState(initialSource);
@@ -313,10 +312,6 @@ export function CollectionClient({
     () => [...new Set(items.map((i) => i.condition))],
     [items]
   );
-  const types = useMemo(
-    () => [...new Set(items.map((i) => i.card_type).filter(Boolean))] as string[],
-    [items]
-  );
   const languages = useMemo(
     () => [...new Set(items.map((i) => i.language))],
     [items]
@@ -341,7 +336,6 @@ export function CollectionClient({
           )) &&
         (fSet.size === 0 || fSet.has(i.set_id)) &&
         (!fCondition || i.condition === fCondition) &&
-        (!fType || i.card_type === fType) &&
         (fRarity.size === 0 || (i.rarity != null && fRarity.has(i.rarity))) &&
         (!fLanguage || i.language === fLanguage) &&
         (!fSource || i.source_id === fSource) &&
@@ -368,7 +362,7 @@ export function CollectionClient({
       },
     };
     return [...list].sort((a, b) => dir * cmp[sortKey](a, b));
-  }, [items, q, fSold, fSet, fCondition, fType, fRarity, fLanguage, fSource, fGraded, sortKey, sortAsc, manualIds]);
+  }, [items, q, fSold, fSet, fCondition, fRarity, fLanguage, fSource, fGraded, sortKey, sortAsc, manualIds]);
 
   const summary = useMemo(() => {
     let count = 0;
@@ -599,16 +593,6 @@ export function CollectionClient({
           </option>
         ))}
       </select>
-      {types.length > 0 && (
-        <select value={fType} onChange={(e) => setFType(e.target.value)} className={cls} aria-label="Type">
-          <option value="">Tous types</option>
-          {types.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-      )}
       {rarities.length > 1 && (
         <MultiSelect options={rarities} selected={fRarity} onChange={setFRarity} allLabel="Toutes raretés" cls={cls} />
       )}
@@ -684,7 +668,6 @@ export function CollectionClient({
     (fSold !== "active" ? 1 : 0) +
     (fSet.size > 0 ? 1 : 0) +
     (fCondition ? 1 : 0) +
-    (fType ? 1 : 0) +
     (fRarity.size > 0 ? 1 : 0) +
     (fLanguage ? 1 : 0) +
     (fSource ? 1 : 0) +
@@ -693,7 +676,6 @@ export function CollectionClient({
     setFSold("active");
     setFSet(new Set());
     setFCondition("");
-    setFType("");
     setFRarity(new Set());
     setFLanguage("");
     setFSource("");
@@ -969,7 +951,7 @@ export function CollectionClient({
                 <th className="label-xs px-4 py-3">Set</th>
                 <th className="label-xs px-4 py-3">N°</th>
                 <th className="label-xs px-4 py-3">État</th>
-                <th className="label-xs px-4 py-3">Type</th>
+                <th className="label-xs px-4 py-3">Rareté</th>
                 <th className="label-xs px-4 py-3">Qté</th>
                 {!hideValues && (
                   <>
@@ -1007,7 +989,7 @@ export function CollectionClient({
                   <td className="px-4 py-2.5 text-muted">{item.set_name}</td>
                   <td className="num px-4 py-2.5 text-muted">{item.local_id}</td>
                   <td className="num px-4 py-2.5">{item.condition}</td>
-                  <td className="px-4 py-2.5 text-muted">{item.card_type ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-muted">{item.rarity ?? "—"}</td>
                   <td className="num px-4 py-2.5">{item.quantity}</td>
                   {!hideValues && (
                     <>

@@ -10,7 +10,6 @@ import {
 } from "@/app/items/actions";
 import {
   CONDITIONS,
-  CARD_TYPES,
   LANGUAGES,
   SOURCE_KINDS,
   GEOCODED_KINDS,
@@ -238,25 +237,7 @@ export function ItemForm({
 
       {/* 2 — La carte */}
       <Section step={stepNo(2)} title="Exemplaire">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div>
-            <label htmlFor="card_type" className="label-xs mb-1.5 block">
-              Type
-            </label>
-            <select
-              id="card_type"
-              name="card_type"
-              defaultValue={defaults.card_type ?? ""}
-              className="field"
-            >
-              <option value="">—</option>
-              {CARD_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           <div>
             <label htmlFor="language" className="label-xs mb-1.5 block">
               Langue
