@@ -39,8 +39,9 @@ function ProductTile({ p }: { p: CatalogProduct }) {
   );
 }
 
-/** Tuile extension : logo, nom, nombre de produits, année */
-function SetTile({ st, onOpen }: { st: CatalogSet; onOpen: () => void }) {
+/** Tuile extension : logo, nom, nombre de produits, année. `eager` : visuel chargé tout de suite (première série, visible à l'arrivée) */
+function SetTile({ st, onOpen, eager = false }: { st: CatalogSet; onOpen: () => void; eager?: boolean }) {
+  const loading = eager ? "eager" : "lazy";
   return (
     <button
       type="button"
@@ -50,7 +51,7 @@ function SetTile({ st, onOpen }: { st: CatalogSet; onOpen: () => void }) {
       <div className="flex h-14 items-center justify-center">
         {st.logo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={st.logo} alt="" className="max-h-14 max-w-[9rem] object-contain" loading="lazy" />
+          <img src={st.logo} alt="" className="max-h-14 max-w-[9rem] object-contain" loading={loading} />
         ) : (
           <Boxes size={28} className="text-muted" aria-hidden />
         )}
@@ -189,29 +190,12 @@ export function CatalogClient({ series }: { series: CatalogSerie[] }) {
       ) : (
         /* Toutes les séries et leurs extensions, sur une seule page */
         <>
-          <nav aria-label="Séries" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-            {series.map((s) => (
-              <a
-                key={s.id}
-                href={`#serie-${s.id}`}
-                title={s.name}
-                className="flex shrink-0 items-center gap-2 rounded-xl border border-edge px-3 py-2 text-xs font-medium transition hover:bg-raised"
-              >
-                {s.logo && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={s.logo} alt="" className="h-6 max-w-[6rem] object-contain" />
-                )}
-                <span>{s.name}</span>
-              </a>
-            ))}
-          </nav>
-
-          {series.map((s) => (
+          {series.map((s, si) => (
             <section key={s.id} id={`serie-${s.id}`} className="scroll-mt-24">
               <div className="mb-3 flex items-center gap-3">
                 {s.logo && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={s.logo} alt="" className="h-9 max-w-[10rem] object-contain" loading="lazy" />
+                  <img src={s.logo} alt="" className="h-9 max-w-[10rem] object-contain" loading={si === 0 ? "eager" : "lazy"} />
                 )}
                 <div>
                   <h2 className="display text-xl font-bold tracking-tight">{s.name}</h2>
@@ -221,7 +205,7 @@ export function CatalogClient({ series }: { series: CatalogSerie[] }) {
               <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {s.sets.map((st) => (
                   <li key={st.key}>
-                    <SetTile st={st} onOpen={() => open(st.key)} />
+                    <SetTile st={st} onOpen={() => open(st.key)} eager={si === 0} />
                   </li>
                 ))}
               </ul>

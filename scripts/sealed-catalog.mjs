@@ -8,6 +8,9 @@
 // Le type (ETB, display, booster, tin…) est déduit du nom par règles.
 // Idempotent (upsert). Service role via .env.local ou les variables du job nocturne.
 //   node scripts/sealed-catalog.mjs
+import { existsSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
+import sharp from "sharp";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdminEnv } from "./lib/env.mjs";
 
@@ -242,10 +245,21 @@ async function loadTcgdex() {
   for (const serie of series) {
     const detail = await getJSON(`https://api.tcgdex.net/v2/fr/series/${serie.id}`);
     for (const st of detail?.sets ?? []) {
+      // Logo FR ; sinon le logo EN s'il existe (sets récents pas encore localisés)
+      let logo = st.logo ? `${st.logo}.webp` : null;
+      if (!logo) {
+        const en = `https://assets.tcgdex.net/en/${serie.id}/${st.id}/logo.webp`;
+        try {
+          const r = await fetch(en, { method: "HEAD", headers: UA });
+          if (r.ok) logo = en;
+        } catch {
+          /* pas de logo EN non plus */
+        }
+      }
       const info = {
         set_id: st.id,
         set_name_fr: st.name ?? "",
-        set_logo: st.logo ? `${st.logo}.webp` : null,
+        set_logo: logo,
         serie_id: String(serie.id).toLowerCase(),
       };
       for (const key of new Set([norm(enSets.get(st.id) ?? ""), norm(st.name ?? "")])) {
@@ -256,6 +270,86 @@ async function loadTcgdex() {
   }
   console.log(`TCGdex : ${index.size} clés d'extension, ${serieMeta.size} séries`);
   return { index, serieMeta };
+}
+
+// ---- Logos des groupes que TCGdex ignore (Delta Reign, Trick or Trade…) :
+// mêmes sources que scripts/set-logos.mjs — Pokécardex par code, puis
+// Bulbapedia (fichier « <nom> Logo EN.png », sinon la page de l'extension) —
+// enregistrés en .webp dans public/set-logos/fr/tp-<groupId> (commités par le
+// job nocturne). Un logo déjà sur disque n'est pas retéléchargé.
+const LOGO_DIR = "public/set-logos/fr";
+const PCX_HEADERS = { "user-agent": "Mozilla/5.0 (compatible; TailTCG-logos)" };
+const BULBA = "https://bulbapedia.bulbagarden.net/w/api.php";
+const BULBA_HEADERS = { "user-agent": "TailTCG/1.0 (logos de sets ; contact via le dépôt GitHub)" };
+async function bulbaJson(params) {
+  try {
+    const r = await fetch(`${BULBA}?${new URLSearchParams({ format: "json", ...params })}`, { headers: BULBA_HEADERS });
+    return r.ok ? await r.json() : null;
+  } catch {
+    return null;
+  }
+}
+async function bulbaFileUrl(title) {
+  const d = await bulbaJson({ action: "query", titles: title, prop: "imageinfo", iiprop: "url", redirects: "1" });
+  return Object.values(d?.query?.pages ?? {})[0]?.imageinfo?.[0]?.url ?? null;
+}
+/** Logo (ou symbole) trouvé sur la page Bulbapedia « <nom> (TCG) » */
+async function bulbaPageLogo(name) {
+  const search = await bulbaJson({ action: "query", list: "search", srsearch: `${name} TCG`, srlimit: "10" });
+  const words = norm(name).split(" ").filter((w) => w.length > 2);
+  const hit = (search?.query?.search ?? []).find((r) => r.title.includes("(TCG)") && words.every((w) => norm(r.title).includes(w)));
+  if (!hit) return null;
+  const d = await bulbaJson({ action: "query", titles: hit.title, prop: "images", imlimit: "100", redirects: "1" });
+  const images = Object.values(d?.query?.pages ?? {})[0]?.images?.map((i) => i.title) ?? [];
+  const logo = images.find((t) => /logo/i.test(t) && !/project|pok.mon tcg logo/i.test(t)) ?? images.find((t) => /^File:SetSymbol/i.test(t));
+  return logo ? bulbaFileUrl(logo) : null;
+}
+async function download(url, headers) {
+  try {
+    const r = await fetch(url, { headers });
+    if (!r.ok) return null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    return buf.length > 500 ? buf : null;
+  } catch {
+    return null;
+  }
+}
+const groupLogoCache = new Map();
+/** Logo d'un groupe TCGplayer sans extension TCGdex : chemin local (/set-logos/fr/tp-<id>.webp) ou null */
+async function unmatchedLogo(group, cleanName) {
+  const id = `tp-${group.groupId}`;
+  if (groupLogoCache.has(id)) return groupLogoCache.get(id);
+  const rel = `/set-logos/fr/${id}.webp`;
+  if (existsSync(`public${rel}`)) {
+    groupLogoCache.set(id, rel);
+    return rel;
+  }
+  const cands = [];
+  const abbr = String(group.abbreviation ?? "").trim();
+  if (abbr.length >= 3) cands.push([`Pokécardex ${abbr}`, `https://pokecardex.b-cdn.net/assets/images/logos/${encodeURIComponent(abbr)}.png`, PCX_HEADERS]);
+  for (const title of [`File:${cleanName} Logo EN.png`, `File:${cleanName} Logo.png`]) {
+    const u = await bulbaFileUrl(title);
+    if (u) cands.push([`Bulbapedia ${title}`, u, BULBA_HEADERS]);
+  }
+  const page = await bulbaPageLogo(cleanName);
+  if (page) cands.push([`Bulbapedia ${page.split("/").pop()}`, page, BULBA_HEADERS]);
+  let out = null;
+  for (const [source, url, headers] of cands) {
+    const buf = await download(url, headers);
+    if (!buf) continue;
+    try {
+      await mkdir(LOGO_DIR, { recursive: true });
+      await sharp(buf).resize({ width: 480, height: 200, fit: "inside", withoutEnlargement: true }).webp({ quality: 85 }).toFile(`public${rel}`);
+      console.log(`  logo ✓ ${cleanName} ← ${source}`);
+      out = rel;
+      break;
+    } catch {
+      /* image illisible : source suivante */
+    }
+  }
+  await sleep(400);
+  groupLogoCache.set(id, out);
+  return out;
 }
 
 const AUTRES = { id: "autres", name: "Autres", logo: null };
@@ -324,6 +418,7 @@ for (const { group, products, priceById } of groups) {
     if (td) break;
   }
   const sr = (td && serieMeta.get(td.serie_id)) || fallbackSerie(group.name, serieMeta);
+  const groupLogo = td ? null : await unmatchedLogo(group, setClean);
   const released = group.publishedOn ? String(group.publishedOn).slice(0, 10) : null;
   for (const p of products) {
     const cmId = matchCardmarket(cm, p.name, td ? norm(td.set_name_fr) : setNorm) ?? matchCardmarket(cm, p.name, setNorm);
@@ -340,7 +435,7 @@ for (const { group, products, priceById } of groups) {
       serie: sr.name,
       serie_id: sr.id,
       serie_logo: sr.logo,
-      set_logo: td?.set_logo ?? null,
+      set_logo: td?.set_logo ?? groupLogo,
       released_on: released,
       image: String(p.imageUrl ?? "").replace(/_200w\.jpg$/, "_400w.jpg"),
       cardmarket_id: cmId,
@@ -353,6 +448,67 @@ console.log(`\n${rows.length} produits scellés | extension TCGdex : ${withSet} 
 const kinds = {};
 for (const r of rows) kinds[r.kind] = (kinds[r.kind] ?? 0) + 1;
 console.log("par type :", JSON.stringify(kinds));
+
+// ---- Logos : même source que « Ajouter » (catalog_sets, lang fr) — TCGdex
+// quand il l'a, sinon le fichier local /set-logos/fr/<id> récupéré par
+// scripts/set-logos.mjs (Pokécardex, Limitless…). Rendu : `${logo}.webp`.
+const setIds = [...new Set(rows.map((r) => r.set_id).filter(Boolean))];
+const catalogSet = new Map();
+for (let i = 0; i < setIds.length; i += 500) {
+  const { data } = await db.from("catalog_sets").select("id, logo, serie_logo").eq("lang", "fr").in("id", setIds.slice(i, i + 500));
+  for (const s of data ?? []) catalogSet.set(s.id, s);
+}
+let fromCatalog = 0;
+for (const r of rows) {
+  const s = r.set_id ? catalogSet.get(r.set_id) : null;
+  if (s?.logo) {
+    r.set_logo = `${s.logo}.webp`;
+    fromCatalog++;
+  }
+  if (s?.serie_logo && !r.serie_logo) r.serie_logo = `${s.serie_logo}.webp`;
+}
+console.log(`logos d'extension via catalog_sets : ${fromCatalog} produits (${rows.filter((r) => r.set_logo).length} avec logo au total)`);
+
+// ---- Chaque logo doit exister : TCGdex publie parfois un set récent en .png
+// seulement (Nuit Noire), ou côté EN avant FR. Un logo local (/set-logos/…)
+// est vérifié sur disque. Une requête HEAD par URL distincte, en cache.
+const headOk = async (u) => {
+  try {
+    return (await fetch(u, { method: "HEAD", headers: UA })).ok;
+  } catch {
+    return false;
+  }
+};
+async function resolveLogo(url) {
+  if (!url) return null;
+  if (url.startsWith("/")) return existsSync(`public${url}`) ? url : null;
+  if (await headOk(url)) return url;
+  for (const alt of [
+    url.replace(/\.webp$/, ".png"),
+    url.replace("assets.tcgdex.net/fr/", "assets.tcgdex.net/en/"),
+    url.replace("assets.tcgdex.net/fr/", "assets.tcgdex.net/en/").replace(/\.webp$/, ".png"),
+  ]) {
+    if (alt !== url && (await headOk(alt))) return alt;
+  }
+  return null;
+}
+const logoCache = new Map();
+const resolved = async (u) => {
+  if (!u) return null;
+  if (!logoCache.has(u)) logoCache.set(u, await resolveLogo(u));
+  return logoCache.get(u);
+};
+let fixed = 0;
+let dead = 0;
+for (const r of rows) {
+  for (const k of ["set_logo", "serie_logo"]) {
+    const before = r[k];
+    r[k] = await resolved(before);
+    if (before && r[k] && r[k] !== before) fixed++;
+    if (before && !r[k]) dead++;
+  }
+}
+console.log(`logos vérifiés : ${logoCache.size} URL distinctes, ${fixed} remplacés par une variante, ${dead} introuvables`);
 
 for (let i = 0; i < rows.length; i += 500) {
   const { error } = await db.from("sealed_products").upsert(rows.slice(i, i + 500), { onConflict: "id" });
