@@ -963,6 +963,101 @@ export type Database = {
         }
         Relationships: []
       }
+      sealed_items: {
+        Row: {
+          created_at: string | null
+          id: string
+          manual_price: number | null
+          notes: string | null
+          owner_id: string
+          product_id: number
+          purchase_date: string | null
+          purchase_price: number | null
+          quantity: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          manual_price?: number | null
+          notes?: string | null
+          owner_id?: string
+          product_id: number
+          purchase_date?: string | null
+          purchase_price?: number | null
+          quantity?: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          manual_price?: number | null
+          notes?: string | null
+          owner_id?: string
+          product_id?: number
+          purchase_date?: string | null
+          purchase_price?: number | null
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sealed_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "sealed_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sealed_products: {
+        Row: {
+          cardmarket_id: number | null
+          group_id: number
+          id: number
+          image: string
+          kind: string
+          name: string
+          price_usd: number | null
+          released_on: string | null
+          serie: string | null
+          set_id: string | null
+          set_logo: string | null
+          set_name: string
+          set_name_fr: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cardmarket_id?: number | null
+          group_id: number
+          id: number
+          image?: string
+          kind?: string
+          name: string
+          price_usd?: number | null
+          released_on?: string | null
+          serie?: string | null
+          set_id?: string | null
+          set_logo?: string | null
+          set_name: string
+          set_name_fr?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cardmarket_id?: number | null
+          group_id?: number
+          id?: number
+          image?: string
+          kind?: string
+          name?: string
+          price_usd?: number | null
+          released_on?: string | null
+          serie?: string | null
+          set_id?: string | null
+          set_logo?: string | null
+          set_name?: string
+          set_name_fr?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       sources: {
         Row: {
           address: string | null

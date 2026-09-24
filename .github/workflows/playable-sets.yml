@@ -41,6 +41,9 @@ jobs:
         run: node scripts/catalog-sync.mjs
       - name: Compléter l'index du scan (nouvelles cartes seulement)
         run: node scripts/scan-index.mjs
+      - name: Catalogue des produits scellés (TCGCSV, TCGdex, Cardmarket → Supabase)
+        continue-on-error: true
+        run: node scripts/sealed-catalog.mjs
       - name: Committer s'il y a du nouveau
         run: |
           if [ -n "$(git status --porcelain src/data public/set-logos)" ]; then
