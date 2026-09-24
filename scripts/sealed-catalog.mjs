@@ -207,16 +207,26 @@ function setKeys(groupName) {
   const n = norm(groupName);
   const keys = new Set([n]);
   const noAbbr = n.replace(/^(sm|swsh|sv|bw|dp|hgss|xy|me|ex)\s+/, "");
-  keys.add(noAbbr);
+  // « SM Base Set », « XY Base Set », « Sword & Shield Base Set » = le premier
+  // set de la série : ses clés passent avant tout le reste.
   const base = n.match(/^(.*?)\s+base set$/)?.[1];
   if (base) {
-    keys.add(base);
     if (SERIES[base]) keys.add(SERIES[base]);
+    keys.add(base);
   }
   for (const phrase of SERIES_PHRASES) {
-    if (n.startsWith(phrase + " ")) keys.add(n.slice(phrase.length + 1));
-    if (noAbbr.startsWith(phrase + " ")) keys.add(noAbbr.slice(phrase.length + 1));
+    // « Sword & Shield Base Set » désigne le set « Sword & Shield » (clé `base`
+    // déjà ajoutée), pas « Base Set » de 1999 : on ne retient jamais ce reste-là.
+    for (const src of [n, noAbbr]) {
+      if (src.startsWith(phrase + " ")) {
+        const rest = src.slice(phrase.length + 1);
+        if (rest !== "base set") keys.add(rest);
+      }
+    }
   }
+  // Nom sans préfixe d'abréviation, en dernier — jamais s'il se réduit à
+  // « base set » (collision avec le Set de Base de 1999).
+  if (noAbbr !== n && noAbbr !== "base set") keys.add(noAbbr);
   return [...keys].filter(Boolean);
 }
 
@@ -225,14 +235,18 @@ async function loadTcgdex() {
   const enSets = new Map(((await getJSON("https://api.tcgdex.net/v2/en/sets")) ?? []).map((s) => [s.id, s.name ?? ""]));
   const series = (await getJSON("https://api.tcgdex.net/v2/fr/series")) ?? [];
   const index = new Map();
+  /** id de série TCGdex (sv, swsh, sm, base, neo…) → { id, nom FR, logo } */
+  const serieMeta = new Map(
+    series.map((s) => [String(s.id).toLowerCase(), { id: String(s.id).toLowerCase(), name: s.name ?? "", logo: s.logo ? `${s.logo}.webp` : null }]),
+  );
   for (const serie of series) {
     const detail = await getJSON(`https://api.tcgdex.net/v2/fr/series/${serie.id}`);
     for (const st of detail?.sets ?? []) {
       const info = {
         set_id: st.id,
         set_name_fr: st.name ?? "",
-        set_logo: st.logo ? `${st.logo}.png` : null,
-        serie: serie.name ?? "",
+        set_logo: st.logo ? `${st.logo}.webp` : null,
+        serie_id: String(serie.id).toLowerCase(),
       };
       for (const key of new Set([norm(enSets.get(st.id) ?? ""), norm(st.name ?? "")])) {
         if (key && !index.has(key)) index.set(key, info);
@@ -240,8 +254,32 @@ async function loadTcgdex() {
     }
     await sleep(60);
   }
-  console.log(`TCGdex : ${index.size} clés d'extension`);
-  return index;
+  console.log(`TCGdex : ${index.size} clés d'extension, ${serieMeta.size} séries`);
+  return { index, serieMeta };
+}
+
+const AUTRES = { id: "autres", name: "Autres", logo: null };
+/** Préfixe TCGplayer (« SV08: », « SM - », « HS—… ») → id de série TCGdex */
+const PREFIX_TO_ID = { sv: "sv", sve: "sv", swsh: "swsh", sm: "sm", xy: "xy", bw: "bw", dp: "dp", pl: "pl", hgss: "hgss", hs: "hgss", col: "col", ex: "ex", me: "me", mee: "me", pop: "pop", neo: "neo", tk: "tk" };
+/** Début de nom (normalisé) → id de série TCGdex, pour les groupes sans préfixe */
+const PHRASE_TO_ID = [
+  ["scarlet violet", "sv"], ["sword shield", "swsh"], ["sun moon", "sm"], ["black white", "bw"], ["diamond pearl", "dp"],
+  ["platinum", "pl"], ["heartgold soulsilver", "hgss"], ["call of legends", "col"], ["mega evolution", "me"], ["pop series", "pop"],
+  ["trainer kit", "tk"], ["mcdonald", "mc"], ["expedition", "ecard"], ["aquapolis", "ecard"], ["skyridge", "ecard"], ["e card", "ecard"],
+  ["base set", "base"], ["jungle", "base"], ["fossil", "base"], ["team rocket", "base"], ["gym ", "base"], ["legendary collection", "base"],
+  ["neo ", "neo"], ["southern islands", "neo"], ["ex ", "ex"],
+];
+/** Série d'un groupe TCGplayer non apparié à une extension TCGdex : par préfixe, puis par début de nom, sinon « Autres » */
+function fallbackSerie(groupName, serieMeta) {
+  const n = norm(groupName);
+  const raw = String(groupName ?? "");
+  const abbr = (raw.match(/^([A-Za-z]+)\d/) ?? raw.match(/^([A-Za-z]+)\s*[:—-]/))?.[1]?.toLowerCase();
+  const byAbbr = abbr && PREFIX_TO_ID[abbr] ? serieMeta.get(PREFIX_TO_ID[abbr]) : null;
+  if (byAbbr) return byAbbr;
+  for (const [phrase, id] of PHRASE_TO_ID) {
+    if ((n === phrase.trim() || n.startsWith(phrase)) && serieMeta.has(id)) return serieMeta.get(id);
+  }
+  return AUTRES;
 }
 
 // ---- TCGCSV : extensions → produits scellés + prix ----
@@ -270,7 +308,7 @@ async function loadTcgcsv() {
 }
 
 // ---- Assemblage + upsert ----
-const [cm, tcgdex, groups] = await Promise.all([loadCardmarket(), loadTcgdex(), loadTcgcsv()]);
+const [cm, { index: tcgdex, serieMeta }, groups] = await Promise.all([loadCardmarket(), loadTcgdex(), loadTcgcsv()]);
 const rows = [];
 let withSet = 0;
 let withCm = 0;
@@ -285,6 +323,7 @@ for (const { group, products, priceById } of groups) {
     td = tcgdex.get(key) ?? null;
     if (td) break;
   }
+  const sr = (td && serieMeta.get(td.serie_id)) || fallbackSerie(group.name, serieMeta);
   const released = group.publishedOn ? String(group.publishedOn).slice(0, 10) : null;
   for (const p of products) {
     const cmId = matchCardmarket(cm, p.name, td ? norm(td.set_name_fr) : setNorm) ?? matchCardmarket(cm, p.name, setNorm);
@@ -298,7 +337,9 @@ for (const { group, products, priceById } of groups) {
       set_name: setClean,
       set_id: td?.set_id ?? null,
       set_name_fr: td?.set_name_fr ?? null,
-      serie: td?.serie ?? null,
+      serie: sr.name,
+      serie_id: sr.id,
+      serie_logo: sr.logo,
       set_logo: td?.set_logo ?? null,
       released_on: released,
       image: String(p.imageUrl ?? "").replace(/_200w\.jpg$/, "_400w.jpg"),
@@ -321,3 +362,25 @@ for (let i = 0; i < rows.length; i += 500) {
   }
 }
 console.log("sealed_products à jour.");
+
+// ---- Relevé du jour : cote € (guide Cardmarket local) par produit apparié ----
+// Même ordre de référence que src/lib/cardmarket.ts : trend, avg7, avg30, avg1, avg.
+const cmIds = [...new Set(rows.map((r) => r.cardmarket_id).filter((v) => Number.isInteger(v)))];
+const byCm = new Map();
+for (let i = 0; i < cmIds.length; i += 500) {
+  const { data } = await db.from("cardmarket_price_guide").select("id_product, trend, avg7, avg30, avg1, avg").in("id_product", cmIds.slice(i, i + 500));
+  for (const g of data ?? []) {
+    const ref = [g.trend, g.avg7, g.avg30, g.avg1, g.avg].find((v) => typeof v === "number" && v > 0);
+    if (ref != null) byCm.set(g.id_product, ref);
+  }
+}
+const today = new Date().toISOString().slice(0, 10);
+const snaps = rows.filter((r) => byCm.has(r.cardmarket_id)).map((r) => ({ product_id: r.id, day: today, price: byCm.get(r.cardmarket_id) }));
+for (let i = 0; i < snaps.length; i += 500) {
+  const { error } = await db.from("sealed_price_snapshots").upsert(snaps.slice(i, i + 500), { onConflict: "product_id,day" });
+  if (error) {
+    console.error("relevés :", error.message);
+    process.exit(1);
+  }
+}
+console.log(`relevé du ${today} : ${snaps.length} cotes enregistrées.`);

@@ -1007,6 +1007,32 @@ export type Database = {
           },
         ]
       }
+      sealed_price_snapshots: {
+        Row: {
+          day: string
+          price: number
+          product_id: number
+        }
+        Insert: {
+          day: string
+          price: number
+          product_id: number
+        }
+        Update: {
+          day?: string
+          price?: number
+          product_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sealed_price_snapshots_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "sealed_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sealed_products: {
         Row: {
           cardmarket_id: number | null
@@ -1018,6 +1044,8 @@ export type Database = {
           price_usd: number | null
           released_on: string | null
           serie: string | null
+          serie_id: string | null
+          serie_logo: string | null
           set_id: string | null
           set_logo: string | null
           set_name: string
@@ -1034,6 +1062,8 @@ export type Database = {
           price_usd?: number | null
           released_on?: string | null
           serie?: string | null
+          serie_id?: string | null
+          serie_logo?: string | null
           set_id?: string | null
           set_logo?: string | null
           set_name: string
@@ -1050,6 +1080,8 @@ export type Database = {
           price_usd?: number | null
           released_on?: string | null
           serie?: string | null
+          serie_id?: string | null
+          serie_logo?: string | null
           set_id?: string | null
           set_logo?: string | null
           set_name?: string
