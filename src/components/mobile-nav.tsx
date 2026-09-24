@@ -28,21 +28,22 @@ import type { ShellData } from "@/lib/shell-store";
 import { Logo } from "@/components/logo";
 
 // Navigation mobile : barre haute sobre (logo + recherche), barre d'onglets
-// (Collection · Classeurs · + · Recherchées · Profil). L'onglet Profil ouvre
+// (Collection · Cartes · + · Classeurs · Profil). L'onglet Profil ouvre
 // une sheet avec le reste de la navigation, le thème et le compte.
 
 type Tab = { href: string; label: string; Icon: LucideIcon };
 
 const TABS: Tab[] = [
-  { href: "/", label: "Collection", Icon: LayoutGrid },
+  { href: "/collection", label: "Collection", Icon: BarChart3 },
+  { href: "/", label: "Cartes", Icon: LayoutGrid },
   { href: "/classeurs", label: "Classeurs", Icon: NotebookTabs },
-  { href: "/wishlist", label: "Recherchées", Icon: Star },
 ];
 
 /** Pages accessibles depuis la sheet Profil */
 const MORE: Tab[] = [
+  { href: "/scelles", label: "Scellés", Icon: Package },
+  { href: "/wishlist", label: "Recherchées", Icon: Star },
   { href: "/boosters", label: "Boosters", Icon: Package },
-  { href: "/stats", label: "Stats", Icon: BarChart3 },
   { href: "/pregrades", label: "Pré-gradées", Icon: Award },
   { href: "/boutiques", label: "Boutiques", Icon: MapPin },
   { href: "/journal", label: "Journal", Icon: History },
@@ -183,7 +184,7 @@ export function MobileNav({
         >
           <Plus size={22} strokeWidth={2.4} aria-hidden />
         </Link>
-        <TabLink tab={TABS[2]} active={isTabActive("/wishlist", pathname)} />
+        <TabLink tab={TABS[2]} active={isTabActive(TABS[2].href, pathname)} />
         <button
           type="button"
           onClick={() => setOpen(true)}

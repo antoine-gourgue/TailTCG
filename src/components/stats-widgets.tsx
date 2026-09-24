@@ -200,75 +200,16 @@ export function Donut({ slices, unit = "cartes", label }: { slices: Slice[]; uni
   );
 }
 
-export type MonthPoint = { key: string; label: string; spend: number; cards: number; current: boolean };
+export type MonthPoint = {
+  key: string;
+  label: string;
+  spend: number;
+  cards: number;
+  current: boolean;
+  /** part de `spend` consacrée aux scellés (empilée en couleur dédiée) */
+  sealed?: number;
+};
 
-/** Barres mensuelles : dépense (ou cartes ajoutées si aucun prix) sur 12 mois */
-export function MonthlyBars({ months, metric }: { months: MonthPoint[]; metric: "spend" | "cards" }) {
-  const W = 640;
-  const H = 150;
-  const PAD = { top: 14, right: 8, bottom: 22, left: 8 };
-  const slot = (W - PAD.left - PAD.right) / months.length;
-  const bw = slot * 0.56;
-  const val = (m: MonthPoint) => (metric === "spend" ? m.spend : m.cards);
-  const max = Math.max(...months.map(val), 0);
-  const h = (v: number) => (max > 0 ? (v / max) * (H - PAD.top - PAD.bottom) : 0);
-  const fmt = (v: number) => (metric === "spend" ? formatEur(v) : `${v} carte${v > 1 ? "s" : ""}`);
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Achats par mois">
-      <line
-        x1={PAD.left}
-        x2={W - PAD.right}
-        y1={H - PAD.bottom}
-        y2={H - PAD.bottom}
-        stroke="currentColor"
-        strokeOpacity={0.1}
-      />
-      {months.map((m, i) => {
-        const v = val(m);
-        const bh = Math.max(h(v), v > 0 ? 2 : 0);
-        const x = PAD.left + i * slot + (slot - bw) / 2;
-        return (
-          <g key={m.key}>
-            <rect
-              x={x}
-              y={H - PAD.bottom - bh}
-              width={bw}
-              height={bh}
-              rx={4}
-              fill="var(--accent)"
-              fillOpacity={m.current ? 1 : 0.55}
-            >
-              <title>{`${m.label} : ${fmt(v)}${metric === "spend" && m.cards > 0 ? ` · ${m.cards} carte${m.cards > 1 ? "s" : ""}` : ""}`}</title>
-            </rect>
-            {v > 0 && (
-              <text
-                x={x + bw / 2}
-                y={H - PAD.bottom - bh - 4}
-                textAnchor="middle"
-                fontSize={9}
-                fill="var(--muted)"
-                fontFamily="var(--font-geist-mono)"
-              >
-                {metric === "spend" ? `${Math.round(v)} €` : v}
-              </text>
-            )}
-            <text
-              x={x + bw / 2}
-              y={H - 7}
-              textAnchor="middle"
-              fontSize={9.5}
-              fill={m.current ? "var(--foreground)" : "var(--muted)"}
-              fontWeight={m.current ? 600 : 400}
-            >
-              {m.label}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
 
 export type RankItem = {
   id: string;

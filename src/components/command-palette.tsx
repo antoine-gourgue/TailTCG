@@ -25,13 +25,14 @@ function normalize(s: string): string {
 }
 
 const PAGES = [
-  { href: "/", label: "Collection", Icon: LayoutGrid },
+  { href: "/collection", label: "Collection", Icon: BarChart3 },
+  { href: "/", label: "Cartes", Icon: LayoutGrid },
+  { href: "/scelles", label: "Scellés", Icon: LayoutGrid },
   { href: "/classeurs", label: "Classeurs", Icon: NotebookTabs },
   { href: "/recherche", label: "Ajouter une carte", Icon: SearchIcon },
   { href: "/wishlist", label: "Recherchées", Icon: Star },
   { href: "/pregrades", label: "Pré-gradées", Icon: Award },
   { href: "/boutiques", label: "Boutiques", Icon: MapPin },
-  { href: "/stats", label: "Stats", Icon: BarChart3 },
   { href: "/journal", label: "Journal", Icon: History },
   { href: "/parametres", label: "Paramètres", Icon: Settings },
 ];
