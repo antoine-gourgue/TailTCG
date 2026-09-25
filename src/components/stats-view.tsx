@@ -26,7 +26,8 @@ import { formatEur } from "@/lib/domain";
 import { kindLabel } from "@/lib/sealed";
 import { combineStats, type SealedRank, type SealedStats } from "@/lib/stats-data";
 import { ValueHistoryChart, type ValuePoint } from "@/components/value-history-chart";
-import { BarRow, Donut, Empty, Fact, Panel, RankRow, StatTile, type MonthPoint, type RankItem, type Slice } from "@/components/stats-widgets";
+import { BarRow, Empty, Fact, Panel, RankRow, StatTile, type MonthPoint, type RankItem, type Slice } from "@/components/stats-widgets";
+import { Donut } from "@/components/donut";
 import { MonthlyBars } from "@/components/monthly-bars";
 
 export type SetStat = {

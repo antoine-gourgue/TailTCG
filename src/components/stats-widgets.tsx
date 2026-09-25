@@ -129,76 +129,9 @@ export function BarRow({
 }
 
 /** Intensités de l'accent, de la plus forte à la plus légère */
-export const RAMP = [100, 72, 52, 36, 24, 15, 9].map(
-  (p) => `color-mix(in srgb, var(--accent) ${p}%, transparent)`
-);
-
 export type Slice = { code: string; label: string; count: number };
 
-/** Anneau + légende : parts d'un total, ordre = ordre des tranches */
-export function Donut({ slices, unit = "cartes", label }: { slices: Slice[]; unit?: string; label: string }) {
-  const present = slices.filter((s) => s.count > 0);
-  const total = present.reduce((a, s) => a + s.count, 0);
-  if (total === 0) return <Empty>Rien à afficher pour l&apos;instant.</Empty>;
-
-  const R = 40;
-  const C = 2 * Math.PI * R;
-  const segs: (Slice & { len: number; offset: number; color: string })[] = [];
-  for (let i = 0, offset = 0; i < present.length; i++) {
-    const len = (present[i].count / total) * C;
-    segs.push({ ...present[i], len, offset, color: RAMP[Math.min(i, RAMP.length - 1)] });
-    offset += len;
-  }
-
-  return (
-    <div className="flex items-center gap-5 md:flex-col md:items-start md:gap-4 lg:flex-row lg:items-center lg:gap-5">
-      <svg viewBox="0 0 100 100" className="h-28 w-28 shrink-0" role="img" aria-label={label}>
-        <circle cx={50} cy={50} r={R} fill="none" stroke="currentColor" strokeOpacity={0.06} strokeWidth={12} />
-        {segs.map((s) => (
-          <circle
-            key={s.code}
-            cx={50}
-            cy={50}
-            r={R}
-            fill="none"
-            stroke={s.color}
-            strokeWidth={12}
-            strokeDasharray={`${Math.max(s.len - 1.5, 0.5)} ${C}`}
-            strokeDashoffset={-s.offset}
-            transform="rotate(-90 50 50)"
-          >
-            <title>{`${s.label} : ${s.count}`}</title>
-          </circle>
-        ))}
-        <text
-          x={50}
-          y={49}
-          textAnchor="middle"
-          fontSize={17}
-          fontWeight={700}
-          fill="var(--foreground)"
-          fontFamily="var(--font-geist-mono)"
-        >
-          {total}
-        </text>
-        <text x={50} y={62} textAnchor="middle" fontSize={7.5} fill="var(--muted)">
-          {unit}
-        </text>
-      </svg>
-      <ul className="flex w-full min-w-0 flex-1 flex-col gap-1.5">
-        {segs.map((s) => (
-          <li key={s.code} className="flex items-center gap-2 text-[13px]">
-            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: s.color }} />
-            <span className="truncate">{s.label}</span>
-            <span className="num ml-auto shrink-0 text-[11px] text-muted">
-              {s.count} · {Math.round((s.count / total) * 100)}%
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+/** Le Donut (interactif) vit dans donut.tsx ; `Slice` reste ici pour les données */
 
 export type MonthPoint = {
   key: string;
