@@ -36,7 +36,7 @@ export default async function PokedexPage() {
 
   return (
     <AppShell>
-      <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8">
+      <main className="relative z-10 page py-8">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <Link

@@ -247,7 +247,7 @@ export default async function SharedCollectionPage({
   }));
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8">
+    <main className="page py-8">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Logo variant="mark" size={36} />

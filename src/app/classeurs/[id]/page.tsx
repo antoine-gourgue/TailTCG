@@ -215,7 +215,7 @@ export default async function ClasseurPage({
         className={`relative z-10 mx-auto w-full px-4 ${
           // Les pages face à face ont besoin de largeur, et de toute la
           // hauteur de l'écran : en-tête compact
-          mode === "pages" ? "max-w-[1400px] pb-3 pt-5" : "max-w-6xl py-8"
+          mode === "pages" ? "max-w-[1400px] pb-3 pt-5" : "max-w-[1400px] py-8"
         }`}
       >
        <CleanViewProvider>

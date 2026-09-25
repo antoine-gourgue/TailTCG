@@ -41,7 +41,7 @@ export default async function BoostersPage() {
   }
 
   return (
-    <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8">
+    <main className="relative z-10 page py-8">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="display mb-1 text-3xl font-bold tracking-tight">Boosters</h1>

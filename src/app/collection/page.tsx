@@ -24,7 +24,7 @@ export default async function CollectionPage() {
 
   return (
     <AppShell>
-      <main className="mx-auto w-full max-w-6xl px-4 py-8">
+      <main className="page py-8">
         <div className="mb-6">
           <h1 className="display mb-1 text-3xl font-bold tracking-tight">Collection</h1>
           <p className="text-sm text-muted">

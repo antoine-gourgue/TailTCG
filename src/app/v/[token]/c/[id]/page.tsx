@@ -187,7 +187,7 @@ export default async function SharedBinderPage({
   return (
     <main
       className={`mx-auto w-full px-4 ${
-        mode === "pages" ? "max-w-[1400px] pb-3 pt-5" : "max-w-6xl py-8"
+        mode === "pages" ? "max-w-[1400px] pb-3 pt-5" : "max-w-[1400px] py-8"
       }`}
     >
      <CleanViewProvider>

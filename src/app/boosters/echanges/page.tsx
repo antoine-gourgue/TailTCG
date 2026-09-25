@@ -140,7 +140,7 @@ export default async function EchangesPage() {
   const myForTrade = new Set(myRows.filter((r) => r.for_trade).map((r) => r.id));
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8">
+    <main className="page py-8">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="display mb-1 text-3xl font-bold tracking-tight">Échanges</h1>

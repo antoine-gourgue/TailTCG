@@ -103,6 +103,22 @@ body {
 
 /* ————— Coquille : sidebar repliable ————— */
 
+/* Conteneur de page : les grilles et tableaux de bord profitent des grands
+   écrans (1400px), avec des marges latérales modestes ; les pages de lecture
+   (fiche, paramètres) gardent leur propre largeur */
+.page {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1400px;
+  padding-inline: 1rem;
+}
+
+@media (min-width: 640px) {
+  .page {
+    padding-inline: 1.5rem;
+  }
+}
+
 .app-main {
   min-height: 100vh;
   /* Place pour le dock flottant mobile : 62px + sa marge (12px) + respiration,

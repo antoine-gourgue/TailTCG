@@ -192,7 +192,7 @@ export default async function CartePage({
 
   return (
     <AppShell>
-      <main className="mx-auto w-full max-w-6xl px-4 py-8">
+      <main className="page py-8">
         <div className="mb-6 flex items-center justify-between">
           <Link
             href={back.href}

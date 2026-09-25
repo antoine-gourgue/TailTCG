@@ -76,7 +76,7 @@ export function ProductDetail({
   const varTone = (v: number | null) => (v == null ? "faint" : v > 0 ? "gain" : v < 0 ? "loss" : undefined);
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8">
+    <main className="page py-8">
       <Link href="/scelles/ajouter" className="mb-6 inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground">
         <ArrowLeft size={14} aria-hidden />
         Catalogue des scellés

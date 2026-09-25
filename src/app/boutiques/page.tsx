@@ -43,7 +43,7 @@ export default async function BoutiquesPage() {
   return (
     <>
       <AppShell>
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="page py-8">
         <h1 className="mb-6 display text-3xl font-bold tracking-tight">
           Boutiques &amp; sites
         </h1>

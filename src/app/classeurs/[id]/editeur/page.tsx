@@ -91,7 +91,7 @@ export default async function EditeurPage({
 
   return (
     <AppShell>
-      <main className="mx-auto w-full max-w-6xl px-4 pb-8 pt-5">
+      <main className="page pb-8 pt-5">
         <BinderEditor
           binderId={binder.id}
           name={binder.name}

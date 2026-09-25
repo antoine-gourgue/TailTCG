@@ -100,7 +100,7 @@ export default async function PregradesPage() {
 
   return (
     <AppShell>
-      <main className="mx-auto w-full max-w-6xl px-4 py-8">
+      <main className="page py-8">
         <h1 className="display mb-1 text-3xl font-bold tracking-tight">
           Pré-gradées
         </h1>

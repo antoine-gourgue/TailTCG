@@ -17,7 +17,7 @@ export default async function AdminLayout({
 
   return (
     <AppShell>
-      <main className="mx-auto w-full max-w-6xl px-4 py-8">
+      <main className="page py-8">
         <div className="mb-5 flex items-center gap-2.5">
           <ShieldCheck size={22} className="text-accent-strong" aria-hidden />
           <h1 className="display text-3xl font-bold tracking-tight">Back-office</h1>
