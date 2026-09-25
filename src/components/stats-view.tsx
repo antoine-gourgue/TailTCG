@@ -19,7 +19,6 @@ import {
   TrendingUp,
   Wallet,
   Activity,
-  ArrowRight,
   type LucideIcon,
 } from "lucide-react";
 import { formatEur } from "@/lib/domain";
@@ -159,55 +158,19 @@ export function StatsView({ d, s }: { d: StatsData; s?: SealedStats }) {
         </div>
       )}
 
-      {/* ——— Cartes vs scellés ——— */}
+      {/* ——— Cartes vs scellés : chaque ligne se partage entre les deux, barres dos à dos ——— */}
       {c && sealed && (
-        <Panel icon={Layers} title="Cartes et scellés" hint="Ce que pèse chaque partie de la collection.">
-          {c.cardsShare != null && (
-            <div className="mb-4">
-              <div className="mb-1.5 flex justify-between text-xs">
-                <span className="flex items-center gap-1.5 font-medium">
-                  <span className="h-2.5 w-2.5 rounded-sm bg-accent" aria-hidden />
-                  Cartes <span className="num text-muted">{Math.round(c.cardsShare)} %</span>
-                </span>
-                <span className="flex items-center gap-1.5 font-medium">
-                  <span className="num text-muted">{100 - Math.round(c.cardsShare)} %</span> Scellés
-                  <span className="h-2.5 w-2.5 rounded-sm bg-sealed" aria-hidden />
-                </span>
-              </div>
-              <div className="flex h-2.5 overflow-hidden rounded-full bg-raised" role="img" aria-label={`Cartes ${Math.round(c.cardsShare)} % de la valeur, scellés ${100 - Math.round(c.cardsShare)} %`}>
-                <span className="bg-accent" style={{ width: `${c.cardsShare}%` }} />
-                <span className="flex-1 bg-sealed" />
-              </div>
-            </div>
-          )}
-          <div className="grid grid-cols-[auto_1fr_1fr] gap-x-4 text-sm">
-            <div className="col-span-3 grid grid-cols-subgrid items-end pb-2">
-              <span />
-              <ColHead tone="accent" label="Cartes" sub={`${plural(d.count, "carte")} · ${plural(d.sets.length, "set")}`} href="/" />
-              <ColHead tone="sealed" label="Scellés" sub={`${plural(sealed.count, "produit")} · ${plural(sealed.unique, "référence")}`} href="/scelles" />
-            </div>
-            <CompareRow label="Valeur" a={formatEur(d.value)} b={formatEur(sealed.value)} />
-            <CompareRow
-              label="Cardmarket"
-              a={d.market != null ? `${formatEur(d.market)}` : <span className="text-muted">—</span>}
-              b={
-                sealed.value != null ? (
-                  <>
-                    {formatEur(sealed.value)} <span className="text-xs font-normal text-muted">= cote</span>
-                  </>
-                ) : (
-                  <span className="text-muted">—</span>
-                )
-              }
-            />
-            <CompareRow label="Investi" a={formatEur(d.invested)} b={formatEur(sealed.invested)} />
-            <CompareRow label="Plus-value" a={<Gain v={d.gain} p={d.gainPct} />} b={<Gain v={sealed.gain} p={sealed.gainPct} />} />
-            <CompareRow
-              label="Sur 30 jours"
-              a={c.cardsMonthDelta != null ? <Gain v={c.cardsMonthDelta} /> : <span className="text-xs font-normal text-faint">Historique trop court</span>}
-              b={c.sealedMonthDelta != null ? <Gain v={c.sealedMonthDelta} /> : <span className="text-xs font-normal text-faint">Relevé en cours</span>}
-            />
+        <Panel icon={Layers} title="Cartes et scellés" hint="Chaque ligne se partage entre les deux : les barres se rejoignent au centre, à proportion.">
+          <div className="grid grid-cols-[1fr_4.5rem_1fr] items-end gap-2 pb-3 sm:grid-cols-[1fr_6rem_1fr]">
+            <SideHead tone="accent" label="Cartes" sub={`${plural(d.count, "carte")} · ${plural(d.sets.length, "set")}`} href="/" align="right" />
+            <span />
+            <SideHead tone="sealed" label="Scellés" sub={`${plural(sealed.count, "produit")} · ${plural(sealed.unique, "référence")}`} href="/scelles" align="left" />
           </div>
+          <Butterfly label="Valeur" a={d.value} b={sealed.value} />
+          <Butterfly label="Cardmarket" a={d.market} b={sealed.value} />
+          <Butterfly label="Investi" a={d.invested} b={sealed.invested} />
+          <Butterfly label="Plus-value" a={d.gain} b={sealed.gain} pa={d.gainPct} pb={sealed.gainPct} signed />
+          <Butterfly label="Sur 30 jours" a={c.cardsMonthDelta} b={c.sealedMonthDelta} signed missingB="Relevé en cours" />
         </Panel>
       )}
 
@@ -433,26 +396,69 @@ export function StatsView({ d, s }: { d: StatsData; s?: SealedStats }) {
   );
 }
 
-/** En-tête de colonne du comparatif : pastille de couleur, nom cliquable, sous-titre */
-function ColHead({ tone, label, sub, href }: { tone: "accent" | "sealed"; label: string; sub: string; href: string }) {
+/** En-tête d'un côté du comparatif : pastille, nom cliquable, sous-titre */
+function SideHead({ tone, label, sub, href, align }: { tone: "accent" | "sealed"; label: string; sub: string; href: string; align: "left" | "right" }) {
+  const right = align === "right";
   return (
-    <div className="min-w-0">
-      <Link href={href} className="group flex items-center gap-1.5 font-semibold hover:text-accent-strong">
+    <div className={`min-w-0 ${right ? "text-right" : ""}`}>
+      <Link href={href} className={`inline-flex items-center gap-1.5 font-semibold underline-offset-4 hover:text-accent-strong hover:underline ${right ? "flex-row-reverse" : ""}`}>
         <span className={`h-2.5 w-2.5 shrink-0 rounded-sm ${tone === "accent" ? "bg-accent" : "bg-sealed"}`} aria-hidden />
         {label}
-        <ArrowRight size={13} className="text-faint transition group-hover:translate-x-0.5 group-hover:text-accent-strong" aria-hidden />
       </Link>
       <p className="truncate text-xs text-muted">{sub}</p>
     </div>
   );
 }
 
-function CompareRow({ label, a, b }: { label: string; a: React.ReactNode; b: React.ReactNode }) {
+/**
+ * Ligne du comparatif : cartes à gauche, scellés à droite, barres dos à dos
+ * qui se partagent la ligne à proportion des deux montants.
+ */
+function Butterfly({
+  label,
+  a,
+  b,
+  pa,
+  pb,
+  signed: isSigned = false,
+  missingB = "—",
+}: {
+  label: string;
+  a: number | null;
+  b: number | null;
+  pa?: number | null;
+  pb?: number | null;
+  signed?: boolean;
+  missingB?: string;
+}) {
+  const wa = Math.max(a ?? 0, 0);
+  const wb = Math.max(b ?? 0, 0);
+  const sum = wa + wb;
+  const shareA = sum > 0 ? (wa / sum) * 100 : 0;
+  const shareB = sum > 0 ? (wb / sum) * 100 : 0;
+  const cell = (v: number | null, p: number | null | undefined, missing: string) =>
+    v == null ? (
+      <span className="text-xs font-normal text-faint">{missing}</span>
+    ) : isSigned ? (
+      <Gain v={v} p={p} />
+    ) : (
+      <span className="num text-sm font-semibold">{formatEur(v)}</span>
+    );
   return (
-    <div className="col-span-3 grid grid-cols-subgrid items-center border-t border-edge py-2.5">
-      <span className="label-xs text-faint">{label}</span>
-      <span className="num font-semibold">{a}</span>
-      <span className="num font-semibold">{b}</span>
+    <div className="grid grid-cols-[1fr_4.5rem_1fr] items-center gap-2 border-t border-edge py-2.5 sm:grid-cols-[1fr_6rem_1fr]">
+      <div className="flex min-w-0 items-center justify-end gap-2.5">
+        <span className="shrink-0 whitespace-nowrap">{cell(a, pa, "—")}</span>
+        <div className="flex h-2.5 min-w-0 flex-1 justify-end overflow-hidden rounded-l-full bg-raised/70">
+          <span className="h-full rounded-l-full bg-accent" style={{ width: `${shareA}%` }} />
+        </div>
+      </div>
+      <span className="label-xs truncate text-center text-faint">{label}</span>
+      <div className="flex min-w-0 items-center gap-2.5">
+        <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-r-full bg-raised/70">
+          <span className="block h-full rounded-r-full bg-sealed" style={{ width: `${shareB}%` }} />
+        </div>
+        <span className="shrink-0 whitespace-nowrap">{cell(b, pb, missingB)}</span>
+      </div>
     </div>
   );
 }
