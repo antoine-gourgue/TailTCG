@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/logo";
 
-// Voile de chargement sur la zone de contenu : le logo animé reste affiché
-// tant que les images visibles ne sont pas arrivées, au plus 1,2 s (au-delà,
-// la page s'affiche et les images retardataires apparaissent d'elles-mêmes).
+// Voile de chargement : le logo animé reste affiché tant que les images
+// visibles à l'écran ne sont pas arrivées, au plus 1,2 s (au-delà, la page
+// s'affiche et les images retardataires apparaissent d'elles-mêmes).
 export function ImageGate() {
   const [state, setState] = useState<"waiting" | "fading" | "done">("waiting");
 
@@ -63,7 +63,7 @@ export function ImageGate() {
   return (
     <div
       aria-hidden
-      className={`absolute inset-0 z-30 flex flex-col items-center justify-center gap-5 bg-background transition-opacity duration-300 ${
+      className={`fixed inset-0 z-[60] flex flex-col items-center justify-center gap-5 bg-background transition-opacity duration-300 ${
         state === "fading" ? "pointer-events-none opacity-0" : "opacity-100"
       }`}
     >
