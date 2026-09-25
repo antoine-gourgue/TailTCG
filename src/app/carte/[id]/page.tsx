@@ -322,6 +322,7 @@ export default async function CartePage({
                       }}
                     />
                   )}
+                  <PregradeButton itemId={item.id ?? id} photos={photos} scan />
                   <PregradeButton itemId={item.id ?? id} photos={photos} />
                   <PhoneCaptureButton
                     kind="photos"

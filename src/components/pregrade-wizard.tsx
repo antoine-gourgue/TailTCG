@@ -8,11 +8,14 @@ import {
   ChevronRight,
   Camera,
   Sparkles,
+  ScanLine,
 } from "lucide-react";
 import { saveGrading } from "@/app/items/actions";
 import { GRADE_LABELS } from "@/lib/grading";
 import { loadImage, warpCardToCanvas, type Pt } from "@/lib/perspective";
 import { detectCardInImage } from "@/lib/scan/still";
+import { analyzeRectified, canvasFromUrl } from "@/lib/grading-auto";
+import { GradeCapture } from "@/components/grade-capture";
 import { estimateAll, CRITERION_LABEL, gradeLabel, ratioLabel, type GraderEstimate } from "@/lib/graders";
 import type { Annotation } from "@/lib/grading-defects";
 import { DefectAnnotator } from "@/components/defect-annotator";
@@ -121,22 +124,26 @@ function ratioPair(a: number, b: number): [number, number] {
 export function PregradeButton({
   itemId,
   photos,
+  scan = false,
 }: {
   itemId: string;
   photos: GalleryPhoto[];
+  /** ouvre directement la caméra : recto, verso, puis analyse automatique */
+  scan?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className="btn btn-ghost">
-        <Ruler size={15} aria-hidden />
-        Pré-grader
+        {scan ? <ScanLine size={15} aria-hidden /> : <Ruler size={15} aria-hidden />}
+        {scan ? "Pré-grader au scan" : "Pré-grader"}
       </button>
       {open && (
         <PregradeWizard
           itemId={itemId}
           photos={photos}
+          startWithScan={scan}
           onClose={() => setOpen(false)}
         />
       )}
@@ -147,14 +154,19 @@ export function PregradeButton({
 function PregradeWizard({
   itemId,
   photos,
+  startWithScan = false,
   onClose,
 }: {
   itemId: string;
   photos: GalleryPhoto[];
+  startWithScan?: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [capturing, setCapturing] = useState(startWithScan);
+  // Ce que l'analyse automatique a rempli : rappelé à l'écran pour inviter à vérifier
+  const [autoNote, setAutoNote] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [rectoId, setRectoId] = useState<string | null>(photos[0]?.id ?? null);
@@ -179,6 +191,8 @@ function PregradeWizard({
 
   const recto = photos.find((p) => p.id === rectoId) ?? photos[0] ?? null;
   const verso = photos.find((p) => p.id === versoId) ?? null;
+  /** un verso existe : photo choisie, ou calque pris au scan */
+  const hasVerso = verso != null || rectifiedV != null;
 
   /* Notes */
   const [lPct] = ratioPair(guides.iL - guides.oL, guides.oR - guides.iR);
@@ -189,7 +203,7 @@ function PregradeWizard({
 
   const [lPctV] = ratioPair(guidesV.iL - guidesV.oL, guidesV.oR - guidesV.iR);
   const [tPctV] = ratioPair(guidesV.iT - guidesV.oT, guidesV.oB - guidesV.iB);
-  const centeringNoteV = verso
+  const centeringNoteV = hasVerso
     ? centeringGradeBack(
         Math.max(
           Math.max(lPctV, 100 - lPctV),
@@ -205,11 +219,11 @@ function PregradeWizard({
   // Les 8 coins (4 recto + 4 verso si présent) comptent dans la note
   const cornerValues = [
     ...corners.filter((c): c is number => c != null),
-    ...(verso ? cornersV.filter((c): c is number => c != null) : []),
+    ...(hasVerso ? cornersV.filter((c): c is number => c != null) : []),
   ];
   const cornersComplete =
     corners.every((c) => c != null) &&
-    (!verso || cornersV.every((c) => c != null));
+    (!hasVerso || cornersV.every((c) => c != null));
   const cornersNote =
     cornersComplete && cornerValues.length > 0
       ? Math.round(
@@ -244,7 +258,7 @@ function PregradeWizard({
     : null;
 
   const frontWorst = Math.max(worstLR, worstTB);
-  const backWorst = verso ? Math.max(Math.max(lPctV, 100 - lPctV), Math.max(tPctV, 100 - tPctV)) : null;
+  const backWorst = hasVerso ? Math.max(Math.max(lPctV, 100 - lPctV), Math.max(tPctV, 100 - tPctV)) : null;
   const estimates: GraderEstimate[] | null =
     cornersNote != null ? estimateAll({ frontWorst, backWorst, corners: cornersNote, edges: edgesNote, surface: surfaceNote }) : null;
 
@@ -260,7 +274,7 @@ function PregradeWizard({
   const canNext =
     step === 0 ? recto != null : step === 3 ? cornersComplete : true;
   const workingUrl = rectified ?? recto?.url ?? null;
-  const workingUrlV = verso ? rectifiedV ?? verso.url : null;
+  const workingUrlV = rectifiedV ?? verso?.url ?? null;
 
   async function rectifyOne(url: string, q: Quad): Promise<string> {
     const img = await loadImage(url);
@@ -289,6 +303,52 @@ function PregradeWizard({
     }
   }
 
+  /**
+   * Analyse automatique des calques : lignes de centrage, coins, tranches.
+   * Ne remplit que ce qui est mesurable ; l'utilisateur vérifie ensuite.
+   */
+  async function autoAnalyze(rectoUrl: string, versoUrl: string | null) {
+    const filled: string[] = [];
+    try {
+      const a = analyzeRectified(await canvasFromUrl(rectoUrl));
+      if (a?.guides) {
+        setGuides(a.guides);
+        filled.push("centrage recto");
+      }
+      if (a?.borderUniform) {
+        setCorners(a.corners);
+        filled.push("coins");
+        if (a.edgeDefects.length > 0) {
+          setEdgeDefects(new Set(a.edgeDefects));
+          filled.push("tranches");
+        }
+      }
+      if (versoUrl) {
+        const b = analyzeRectified(await canvasFromUrl(versoUrl));
+        if (b?.guides) {
+          setGuidesV(b.guides);
+          filled.push("centrage verso");
+        }
+        if (b?.borderUniform) setCornersV(b.corners);
+      }
+    } catch {
+      // l'analyse est un confort : en cas d'échec, tout reste manuel
+    }
+    setAutoNote(filled.length > 0 ? `Analyse automatique : ${filled.join(", ")}. Vérifie et corrige si besoin.` : null);
+  }
+
+  // Prises de vues au scan : calques déjà redressés → analyse, puis étape Centrage
+  async function onCaptured(rectoUrl: string, versoUrl: string | null) {
+    setCapturing(false);
+    setRectified(rectoUrl);
+    setRectifiedV(versoUrl);
+    setGuides(RECTIFIED_GUIDES);
+    setGuidesV(RECTIFIED_GUIDES);
+    setFace("r");
+    await autoAnalyze(rectoUrl, versoUrl);
+    setStep(2);
+  }
+
   // Étape cadrage → suivant : redresse recto (et verso) dans le calque
   async function goNext() {
     if (step === 0) {
@@ -297,21 +357,26 @@ function PregradeWizard({
     }
     if (step === 1 && recto) {
       setRectifying(true);
+      let rUrl: string | null = null;
       try {
-        setRectified(await rectifyOne(recto.url, quad));
+        rUrl = await rectifyOne(recto.url, quad);
+        setRectified(rUrl);
         setGuides(RECTIFIED_GUIDES);
       } catch {
         setToast("Redressement impossible — photo brute utilisée");
         setRectified(null);
       }
+      let vUrl: string | null = null;
       if (verso) {
         try {
-          setRectifiedV(await rectifyOne(verso.url, quadV));
+          vUrl = await rectifyOne(verso.url, quadV);
+          setRectifiedV(vUrl);
           setGuidesV(RECTIFIED_GUIDES);
         } catch {
           setRectifiedV(null);
         }
       }
+      if (rUrl) await autoAnalyze(rUrl, vUrl);
       setRectifying(false);
       setFace("r");
     }
@@ -340,7 +405,7 @@ function PregradeWizard({
         edgeDefects: [...edgeDefects],
         surfaceDefects: [...surfaceDefects],
         annotations,
-        verso: verso
+        verso: hasVerso
           ? { lr: [lPctV, 100 - lPctV], tb: [tPctV, 100 - tPctV] }
           : null,
         graders: (estimates ?? []).map((e) => ({ id: e.grader.id, grade: e.grade, limiting: e.limiting })),
@@ -384,8 +449,21 @@ function PregradeWizard({
         </div>
       }
     >
+        {capturing && <GradeCapture onDone={onCaptured} onClose={() => setCapturing(false)} />}
         {/* Contenu */}
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          {autoNote && step >= 2 && step <= 5 && (
+            <p className="mb-3 rounded-xl border border-accent/40 bg-accent-soft/60 px-3 py-2 text-xs text-foreground">
+              <Sparkles size={12} className="mr-1 inline text-accent-strong" aria-hidden />
+              {autoNote}
+            </p>
+          )}
+          {step === 0 && (
+            <button type="button" onClick={() => setCapturing(true)} className="btn btn-primary mb-4 w-full !justify-center">
+              <ScanLine size={15} aria-hidden />
+              Scanner la carte avec l&apos;appareil photo
+            </button>
+          )}
           {step === 0 && (
             <StepPhotos
               photos={photos}
