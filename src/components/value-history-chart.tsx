@@ -41,7 +41,16 @@ function alignLayer(layer: ValuePoint[], dates: string[]): (number | null)[] {
  * proche avec infobulle maison. Avec `layers`, les composantes s'empilent sous
  * la courbe totale et un sélecteur permet d'isoler chacune.
  */
-export function ValueHistoryChart({ points, layers }: { points: ValuePoint[]; layers?: ValueLayer[] }) {
+export function ValueHistoryChart({
+  points,
+  layers,
+  minSpanRatio = 0,
+}: {
+  points: ValuePoint[];
+  layers?: ValueLayer[];
+  /** amplitude verticale minimale, en fraction de la valeur : une cote qui bouge de 1 % ne remplit pas tout le cadre */
+  minSpanRatio?: number;
+}) {
   const [hover, setHover] = useState<number | null>(null);
   // -1 : total empilé, sinon l'index de la couche affichée seule
   const [view, setView] = useState(-1);
@@ -117,12 +126,15 @@ export function ValueHistoryChart({ points, layers }: { points: ValuePoint[]; la
   const values = data.map((d) => d.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const span = max - min || max * 0.1 || 1;
-  // Empilé : depuis zéro, pour que les couches aient un sens ; seul : zoom sur l'amplitude
-  const yLo = stacked ? 0 : min - span * 0.15;
-  const yHi = stacked ? (max || 1) * 1.08 : max + span * 0.15;
+  // Empilé : depuis zéro, pour que les couches aient un sens ; seul : zoom sur l'amplitude,
+  // centré, avec une amplitude plancher (minSpanRatio) pour rester honnête sur les petites variations
+  const mid = (min + max) / 2;
+  const half = Math.max(((max - min) / 2) * 1.3, ((max || 1) * minSpanRatio) / 2, (max || 1) * 0.005);
+  const yLo = stacked ? 0 : mid - half;
+  const yHi = stacked ? (max || 1) * 1.08 : mid + half;
   const y = (v: number) => PAD.top + (1 - (v - yLo) / (yHi - yLo)) * (H - PAD.top - PAD.bottom);
-  const gridYs = stacked ? [0, max / 2, max] : min === max ? [min] : [min, (min + max) / 2, max];
+  // Repères répartis sur la hauteur affichée (jamais collés, même quand la courbe bouge à peine)
+  const gridYs = stacked ? [0, max / 2, max] : [0.12, 0.5, 0.88].map((f) => yLo + (yHi - yLo) * f);
   const baseline = H - PAD.bottom;
 
   const line = data.map((d, i) => `${i === 0 ? "M" : "L"}${xs[i].toFixed(1)},${y(d.value).toFixed(1)}`).join(" ");

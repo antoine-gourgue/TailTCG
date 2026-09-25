@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, Boxes, ExternalLink, Trash2 } from "lucide-react";
-import { SealedPriceChart } from "@/components/sealed-price-chart";
+import { ValueHistoryChart } from "@/components/value-history-chart";
 import { formatEur } from "@/lib/domain";
 import { cardmarketUrl } from "@/lib/tcgdex";
 import { kindLabel, sealedSetName } from "@/lib/sealed";
@@ -33,6 +33,8 @@ export type SealedLot = {
 const USD_TO_EUR = 0.92;
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 const pct = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(1).replace(".", ",")} %`;
+const fmtDay = (d: string) => new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+const signed = (v: number) => `${v > 0 ? "+" : ""}${formatEur(v)}`;
 
 function Stat({ label, value, tone, sub }: { label: string; value: string; tone?: "gain" | "loss" | "faint"; sub?: string }) {
   return (
@@ -163,31 +165,130 @@ export function ProductDetail({
         </div>
       </div>
 
+      {/* Historique : courbe sur une échelle de temps, variation depuis le premier relevé, repères min/max/moyenne */}
       <section className="panel mt-8 p-5">
-        <h2 className="display mb-4 text-base font-semibold">Évolution de la cote</h2>
-        <SealedPriceChart points={history} />
+        {(() => {
+          const pts = history.map((h) => ({ recorded_at: h.day, value: h.price }));
+          const first = history[0]?.price ?? null;
+          const last = history[history.length - 1]?.price ?? null;
+          const delta = first != null && last != null && first > 0 ? ((last - first) / first) * 100 : null;
+          const prices = history.map((h) => h.price);
+          const min = prices.length ? Math.min(...prices) : null;
+          const max = prices.length ? Math.max(...prices) : null;
+          const avg = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : null;
+          return (
+            <>
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+                <div>
+                  <h2 className="display text-base font-semibold">Évolution de la cote</h2>
+                  <p className="text-xs text-muted">
+                    {history.length === 0
+                      ? "Relevé chaque nuit à partir de maintenant."
+                      : `${history.length} relevé${history.length > 1 ? "s" : ""} · du ${fmtDay(history[0].day)} au ${fmtDay(history[history.length - 1].day)}`}
+                  </p>
+                </div>
+                {last != null && (
+                  <div className="text-right">
+                    <p className="num text-lg font-bold leading-none">{formatEur(last)}</p>
+                    {delta != null && history.length > 1 && (
+                      <p className={`num mt-1 text-xs ${delta > 0 ? "text-gain" : delta < 0 ? "text-loss" : "text-muted"}`}>
+                        {signed(last - first!)} · {pct(delta)} depuis le premier relevé
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+              {pts.length >= 2 ? (
+                <ValueHistoryChart points={pts} minSpanRatio={0.08} />
+              ) : pts.length === 1 ? (
+                <p className="text-sm text-muted">
+                  Premier relevé le {fmtDay(history[0].day)} : <span className="num text-foreground">{formatEur(history[0].price)}</span>. La courbe se dessine dès le prochain.
+                </p>
+              ) : (
+                <p className="text-sm text-muted">Pas encore de relevé : la cote est enregistrée chaque nuit à partir de maintenant.</p>
+              )}
+              {prices.length >= 2 && min != null && max != null && avg != null && (
+                <div className="mt-4 flex flex-wrap gap-x-10 gap-y-3 border-t border-edge pt-4">
+                  <Stat label="Plus bas" value={formatEur(min)} />
+                  <Stat label="Plus haut" value={formatEur(max)} />
+                  <Stat label="Moyenne" value={formatEur(avg)} />
+                  {v7 != null && <Stat label="7 jours" value={pct(v7)} tone={varTone(v7)} />}
+                  {v30 != null && <Stat label="30 jours" value={pct(v30)} tone={varTone(v30)} />}
+                </div>
+              )}
+            </>
+          );
+        })()}
       </section>
 
+      {/* Mes lots : ce que chaque lot a coûté, ce qu'il vaut, la différence */}
       {lots.length > 0 && (
         <section className="panel mt-6 p-5">
-          <h2 className="display mb-4 text-base font-semibold">Mes lots</h2>
-          <ul className="divide-y divide-edge">
-            {lots.map((l) => (
-              <li key={l.id} className="flex flex-wrap items-center gap-x-6 gap-y-1 py-3 text-sm">
-                <span className="num font-semibold">{l.quantity} ×</span>
-                <span className="num">{l.purchase_price != null ? formatEur(l.purchase_price) : <span className="text-faint">prix non renseigné</span>}</span>
-                {l.purchase_date && <span className="text-muted">le {fmtDate(l.purchase_date)}</span>}
-                {l.manual_price != null && <span className="text-muted">estimé à la main {formatEur(l.manual_price)}</span>}
-                <form action={removeSealedItem} className="ml-auto">
-                  <input type="hidden" name="id" value={l.id} />
-                  <button type="submit" className="btn btn-ghost text-xs">
-                    <Trash2 size={13} aria-hidden />
-                    Retirer
-                  </button>
-                </form>
-              </li>
-            ))}
-          </ul>
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="display text-base font-semibold">Mes lots</h2>
+            <p className="text-xs text-muted">
+              {owned} exemplaire{owned > 1 ? "s" : ""} · payé {formatEur(paid)}
+              {cote ? ` · valeur ${formatEur(estimated)}` : ""}
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px] text-sm">
+              <thead>
+                <tr className="text-left">
+                  <th className="label-xs pb-2 font-semibold">Quantité</th>
+                  <th className="label-xs pb-2 font-semibold">Payé</th>
+                  <th className="label-xs pb-2 font-semibold">Date</th>
+                  <th className="label-xs pb-2 text-right font-semibold">Valeur</th>
+                  <th className="label-xs pb-2 text-right font-semibold">Plus-value</th>
+                  <th className="pb-2" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-edge">
+                {lots.map((l) => {
+                  const unit = l.manual_price ?? cote?.value ?? null;
+                  const value = unit != null ? unit * l.quantity : null;
+                  const lotPaid = l.purchase_price != null ? l.purchase_price * l.quantity : null;
+                  const lotGain = value != null && lotPaid != null ? value - lotPaid : null;
+                  return (
+                    <tr key={l.id}>
+                      <td className="num py-2.5 font-semibold">{l.quantity} ×</td>
+                      <td className="num py-2.5">
+                        {l.purchase_price != null ? (
+                          <>
+                            {formatEur(l.purchase_price)}
+                            {l.quantity > 1 && <span className="text-xs text-muted"> · {formatEur(lotPaid!)}</span>}
+                          </>
+                        ) : (
+                          <span className="text-faint">non renseigné</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 text-muted">{l.purchase_date ? fmtDate(l.purchase_date) : "—"}</td>
+                      <td className="num py-2.5 text-right">
+                        {value != null ? formatEur(value) : <span className="text-faint">—</span>}
+                        {l.manual_price != null && <span className="block text-[11px] text-muted">estimation saisie</span>}
+                      </td>
+                      <td className={`num py-2.5 text-right font-semibold ${lotGain == null ? "text-faint" : lotGain > 0 ? "text-gain" : lotGain < 0 ? "text-loss" : ""}`}>
+                        {lotGain != null ? signed(lotGain) : "—"}
+                      </td>
+                      <td className="py-2.5 pl-3 text-right">
+                        <form action={removeSealedItem}>
+                          <input type="hidden" name="id" value={l.id} />
+                          <button
+                            type="submit"
+                            title="Retirer ce lot"
+                            aria-label="Retirer ce lot"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-faint transition hover:bg-raised hover:text-loss"
+                          >
+                            <Trash2 size={14} aria-hidden />
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
     </main>

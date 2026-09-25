@@ -520,13 +520,14 @@ for (let i = 0; i < rows.length; i += 500) {
 console.log("sealed_products à jour.");
 
 // ---- Relevé du jour : cote € (guide Cardmarket local) par produit apparié ----
-// Même ordre de référence que src/lib/cardmarket.ts : trend, avg7, avg30, avg1, avg.
+// Même ordre de référence que la cote affichée (CM_REFERENCE_ORDER dans src/lib/tcgdex.ts) : avg30, avg7, avg, avg1, trend —
+// sinon la courbe et la cote de la fiche ne racontent pas la même histoire.
 const cmIds = [...new Set(rows.map((r) => r.cardmarket_id).filter((v) => Number.isInteger(v)))];
 const byCm = new Map();
 for (let i = 0; i < cmIds.length; i += 500) {
   const { data } = await db.from("cardmarket_price_guide").select("id_product, trend, avg7, avg30, avg1, avg").in("id_product", cmIds.slice(i, i + 500));
   for (const g of data ?? []) {
-    const ref = [g.trend, g.avg7, g.avg30, g.avg1, g.avg].find((v) => typeof v === "number" && v > 0);
+    const ref = [g.avg30, g.avg7, g.avg, g.avg1, g.trend].find((v) => typeof v === "number" && v > 0);
     if (ref != null) byCm.set(g.id_product, ref);
   }
 }
