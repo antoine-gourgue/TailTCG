@@ -536,10 +536,12 @@ export async function saveGrading(formData: FormData) {
     const file = formData.get(field);
     if (!(file instanceof File) || file.size === 0) return null;
     if (file.size > 5_000_000 || !file.type.startsWith("image/")) return null;
-    const path = `${user!.id}/gradings/${randomUUID()}.jpg`;
+    // WebP depuis l'atelier (plus léger), JPEG toléré pour les anciens clients
+    const webp = file.type === "image/webp";
+    const path = `${user!.id}/gradings/${randomUUID()}.${webp ? "webp" : "jpg"}`;
     const { error: upError } = await admin.storage
       .from("card-photos")
-      .upload(path, file, { contentType: "image/jpeg" });
+      .upload(path, file, { contentType: webp ? "image/webp" : "image/jpeg" });
     return upError ? null : path;
   }
 

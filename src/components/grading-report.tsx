@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FileText } from "lucide-react";
 import { GRADE_LABELS } from "@/lib/grading";
+import { estimateAll, CRITERION_LABEL, gradeLabel, ratioLabel } from "@/lib/graders";
 import {
   defectMeta,
   pointsToSvg,
@@ -20,6 +21,8 @@ export type GradingReportData = {
   surface: number;
   createdAt: string | null;
   ratios: { lr?: [number, number]; tb?: [number, number] } | null;
+  /** centrage du verso, quand il a été mesuré */
+  versoRatios?: { lr?: [number, number]; tb?: [number, number] } | null;
   annotations: Annotation[];
   rectoUrl: string | null;
   versoUrl: string | null;
@@ -152,6 +155,39 @@ export function GradingReportModal({
                   </div>
                 </div>
               )}
+
+              {/* Estimation chez chaque société, d'après le centrage mesuré et les sous-notes */}
+              {data.ratios?.lr && data.ratios?.tb && (() => {
+                const worstOf = (r: { lr?: [number, number]; tb?: [number, number] }) => Math.max(...(r.lr ?? [50, 50]), ...(r.tb ?? [50, 50]));
+                const frontWorst = worstOf(data.ratios);
+                const backWorst = data.versoRatios?.lr ? worstOf(data.versoRatios) : null;
+                const estimates = estimateAll({ frontWorst, backWorst, corners: data.corners, edges: data.edges, surface: data.surface });
+                return (
+                  <div className="mb-6">
+                    <p className="label-xs mb-1">Estimation par société de gradation</p>
+                    <p className="mb-2 text-xs text-muted">
+                      Centrage {ratioLabel(frontWorst)} recto{backWorst != null ? ` · ${ratioLabel(backWorst)} verso` : ""} · note plafonnée par le critère le plus faible.
+                    </p>
+                    <ul className="divide-y divide-edge rounded-xl border border-edge">
+                      {estimates.map((e) => (
+                        <li key={e.grader.id} className="flex items-center gap-3 px-3 py-2">
+                          <span className="w-12 shrink-0 text-sm font-semibold">{e.grader.short}</span>
+                          <span className="min-w-0 flex-1 truncate text-xs text-muted">
+                            {e.grade >= e.grader.scale[0]
+                              ? "note maximale"
+                              : `limité par ${CRITERION_LABEL[e.limiting]}${e.limiting === "centering" ? ` (plafond ${gradeLabel(e.centeringCap)})` : ""}${
+                                  e.withoutLimit > e.grade ? ` · ${gradeLabel(e.withoutLimit)} sinon` : ""
+                                }`}
+                            {!e.grader.published ? " · barème estimé" : ""}
+                          </span>
+                          <span className="num shrink-0 text-base font-bold">{gradeLabel(e.grade)}</span>
+                          <span className="w-20 shrink-0 truncate text-right text-[11px] text-muted">{e.label ?? ""}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })()}
 
               {/* Cartes annotées */}
               {(data.rectoUrl || data.versoUrl) && (

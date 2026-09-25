@@ -309,6 +309,8 @@ export default async function CartePage({
                         surface: lastGrading.surface ?? 0,
                         createdAt: lastGrading.created_at,
                         ratios: (lastGrading.ratios as GradingReportData["ratios"]) ?? null,
+                        versoRatios:
+                          ((lastGrading.details as { verso?: GradingReportData["versoRatios"] })?.verso) ?? null,
                         annotations:
                           ((lastGrading.details as { annotations?: GradingReportData["annotations"] })
                             ?.annotations) ?? [],

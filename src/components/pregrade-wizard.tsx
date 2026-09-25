@@ -12,6 +12,8 @@ import {
 import { saveGrading } from "@/app/items/actions";
 import { GRADE_LABELS } from "@/lib/grading";
 import { loadImage, warpCardToCanvas, type Pt } from "@/lib/perspective";
+import { detectCardInImage } from "@/lib/scan/still";
+import { estimateAll, CRITERION_LABEL, gradeLabel, ratioLabel, type GraderEstimate } from "@/lib/graders";
 import type { Annotation } from "@/lib/grading-defects";
 import { DefectAnnotator } from "@/components/defect-annotator";
 import type { GalleryPhoto } from "@/components/photo-gallery";
@@ -98,6 +100,7 @@ const RECTIFIED_GUIDES: Guides = {
 };
 
 type Quad = [Pt, Pt, Pt, Pt];
+type AutoFrame = "idle" | "searching" | "found" | "none";
 
 const DEFAULT_QUAD: Quad = [
   { x: 0.12, y: 0.08 },
@@ -169,6 +172,10 @@ function PregradeWizard({
   const [edgeDefects, setEdgeDefects] = useState<Set<string>>(new Set());
   const [surfaceDefects, setSurfaceDefects] = useState<Set<string>>(new Set());
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  // Cadrage automatique (moteur du scan) : état par face
+  const [autoR, setAutoR] = useState<AutoFrame>("idle");
+  const [autoV, setAutoV] = useState<AutoFrame>("idle");
+  const touched = useRef({ r: false, v: false });
 
   const recto = photos.find((p) => p.id === rectoId) ?? photos[0] ?? null;
   const verso = photos.find((p) => p.id === versoId) ?? null;
@@ -236,6 +243,11 @@ function PregradeWizard({
       )
     : null;
 
+  const frontWorst = Math.max(worstLR, worstTB);
+  const backWorst = verso ? Math.max(Math.max(lPctV, 100 - lPctV), Math.max(tPctV, 100 - tPctV)) : null;
+  const estimates: GraderEstimate[] | null =
+    cornersNote != null ? estimateAll({ frontWorst, backWorst, corners: cornersNote, edges: edgesNote, surface: surfaceNote }) : null;
+
   const STEPS = [
     "Photos",
     "Cadrage",
@@ -256,11 +268,33 @@ function PregradeWizard({
     canvas.width = 900;
     canvas.height = Math.round((900 * 88) / 63);
     warpCardToCanvas(img, q, canvas, { grid: 20 });
-    return canvas.toDataURL("image/jpeg", 0.92);
+    return canvas.toDataURL("image/webp", 0.9);
+  }
+
+  // Propose le cadre trouvé par le moteur du scan, sauf si l'utilisateur a déjà bougé les poignées
+  async function autoDetect(f: "r" | "v") {
+    const photo = f === "r" ? recto : verso;
+    const setAuto = f === "r" ? setAutoR : setAutoV;
+    if (!photo) return;
+    setAuto("searching");
+    try {
+      const img = await loadImage(photo.url);
+      const q = await detectCardInImage(img);
+      if (q && !touched.current[f]) {
+        (f === "r" ? setQuad : setQuadV)(q as Quad);
+        setAuto("found");
+      } else setAuto(q ? "found" : "none");
+    } catch {
+      setAuto("none");
+    }
   }
 
   // Étape cadrage → suivant : redresse recto (et verso) dans le calque
   async function goNext() {
+    if (step === 0) {
+      if (autoR === "idle") void autoDetect("r");
+      if (verso && autoV === "idle") void autoDetect("v");
+    }
     if (step === 1 && recto) {
       setRectifying(true);
       try {
@@ -309,17 +343,18 @@ function PregradeWizard({
         verso: verso
           ? { lr: [lPctV, 100 - lPctV], tb: [tPctV, 100 - tPctV] }
           : null,
+        graders: (estimates ?? []).map((e) => ({ id: e.grader.id, grade: e.grade, limiting: e.limiting })),
       })
     );
     if (rectified) {
       const blob = await (await fetch(rectified)).blob();
-      fd.set("rectified", new File([blob], "rectified.jpg", { type: "image/jpeg" }));
+      fd.set("rectified", new File([blob], "rectified.webp", { type: "image/webp" }));
     }
     if (rectifiedV) {
       const blob = await (await fetch(rectifiedV)).blob();
       fd.set(
         "rectified_verso",
-        new File([blob], "rectified-verso.jpg", { type: "image/jpeg" })
+        new File([blob], "rectified-verso.webp", { type: "image/webp" })
       );
     }
     const { error } = await saveGrading(fd);
@@ -361,6 +396,8 @@ function PregradeWizard({
                 setQuad(DEFAULT_QUAD);
                 setRectified(null);
                 setGuides(DEFAULT_GUIDES);
+                setAutoR("idle");
+                touched.current.r = false;
                 if (versoId === id) setVersoId(null);
               }}
               onPickVerso={(id) => {
@@ -368,6 +405,8 @@ function PregradeWizard({
                 setQuadV(DEFAULT_QUAD);
                 setRectifiedV(null);
                 setGuidesV(DEFAULT_GUIDES);
+                setAutoV("idle");
+                touched.current.v = false;
               }}
             />
           )}
@@ -375,9 +414,25 @@ function PregradeWizard({
             <>
               <FaceTabs face={face} onFace={setFace} hasVerso={verso != null} />
               {face === "r" || !verso ? (
-                <StepFrame url={recto.url} quad={quad} onChange={setQuad} />
+                <StepFrame
+                  url={recto.url}
+                  quad={quad}
+                  auto={autoR}
+                  onChange={(q) => {
+                    touched.current.r = true;
+                    setQuad(q);
+                  }}
+                />
               ) : (
-                <StepFrame url={verso.url} quad={quadV} onChange={setQuadV} />
+                <StepFrame
+                  url={verso.url}
+                  quad={quadV}
+                  auto={autoV}
+                  onChange={(q) => {
+                    touched.current.v = true;
+                    setQuadV(q);
+                  }}
+                />
               )}
             </>
           )}
@@ -472,6 +527,9 @@ function PregradeWizard({
               edges={edgesNote}
               surface={surfaceNote}
               global={globalNote}
+              estimates={estimates ?? []}
+              frontWorst={frontWorst}
+              backWorst={backWorst}
             />
           )}
         </div>
@@ -641,10 +699,12 @@ function StepPhotos({
 function StepFrame({
   url,
   quad,
+  auto,
   onChange,
 }: {
   url: string;
   quad: Quad;
+  auto: AutoFrame;
   onChange: (q: Quad) => void;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
@@ -692,9 +752,11 @@ function StepFrame({
   return (
     <div>
       <p className="mb-1 text-sm font-medium">
-        Pose les 4 poignées sur les coins de ta carte.
+        {auto === "found" ? "Cadre détecté automatiquement — ajuste les poignées si besoin." : "Pose les 4 poignées sur les coins de ta carte."}
       </p>
       <p className="mb-3 text-xs text-muted">
+        {auto === "searching" && <span className="text-accent-strong">Recherche du cadre avec le moteur du scan… </span>}
+        {auto === "none" && <span className="text-accent-strong">Cadre non détecté sur cette photo. </span>}
         L&apos;app redresse la photo dans un calque au format carte (63×88) —
         l&apos;aperçu à droite se met à jour en direct : ajuste jusqu&apos;à ce
         que la carte le remplisse parfaitement.
@@ -1124,12 +1186,18 @@ function StepVerdict({
   edges,
   surface,
   global,
+  estimates,
+  frontWorst,
+  backWorst,
 }: {
   centering: number;
   corners: number;
   edges: number;
   surface: number;
   global: number;
+  estimates: GraderEstimate[];
+  frontWorst: number;
+  backWorst: number | null;
 }) {
   return (
     <div className="flex flex-col items-center gap-6 py-2">
@@ -1145,6 +1213,33 @@ function StepVerdict({
         <Gauge label="Bords" value={edges} />
         <Gauge label="Surface" value={surface} />
       </div>
+
+      {/* Chez qui l'envoyer : la même carte, lue avec le barème de chaque société */}
+      {estimates.length > 0 && (
+        <div className="w-full max-w-lg">
+          <p className="label-xs mb-1">Estimation par société de gradation</p>
+          <p className="mb-2 text-xs text-muted">
+            Centrage mesuré {ratioLabel(frontWorst)} recto{backWorst != null ? ` · ${ratioLabel(backWorst)} verso` : ""}. Chaque note est plafonnée par le critère le plus faible.
+          </p>
+          <ul className="divide-y divide-edge rounded-xl border border-edge">
+            {estimates.map((e) => (
+              <li key={e.grader.id} className="flex items-center gap-3 px-3 py-2">
+                <span className="w-12 shrink-0 text-sm font-semibold">{e.grader.short}</span>
+                <span className="min-w-0 flex-1 truncate text-xs text-muted">
+                  {e.grade >= e.grader.scale[0]
+                    ? "note maximale"
+                    : `limité par ${CRITERION_LABEL[e.limiting]}${e.limiting === "centering" ? ` (plafond ${gradeLabel(e.centeringCap)})` : ""}${
+                        e.withoutLimit > e.grade ? ` · ${gradeLabel(e.withoutLimit)} sinon` : ""
+                      }`}
+                  {!e.grader.published ? " · barème estimé" : ""}
+                </span>
+                <span className="num shrink-0 text-base font-bold">{gradeLabel(e.grade)}</span>
+                <span className="w-20 shrink-0 truncate text-right text-[11px] text-muted">{e.label ?? ""}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <p className="max-w-sm text-center text-xs text-faint">
         Estimation indicative, plafonnée par le pire critère — elle ne
         remplace pas une gradation professionnelle.
