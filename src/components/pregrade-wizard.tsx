@@ -17,7 +17,7 @@ import { saveGrading } from "@/app/items/actions";
 import { GRADE_LABELS } from "@/lib/grading";
 import { loadImage, warpCardToCanvas, type Pt } from "@/lib/perspective";
 import { detectCardInImage } from "@/lib/scan/still";
-import { analyzeRectified, canvasFromUrl } from "@/lib/grading-auto";
+import { analyzeRectified, autoAnnotations, canvasFromUrl } from "@/lib/grading-auto";
 import { GradeCapture } from "@/components/grade-capture";
 import { PhoneGradeCapture } from "@/components/phone-grade-capture";
 import { Smartphone } from "lucide-react";
@@ -322,6 +322,8 @@ export function PregradeWizard({
    */
   async function autoAnalyze(rectoUrl: string, versoUrl: string | null) {
     const filled: string[] = [];
+    const marks: Annotation[] = [];
+    let edges = new Set<string>();
     try {
       const a = analyzeRectified(await canvasFromUrl(rectoUrl));
       if (a?.guides) {
@@ -330,11 +332,9 @@ export function PregradeWizard({
       }
       if (a?.borderUniform) {
         setCorners(a.corners);
-        filled.push("coins");
-        if (a.edgeDefects.length > 0) {
-          setEdgeDefects(new Set(a.edgeDefects));
-          filled.push("tranches");
-        }
+        filled.push("coins recto");
+        edges = new Set(a.edgeDefects);
+        marks.push(...autoAnnotations(a, "r"));
       }
       if (versoUrl) {
         const b = analyzeRectified(await canvasFromUrl(versoUrl));
@@ -342,14 +342,29 @@ export function PregradeWizard({
           setGuidesV(b.guides);
           filled.push("centrage verso");
         }
-        if (b?.borderUniform) setCornersV(b.corners);
+        if (b?.borderUniform) {
+          setCornersV(b.corners);
+          filled.push("coins verso");
+          for (const d of b.edgeDefects) edges.add(d);
+          marks.push(...autoAnnotations(b, "v"));
+        }
       }
     } catch {
       // l'analyse est un confort : en cas d'échec, tout reste manuel
     }
+    // « heavy » l'emporte sur « light »
+    if (edges.has("whitening-heavy")) edges.delete("whitening-light");
+    if (edges.size > 0) {
+      setEdgeDefects(edges);
+      filled.push("blanchiment des tranches");
+    }
+    if (marks.length > 0) {
+      setAnnotations(marks);
+      filled.push(`${marks.length} zone${marks.length > 1 ? "s" : ""} blanchie${marks.length > 1 ? "s" : ""} entourée${marks.length > 1 ? "s" : ""}`);
+    }
     setAutoNote(
       filled.length > 0
-        ? `Analyse automatique : ${filled.join(", ")}. Vérifie et corrige si besoin.`
+        ? `Analyse automatique : ${filled.join(", ")}. La surface (rayures, indentations) ne se lit qu'en lumière rasante : à toi de la vérifier.`
         : "Analyse automatique : bordure non reconnue sur cette carte (full art, reflet ou cadrage) — tout est à placer à la main.",
     );
   }

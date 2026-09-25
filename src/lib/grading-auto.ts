@@ -5,6 +5,8 @@
  * n'est qu'un point de départ que l'utilisateur vérifie sur les zooms.
  */
 
+import type { Annotation } from "@/lib/grading-defects";
+
 export type Guides = { oL: number; oR: number; oT: number; oB: number; iL: number; iR: number; iT: number; iB: number };
 
 export type AutoAnalysis = {
@@ -22,6 +24,10 @@ export type AutoAnalysis = {
   edgeDefects: string[];
   /** part de pixels blanchis sur les tranches */
   edgeWhite: number;
+  /** blanc par tranche : gauche, droite, haut, bas */
+  edgeWhites: number[];
+  /** bords extérieurs retenus (fractions du calque) */
+  outer: { oL: number; oR: number; oT: number; oB: number };
 };
 
 type Gray = { w: number; h: number; L: Float32Array; rgba: Uint8ClampedArray };
@@ -140,7 +146,25 @@ function lumaStd(g: Gray, x0: number, y0: number, x1: number, y1: number): { mea
   return { mean, std: n ? Math.sqrt(Math.max(0, s2 / n - mean * mean)) : 0 };
 }
 
+/** Saturation moyenne (0–1) dans un rectangle */
+function meanSaturation(g: Gray, x0: number, y0: number, x1: number, y1: number): number {
+  const { w, rgba } = g;
+  let n = 0;
+  let s = 0;
+  for (let y = Math.max(0, y0); y < Math.min(g.h, y1); y += 2)
+    for (let x = Math.max(0, x0); x < Math.min(w, x1); x += 2) {
+      const i = (y * w + x) * 4;
+      const mx = Math.max(rgba[i], rgba[i + 1], rgba[i + 2]);
+      const mn = Math.min(rgba[i], rgba[i + 1], rgba[i + 2]);
+      s += mx ? (mx - mn) / mx : 0;
+      n++;
+    }
+  return n ? s / n : 0;
+}
+
 const CORNER_GRADE = (white: number) => (white < 0.03 ? 10 : white < 0.12 ? 7 : 4);
+/** blanchiment de coin ou de tranche à partir duquel on l'entoure dans les défauts */
+const WHITE_MARK = 0.03;
 
 export function analyzeRectified(canvas: HTMLCanvasElement): AutoAnalysis | null {
   const g = gray(canvas);
@@ -176,9 +200,10 @@ export function analyzeRectified(canvas: HTMLCanvasElement): AutoAnalysis | null
   const bx1 = Math.round(((guides?.iL ?? outer.oL + 0.05) - 0.006) * w);
   const border = lumaStd(g, bx0, Math.round(h * 0.3), Math.max(bx0 + 2, bx1), Math.round(h * 0.7));
   // photo réelle : grain, léger dégradé d'éclairage → tolérance plus large qu'en synthèse
-  const borderUniform = border.std < 28 && bx1 - bx0 >= Math.round(w * 0.015);
-  // bordure déjà très claire (cartes à bord blanc) : le blanchiment n'est pas séparable
-  const borderLight = border.mean > 200;
+  const borderUniform = border.std < 32 && bx1 - bx0 >= Math.round(w * 0.015);
+  // bordure déjà blanche (claire ET peu saturée) : le blanchiment n'est pas séparable ;
+  // une bordure jaune surexposée reste saturée, donc analysable
+  const borderLight = border.mean > 200 && meanSaturation(g, bx0, Math.round(h * 0.3), Math.max(bx0 + 2, bx1), Math.round(h * 0.7)) < 0.18;
 
   /* ——— Coins : carré de 5 % de la largeur, collé au coin, à l'intérieur du bord ——— */
   const s = Math.round(w * 0.05);
@@ -213,7 +238,44 @@ export function analyzeRectified(canvas: HTMLCanvasElement): AutoAnalysis | null
     else if (edgeWhite > 0.025) edgeDefects.push("whitening-light");
   }
 
-  return { guides, centeringConfidence, borderUniform: analyzable, corners, cornerWhite, edgeDefects, edgeWhite };
+  return { guides, centeringConfidence, borderUniform: analyzable, corners, cornerWhite, edgeDefects, edgeWhite, edgeWhites: edges, outer };
+}
+
+/**
+ * Défauts à entourer d'après l'analyse : un tracé autour de chaque coin blanchi
+ * et le long de chaque tranche blanchie (coordonnées 0–1 du calque).
+ */
+export function autoAnnotations(a: AutoAnalysis, face: "r" | "v"): Annotation[] {
+  if (!a.borderUniform) return [];
+  const out: Annotation[] = [];
+  const { oL, oR, oT, oB } = a.outer;
+  const s = 0.06;
+  const t = 0.02;
+  // coins : HG, HD, BD, BG
+  const cornerBoxes: [number, number, number, number][] = [
+    [oL, oT, oL + s, oT + s],
+    [oR - s, oT, oR, oT + s],
+    [oR - s, oB - s, oR, oB],
+    [oL, oB - s, oL + s, oB],
+  ];
+  a.cornerWhite.forEach((wr, i) => {
+    if (wr < WHITE_MARK) return;
+    const [x0, y0, x1, y1] = cornerBoxes[i];
+    out.push({ face, kind: "whitening", points: [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }, { x: x0, y: y0 }] });
+  });
+  // tranches : gauche, droite, haut, bas (coins exclus)
+  const edgeBoxes: [number, number, number, number][] = [
+    [oL, oT + s, oL + t, oB - s],
+    [oR - t, oT + s, oR, oB - s],
+    [oL + s, oT, oR - s, oT + t],
+    [oL + s, oB - t, oR - s, oB],
+  ];
+  a.edgeWhites.forEach((wr, i) => {
+    if (wr < WHITE_MARK) return;
+    const [x0, y0, x1, y1] = edgeBoxes[i];
+    out.push({ face, kind: "whitening", points: [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }, { x: x0, y: y0 }] });
+  });
+  return out;
 }
 
 /**
