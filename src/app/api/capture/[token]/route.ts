@@ -21,11 +21,15 @@ export async function GET(
   }
   // Pré-gradation : le desktop a besoin de lire les calques déposés (bucket privé) → URLs signées 1 h
   if (session.kind === "grade" && session.status === "done") {
-    const r = (session.result ?? {}) as { recto?: string; verso?: string };
+    const r = (session.result ?? {}) as { recto?: string; verso?: string; recto_raw?: boolean; verso_raw?: boolean };
     const paths = [r.recto, r.verso].filter((p): p is string => !!p);
     const { data: signed } = await createAdminClient().storage.from("card-photos").createSignedUrls(paths, 3600);
     const urlOf = (path?: string) => (path ? (signed?.[paths.indexOf(path)]?.signedUrl ?? null) : null);
-    return NextResponse.json({ status: session.status, kind: session.kind, result: { rectoUrl: urlOf(r.recto), versoUrl: urlOf(r.verso) } });
+    return NextResponse.json({
+      status: session.status,
+      kind: session.kind,
+      result: { rectoUrl: urlOf(r.recto), versoUrl: urlOf(r.verso), raw: { recto: !!r.recto_raw, verso: !!r.verso_raw } },
+    });
   }
   return NextResponse.json({
     status: session.status,

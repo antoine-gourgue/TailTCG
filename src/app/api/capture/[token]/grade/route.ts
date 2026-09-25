@@ -13,7 +13,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   }
   const form = await req.formData();
   const db = createAdminClient();
-  const result: { recto?: string; verso?: string } = {};
+  const result: { recto?: string; verso?: string; recto_raw?: boolean; verso_raw?: boolean } = {};
+  // prise brute = photo entière, l'atelier retrouvera le cadre
+  if (form.get("recto_raw") === "1") result.recto_raw = true;
+  if (form.get("verso_raw") === "1") result.verso_raw = true;
   for (const face of ["recto", "verso"] as const) {
     const file = form.get(face);
     if (!(file instanceof File) || file.size === 0) continue;

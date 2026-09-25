@@ -18,7 +18,7 @@ import { GRADE_LABELS } from "@/lib/grading";
 import { loadImage, warpCardToCanvas, type Pt } from "@/lib/perspective";
 import { detectCardInImage } from "@/lib/scan/still";
 import { analyzeRectified, autoAnnotations, canvasFromUrl } from "@/lib/grading-auto";
-import { GradeCapture } from "@/components/grade-capture";
+import { GradeCapture, type CaptureRaw } from "@/components/grade-capture";
 import { PhoneGradeCapture } from "@/components/phone-grade-capture";
 import { Smartphone } from "lucide-react";
 import { estimateAll, CRITERION_LABEL, gradeLabel, ratioLabel, type GraderEstimate } from "@/lib/graders";
@@ -170,27 +170,40 @@ export function PregradeWizard({
   itemId: string;
   photos: GalleryPhoto[];
   startWithScan?: boolean;
-  /** calques déjà pris (page Pré-gradées) : on saute cadrage et redressement */
-  initialCapture?: { recto: string; verso: string | null };
+  /** calques déjà pris (page Pré-gradées) : on saute cadrage et redressement, sauf prise brute */
+  initialCapture?: { recto: string; verso: string | null; raw?: CaptureRaw };
   onClose: () => void;
 }) {
   const router = useRouter();
-  const [step, setStep] = useState(initialCapture ? 2 : 0);
+  const initialRaw = !!initialCapture && !!(initialCapture.raw?.recto || initialCapture.raw?.verso);
+  const [step, setStep] = useState(initialCapture ? (initialRaw ? 1 : 2) : 0);
+  // Prises brutes du scan : deviennent des photos de travail, qui passent par le cadrage
+  const [extraPhotos, setExtraPhotos] = useState<GalleryPhoto[]>(() =>
+    initialCapture && initialRaw
+      ? [
+          { id: "capture-r", url: initialCapture.recto, label: "Recto (scan)" },
+          ...(initialCapture.verso ? [{ id: "capture-v", url: initialCapture.verso, label: "Verso (scan)" }] : []),
+        ]
+      : [],
+  );
+  const allPhotos = [...photos, ...extraPhotos];
+  /** les visuels viennent du scan : ils rejoindront la galerie de la carte à l'enregistrement */
+  const [fromScan, setFromScan] = useState(!!initialCapture);
   const [capturing, setCapturing] = useState<"local" | "phone" | null>(() => (startWithScan && !initialCapture ? (isTouch() ? "local" : "phone") : null));
   // Ce que l'analyse automatique a rempli : rappelé à l'écran pour inviter à vérifier
   const [autoNote, setAutoNote] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [rectoId, setRectoId] = useState<string | null>(photos[0]?.id ?? null);
-  const [versoId, setVersoId] = useState<string | null>(null);
+  const [rectoId, setRectoId] = useState<string | null>(initialCapture && initialRaw ? "capture-r" : (photos[0]?.id ?? null));
+  const [versoId, setVersoId] = useState<string | null>(initialCapture && initialRaw && initialCapture.verso ? "capture-v" : null);
   const [face, setFace] = useState<"r" | "v">("r");
   const [quad, setQuad] = useState<Quad>(DEFAULT_QUAD);
   const [quadV, setQuadV] = useState<Quad>(DEFAULT_QUAD);
-  const [rectified, setRectified] = useState<string | null>(initialCapture?.recto ?? null);
-  const [rectifiedV, setRectifiedV] = useState<string | null>(initialCapture?.verso ?? null);
+  const [rectified, setRectified] = useState<string | null>(initialCapture && !initialRaw ? initialCapture.recto : null);
+  const [rectifiedV, setRectifiedV] = useState<string | null>(initialCapture && !initialRaw ? initialCapture.verso : null);
   const [rectifying, setRectifying] = useState(false);
-  const [guides, setGuides] = useState<Guides>(initialCapture ? RECTIFIED_GUIDES : DEFAULT_GUIDES);
-  const [guidesV, setGuidesV] = useState<Guides>(initialCapture ? RECTIFIED_GUIDES : DEFAULT_GUIDES);
+  const [guides, setGuides] = useState<Guides>(initialCapture && !initialRaw ? RECTIFIED_GUIDES : DEFAULT_GUIDES);
+  const [guidesV, setGuidesV] = useState<Guides>(initialCapture && !initialRaw ? RECTIFIED_GUIDES : DEFAULT_GUIDES);
   const analyzedInitial = useRef(false);
   const [corners, setCorners] = useState<(number | null)[]>([null, null, null, null]);
   const [cornersV, setCornersV] = useState<(number | null)[]>([null, null, null, null]);
@@ -202,8 +215,8 @@ export function PregradeWizard({
   const [autoV, setAutoV] = useState<AutoFrame>("idle");
   const touched = useRef({ r: false, v: false });
 
-  const recto = photos.find((p) => p.id === rectoId) ?? photos[0] ?? null;
-  const verso = photos.find((p) => p.id === versoId) ?? null;
+  const recto = allPhotos.find((p) => p.id === rectoId) ?? allPhotos[0] ?? null;
+  const verso = allPhotos.find((p) => p.id === versoId) ?? null;
   /** un verso existe : photo choisie, ou calque pris au scan */
   const hasVerso = verso != null || rectifiedV != null;
 
@@ -369,25 +382,66 @@ export function PregradeWizard({
     );
   }
 
-  // Calques fournis à l'ouverture (page Pré-gradées) : analyse automatique une fois monté
-  useEffect(() => {
-    if (!initialCapture || analyzedInitial.current) return;
-    analyzedInitial.current = true;
-    void autoAnalyze(initialCapture.recto, initialCapture.verso);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Prises de vues au scan : calques déjà redressés → analyse, puis étape Centrage
-  async function onCaptured(rectoUrl: string, versoUrl: string | null) {
+  async function onCaptured(rectoUrl: string, versoUrl: string | null, raw: CaptureRaw = {}) {
     setCapturing(null);
+    setFromScan(true);
+    setFace("r");
+    if (raw.recto || raw.verso) {
+      // Photo entière : on passe par le cadrage, avec la détection sur l'image fixe
+      setExtraPhotos([
+        { id: "capture-r", url: rectoUrl, label: "Recto (scan)" },
+        ...(versoUrl ? [{ id: "capture-v", url: versoUrl, label: "Verso (scan)" }] : []),
+      ]);
+      setRectoId("capture-r");
+      setVersoId(versoUrl ? "capture-v" : null);
+      setRectified(null);
+      setRectifiedV(null);
+      setQuad(DEFAULT_QUAD);
+      setQuadV(DEFAULT_QUAD);
+      setGuides(DEFAULT_GUIDES);
+      setGuidesV(DEFAULT_GUIDES);
+      touched.current = { r: false, v: false };
+      setStep(1);
+      void detectInto("r", rectoUrl);
+      if (versoUrl) void detectInto("v", versoUrl);
+      return;
+    }
     setRectified(rectoUrl);
     setRectifiedV(versoUrl);
     setGuides(RECTIFIED_GUIDES);
     setGuidesV(RECTIFIED_GUIDES);
-    setFace("r");
     await autoAnalyze(rectoUrl, versoUrl);
     setStep(2);
   }
+
+  /** Cadrage auto d'une photo donnée par URL (prise brute pas encore dans l'état) */
+  async function detectInto(f: "r" | "v", url: string) {
+    const setAuto = f === "r" ? setAutoR : setAutoV;
+    setAuto("searching");
+    try {
+      const q = await detectCardInImage(await loadImage(url));
+      if (q && !touched.current[f]) (f === "r" ? setQuad : setQuadV)(q as Quad);
+      setAuto(q ? "found" : "none");
+    } catch {
+      setAuto("none");
+    }
+  }
+
+  // Calques fournis à l'ouverture (page Pré-gradées) : analyse automatique une fois monté
+  useEffect(() => {
+    if (!initialCapture || analyzedInitial.current) return;
+    analyzedInitial.current = true;
+    // Différé d'un tick : l'analyse pose son état hors du corps de l'effet
+    window.setTimeout(() => {
+      if (initialRaw) {
+        void detectInto("r", initialCapture.recto);
+        if (initialCapture.verso) void detectInto("v", initialCapture.verso);
+      } else void autoAnalyze(initialCapture.recto, initialCapture.verso);
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Étape cadrage → suivant : redresse recto (et verso) dans le calque
   async function goNext() {
@@ -428,6 +482,7 @@ export function PregradeWizard({
     setSaving(true);
     const fd = new FormData();
     fd.set("item_id", itemId);
+    if (fromScan) fd.set("attach_photos", "1");
     fd.set("centering", String(centeringNote));
     fd.set("corners", String(cornersNote));
     fd.set("edges", String(edgesNote));
@@ -515,7 +570,7 @@ export function PregradeWizard({
           )}
           {step === 0 && (
             <StepPhotos
-              photos={photos}
+              photos={allPhotos}
               rectoId={rectoId}
               versoId={versoId}
               onPickRecto={(id) => {
@@ -640,7 +695,7 @@ export function PregradeWizard({
           )}
           {step === 5 && (
             <StepChecklists
-              photos={photos}
+              photos={allPhotos}
               edgeDefects={edgeDefects}
               surfaceDefects={surfaceDefects}
               onEdge={setEdgeDefects}

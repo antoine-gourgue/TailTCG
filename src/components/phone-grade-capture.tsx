@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Smartphone } from "lucide-react";
 import { createCaptureSession } from "@/app/capture/actions";
 import { Sheet } from "@/components/sheet";
+import type { CaptureRaw } from "@/components/grade-capture";
 
 /**
  * Desktop : QR code à flasher ; le téléphone prend recto/verso (calques
  * redressés) et l'ordinateur récupère les images dès qu'elles sont déposées.
  */
-export function PhoneGradeCapture({ onDone, onClose }: { onDone: (recto: string, verso: string | null) => void; onClose: () => void }) {
+export function PhoneGradeCapture({ onDone, onClose }: { onDone: (recto: string, verso: string | null, raw: CaptureRaw) => void; onClose: () => void }) {
   const [qr, setQr] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const stop = useRef(false);
@@ -31,10 +32,10 @@ export function PhoneGradeCapture({ onDone, onClose }: { onDone: (recto: string,
         try {
           const res = await fetch(`/api/capture/${session.token}`, { cache: "no-store" });
           if (!res.ok) continue;
-          const data = (await res.json()) as { status: string; result?: { rectoUrl?: string | null; versoUrl?: string | null } };
+          const data = (await res.json()) as { status: string; result?: { rectoUrl?: string | null; versoUrl?: string | null; raw?: CaptureRaw } };
           if (data.status === "done" && data.result?.rectoUrl) {
             stop.current = true;
-            onDone(data.result.rectoUrl, data.result.versoUrl ?? null);
+            onDone(data.result.rectoUrl, data.result.versoUrl ?? null, data.result.raw ?? {});
             break;
           }
         } catch {}

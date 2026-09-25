@@ -6,15 +6,20 @@ import { ScanEngine, type Quad } from "@/lib/scan/engine";
 import type { Pt as EnginePt } from "@/lib/scan/detect.mjs";
 import { loadImage, warpCardToCanvas, type Pt } from "@/lib/perspective";
 import { analyzeRectified, canvasFromUrl, orientationOf, rotate180 } from "@/lib/grading-auto";
+import { detectCardInImage } from "@/lib/scan/still";
 
 /* Réglages de la prise automatique */
 const TICK_MS = 130;
 /** immobilité requise avant la prise (ms) */
-const STABLE_MS = 700;
-/** déplacement toléré entre deux images, en fraction de la largeur vidéo */
-const STABLE_MOVE = 0.012;
+const STABLE_MS = 500;
+/** déplacement toléré entre deux images (cadre lissé), en fraction de la largeur vidéo */
+const STABLE_MOVE = 0.025;
+/** lissage du cadre d'une image à l'autre (0 = brut, 1 = figé) */
+const SMOOTH = 0.5;
 /** la carte doit occuper au moins cette part du petit côté de la vidéo */
-const MIN_WIDTH = 0.28;
+const MIN_WIDTH = 0.22;
+/** taille max d'une prise brute (sans cadre trouvé), grand côté */
+const RAW_MAX = 1800;
 /** après une prise, il faut que la carte disparaisse ou bouge franchement avant la suivante */
 const REARM_MOVE = 0.15;
 const OUT_W = 900;
@@ -37,7 +42,8 @@ function pickCard(quads: Quad[]): Quad | null {
     const top = dist(c[0], c[1]);
     const right = dist(c[1], c[2]);
     const ratio = Math.max(top, right) / Math.max(1, Math.min(top, right));
-    if (Math.abs(ratio - CARD_RATIO) / CARD_RATIO > 0.15) continue;
+    // vue en biais : les proportions apparentes s'écartent, on reste large
+    if (Math.abs(ratio - CARD_RATIO) / CARD_RATIO > 0.3) continue;
     const area = top * right;
     if (area > bestArea) {
       bestArea = area;
@@ -53,7 +59,10 @@ function pickCard(quads: Quad[]): Quad | null {
  * résolution et enchaîne recto puis verso. Déclencheur manuel en secours.
  * Rend deux data URL WebP.
  */
-export function GradeCapture({ onDone, onClose }: { onDone: (recto: string, verso: string | null) => void; onClose: () => void }) {
+/** Prise brute = photo entière (le cadrage se fera dans l'atelier) ; sinon calque déjà redressé */
+export type CaptureRaw = { recto?: boolean; verso?: boolean };
+
+export function GradeCapture({ onDone, onClose }: { onDone: (recto: string, verso: string | null, raw: CaptureRaw) => void; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<ScanEngine | null>(null);
@@ -64,6 +73,7 @@ export function GradeCapture({ onDone, onClose }: { onDone: (recto: string, vers
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const shots = useRef<{ recto: string | null; verso: string | null }>({ recto: null, verso: null });
+  const rawShots = useRef<CaptureRaw>({});
   const phaseRef = useRef<Phase>("recto");
   const capturing = useRef(false);
   const lastQuad = useRef<Quad | null>(null);
@@ -207,25 +217,49 @@ export function GradeCapture({ onDone, onClose }: { onDone: (recto: string, vers
       return url;
     }
 
-    /** Sans détection : le centre de l'image au format carte (80 % de la hauteur) */
-    function centerQuad(video: HTMLVideoElement): Quad {
+    /** Photo entière, réduite : l'atelier retrouvera le cadre sur l'image fixe */
+    function rawShot(video: HTMLVideoElement): string {
       const vw = video.videoWidth;
       const vh = video.videoHeight;
-      let h = vh * 0.8;
-      let w = h / CARD_RATIO;
-      if (w > vw * 0.9) {
-        w = vw * 0.9;
-        h = w * CARD_RATIO;
-      }
-      const x0 = (vw - w) / 2;
-      const y0 = (vh - h) / 2;
-      return { corners: [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h]], score: 0 };
+      const k = Math.min(1, RAW_MAX / Math.max(vw, vh));
+      const c = document.createElement("canvas");
+      c.width = Math.round(vw * k);
+      c.height = Math.round(vh * k);
+      c.getContext("2d")!.drawImage(video, 0, 0, c.width, c.height);
+      return c.toDataURL("image/webp", 0.9);
     }
 
-    async function take(video: HTMLVideoElement, q: Quad) {
+    /** Cadre de la carte dans l'image fixe (détection posée, pleine résolution), en pixels vidéo */
+    async function quadFromStill(video: HTMLVideoElement): Promise<Quad | null> {
+      const frame = document.createElement("canvas");
+      frame.width = video.videoWidth;
+      frame.height = video.videoHeight;
+      frame.getContext("2d")!.drawImage(video, 0, 0);
+      const img = await loadImage(frame.toDataURL("image/jpeg", 0.92));
+      const pts = await detectCardInImage(img, 4000);
+      if (!pts) return null;
+      return { corners: pts.map((p) => [p.x * video.videoWidth, p.y * video.videoHeight] as EnginePt), score: 1 };
+    }
+
+    async function take(video: HTMLVideoElement, q: Quad | null) {
       capturing.current = true;
       try {
-        const url = await shoot(video, q, phaseRef.current);
+        const face = phaseRef.current;
+        let url: string;
+        let raw = false;
+        if (q) url = await shoot(video, q, face);
+        else {
+          // déclencheur manuel sans cadre en direct : on cherche la carte sur l'image fixe, sinon photo entière
+          if (on) setStatus("Recherche de la carte sur la photo…");
+          const still = await quadFromStill(video);
+          if (still) url = await shoot(video, still, face);
+          else {
+            url = rawShot(video);
+            raw = true;
+          }
+        }
+        if (face === "recto") rawShots.current.recto = raw;
+        else rawShots.current.verso = raw;
         if (phaseRef.current === "recto") {
           shots.current.recto = url;
           phaseRef.current = "verso";
@@ -245,7 +279,7 @@ export function GradeCapture({ onDone, onClose }: { onDone: (recto: string, vers
         }
         navigator.vibrate?.(30);
         armed = false;
-        lastShotQuad = q;
+        lastShotQuad = q ?? lastShotQuad;
         stableSince = performance.now();
       } finally {
         capturing.current = false;
@@ -259,7 +293,7 @@ export function GradeCapture({ onDone, onClose }: { onDone: (recto: string, vers
         if (!on || !video || !engine) return;
         if (manual.current && !capturing.current && phaseRef.current !== "done") {
           manual.current = false;
-          await take(video, lastQuad.current ?? centerQuad(video));
+          await take(video, lastQuad.current);
         } else if (!engine.busy && !capturing.current && phaseRef.current !== "done") {
           const res = await engine.detect(video, { prev: prev?.corners ?? null, k: 3 });
           const vw = video.videoWidth || 1;
@@ -268,23 +302,27 @@ export function GradeCapture({ onDone, onClose }: { onDone: (recto: string, vers
           const wide = q ? Math.min(dist(q.corners[0], q.corners[1]), dist(q.corners[1], q.corners[2])) / Math.min(vw, vh) : 0;
           if (q && wide >= MIN_WIDTH) {
             const now = performance.now();
-            if (!prev || moved(prev, q, vw) > STABLE_MOVE) stableSince = now;
-            prev = q;
-            lastQuad.current = q;
+            // cadre lissé : la main tremble, pas la carte
+            const sm: Quad = prev
+              ? { corners: q.corners.map((p, i) => [prev!.corners[i][0] * SMOOTH + p[0] * (1 - SMOOTH), prev!.corners[i][1] * SMOOTH + p[1] * (1 - SMOOTH)] as EnginePt), score: q.score }
+              : q;
+            if (!prev || moved(prev, sm, vw) > STABLE_MOVE) stableSince = now;
+            prev = sm;
+            lastQuad.current = sm;
             // réarmement : la carte a franchement bougé depuis la dernière prise (elle a été retournée)
-            if (!armed && lastShotQuad && moved(lastShotQuad, q, vw) > REARM_MOVE) armed = true;
+            if (!armed && lastShotQuad && moved(lastShotQuad, sm, vw) > REARM_MOVE) armed = true;
             const held = now - stableSince;
             const holding = armed ? Math.min(1, held / STABLE_MS) : 0;
-            draw(q.corners, holding);
+            draw(sm.corners, holding);
             if (on) setStatus(armed ? (held < STABLE_MS ? "Ne bouge plus…" : "Prise !") : "Retourne la carte, ou bouge-la pour reprendre.");
-            if (armed && held >= STABLE_MS) await take(video, q);
+            if (armed && held >= STABLE_MS) await take(video, sm);
           } else {
             if (prev) armed = true;
             prev = null;
             lastQuad.current = null;
             stableSince = performance.now();
             draw(null, 0);
-            if (on) setStatus(phaseRef.current === "recto" ? "Cadre la carte entière, à plat." : "Retourne la carte, cadre le verso.");
+            if (on) setStatus(phaseRef.current === "recto" ? "Cadre la carte entière, à plat — ou appuie sur le déclencheur." : "Retourne la carte, cadre le verso — ou appuie sur le déclencheur.");
           }
         }
         if (on) loop();
@@ -302,7 +340,7 @@ export function GradeCapture({ onDone, onClose }: { onDone: (recto: string, vers
   }, []);
 
   function finish() {
-    if (shots.current.recto) onDone(shots.current.recto, shots.current.verso);
+    if (shots.current.recto) onDone(shots.current.recto, shots.current.verso, rawShots.current);
   }
 
   async function rotate(face: "recto" | "verso") {
@@ -315,6 +353,7 @@ export function GradeCapture({ onDone, onClose }: { onDone: (recto: string, vers
 
   function retake() {
     shots.current = { recto: null, verso: null };
+    rawShots.current = {};
     setRecto(null);
     setVerso(null);
     setPhase("recto");

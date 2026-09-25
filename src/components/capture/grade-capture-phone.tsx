@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, ScanLine } from "lucide-react";
-import { GradeCapture } from "@/components/grade-capture";
+import { GradeCapture, type CaptureRaw } from "@/components/grade-capture";
 
 async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
   return (await fetch(dataUrl)).blob();
@@ -12,12 +12,14 @@ async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
 export function GradeCapturePhone({ token }: { token: string }) {
   const [phase, setPhase] = useState<"intro" | "capture" | "sending" | "done" | "error">("capture");
 
-  async function send(recto: string, verso: string | null) {
+  async function send(recto: string, verso: string | null, raw: CaptureRaw) {
     setPhase("sending");
     try {
       const fd = new FormData();
       fd.append("recto", new File([await dataUrlToBlob(recto)], "recto.webp", { type: "image/webp" }));
       if (verso) fd.append("verso", new File([await dataUrlToBlob(verso)], "verso.webp", { type: "image/webp" }));
+      if (raw.recto) fd.append("recto_raw", "1");
+      if (raw.verso) fd.append("verso_raw", "1");
       const res = await fetch(`/api/capture/${token}/grade`, { method: "POST", body: fd });
       setPhase(res.ok ? "done" : "error");
     } catch {

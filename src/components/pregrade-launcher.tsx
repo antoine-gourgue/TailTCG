@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ScanLine, Search, Sparkles, X } from "lucide-react";
-import { GradeCapture } from "@/components/grade-capture";
+import { GradeCapture, type CaptureRaw } from "@/components/grade-capture";
+import { addRecognizedCard } from "@/app/pregrades/actions";
 import { PhoneGradeCapture } from "@/components/phone-grade-capture";
 import { PregradeWizard } from "@/components/pregrade-wizard";
 import { CardImage } from "@/components/card-image";
@@ -19,7 +20,7 @@ export type LauncherItem = {
   image_url: string;
 };
 
-type Capture = { recto: string; verso: string | null };
+type Capture = { recto: string; verso: string | null; raw: CaptureRaw };
 
 function fold(s: string): string {
   return s
@@ -58,8 +59,8 @@ export function PregradeLauncher({ items }: { items: LauncherItem[] }) {
   const [notice, setNotice] = useState<{ text: string; addHref?: string } | null>(null);
   const [q, setQ] = useState("");
 
-  async function onCaptured(recto: string, verso: string | null) {
-    const cap = { recto, verso };
+  async function onCaptured(recto: string, verso: string | null, raw: CaptureRaw = {}) {
+    const cap = { recto, verso, raw };
     setCapture(cap);
     setMode("idle");
     setBusy(true);
@@ -74,12 +75,20 @@ export function PregradeLauncher({ items }: { items: LauncherItem[] }) {
         setTarget(owned);
         setMode("wizard");
       } else if (candidates[0]) {
+        // Reconnue mais absente : on l'ajoute à la collection (à compléter) et on enchaîne
         const c = candidates[0];
-        setNotice({
-          text: `Carte reconnue : ${c.name} (${c.setName} · ${c.localId}), mais elle n'est pas dans ta collection. Ajoute-la, ou choisis l'exemplaire à la main.`,
-          addHref: `/ajouter?card=${encodeURIComponent(c.id)}`,
-        });
-        setMode("pick");
+        const added = await addRecognizedCard(c);
+        if (added.item) {
+          setNotice({ text: `${c.name} (${c.setName} · ${c.localId}) n'était pas dans ta collection : ajoutée, à compléter plus tard (état, prix).` });
+          setTarget(added.item);
+          setMode("wizard");
+        } else {
+          setNotice({
+            text: `Carte reconnue : ${c.name} (${c.setName} · ${c.localId}), mais l'ajout automatique a échoué. Ajoute-la, ou choisis l'exemplaire à la main.`,
+            addHref: `/ajouter?card=${encodeURIComponent(c.id)}`,
+          });
+          setMode("pick");
+        }
       } else {
         setNotice({ text: "Carte non reconnue sur cette photo. Choisis l'exemplaire dans ta collection : les prises sont conservées." });
         setMode("pick");
@@ -120,7 +129,7 @@ export function PregradeLauncher({ items }: { items: LauncherItem[] }) {
         </button>
       </div>
 
-      {notice && mode !== "wizard" && (
+      {notice && (
         <p className="mt-3 flex items-start gap-2 rounded-xl border border-accent/40 bg-accent-soft/60 px-3 py-2 text-sm">
           <Sparkles size={14} className="mt-0.5 shrink-0 text-accent-strong" aria-hidden />
           <span className="min-w-0 flex-1">

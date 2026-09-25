@@ -548,6 +548,18 @@ export async function saveGrading(formData: FormData) {
   const rectified_path = await uploadRectified("rectified");
   const rectified_verso_path = await uploadRectified("rectified_verso");
 
+  // Prises faites au scan : elles rejoignent la galerie de la carte (recto, verso)
+  if (str(formData, "attach_photos") === "1") {
+    const { count } = await admin.from("item_photos").select("id", { count: "exact", head: true }).eq("item_id", itemId);
+    const rows = [
+      rectified_path && { path: rectified_path, label: "Recto (scan)" },
+      rectified_verso_path && { path: rectified_verso_path, label: "Verso (scan)" },
+    ].filter((r): r is { path: string; label: string } => !!r);
+    if (rows.length > 0) {
+      await admin.from("item_photos").insert(rows.map((r, i) => ({ owner_id: user!.id, item_id: itemId, path: r.path, label: r.label, position: (count ?? 0) + i })));
+    }
+  }
+
   const { error } = await supabase.from("item_gradings").insert({
     item_id: itemId,
     centering: num("centering"),
