@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { formatEur } from "@/lib/domain";
 import type { MonthPoint } from "@/components/stats-widgets";
+import { useContainerWidth } from "@/lib/use-container-width";
 
-const W = 640;
 const H = 160;
+const MIN_W = 300;
 const PAD = { top: 18, right: 8, bottom: 22, left: 8 };
 const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 
@@ -24,6 +25,9 @@ function bar(x: number, y: number, w: number, h: number, r: number): string {
 /** Barres mensuelles : dépense (ou cartes ajoutées si aucun prix) sur 12 mois ; part scellée empilée si présente */
 export function MonthlyBars({ months, metric }: { months: MonthPoint[]; metric: "spend" | "cards" }) {
   const [hover, setHover] = useState<number | null>(null);
+  // Dessiné à la largeur réelle : textes lisibles sur mobile sans défilement
+  const [box, width] = useContainerWidth<HTMLDivElement>();
+  const W = Math.max(width, MIN_W);
   const slot = (W - PAD.left - PAD.right) / months.length;
   const bw = slot * 0.56;
   const val = (m: MonthPoint) => (metric === "spend" ? m.spend : m.cards);
@@ -45,7 +49,7 @@ export function MonthlyBars({ months, metric }: { months: MonthPoint[]; metric: 
           </span>
         </div>
       )}
-      <div className="relative">
+      <div className="relative" ref={box}>
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Achats par mois" onMouseLeave={() => setHover(null)}>
           <line x1={PAD.left} x2={W - PAD.right} y1={H - PAD.bottom} y2={H - PAD.bottom} stroke="currentColor" strokeOpacity={0.1} />
           {months.map((m, i) => {

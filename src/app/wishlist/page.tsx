@@ -3,6 +3,10 @@ import { redirect } from "next/navigation";
 import { Trash2, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { signStorageImages } from "@/lib/images";
+import { formatEur } from "@/lib/domain";
+import { getCard } from "@/lib/tcgdex";
+import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
+import { resolveCardmarketPrice } from "@/lib/cardmarket";
 import { AppShell } from "@/components/app-shell";
 import { CardImage } from "@/components/card-image";
 import { removeFromWishlist } from "./actions";
@@ -25,6 +29,21 @@ export default async function WishlistPage() {
 
   const wishes = await signStorageImages(rows ?? [], user.id);
 
+  // Cote Cardmarket de chaque carte recherchée : fiche TCGdex (cache 24 h) puis guide local
+  const prices = new Map<string, number>();
+  await Promise.all(
+    wishes
+      .filter((w) => !w.tcgdex_id.startsWith("custom:"))
+      .slice(0, 80)
+      .map(async (w) => {
+        const card = await getCard(w.tcgdex_id).catch(() => null);
+        if (!card) return;
+        const price = await resolveCardmarketPrice(overrideCardmarketId(card.id, card.pricing?.cardmarket?.idProduct), card.pricing?.cardmarket);
+        if (price != null) prices.set(w.tcgdex_id, price);
+      })
+  );
+  const total = [...prices.values()].reduce((a, v) => a + v, 0);
+
   return (
     <AppShell>
       <main className="page py-8">
@@ -34,6 +53,13 @@ export default async function WishlistPage() {
         <p className="mb-6 text-sm text-muted">
           Ton carnet de chasse : ces cartes sortent automatiquement de la liste
           quand tu les ajoutes à ta collection.
+          {prices.size > 0 && (
+            <>
+              {" "}
+              Au cours Cardmarket, il te manque <span className="num text-foreground">≈ {formatEur(total)}</span>
+              {prices.size < wishes.length ? ` (${prices.size} carte${prices.size > 1 ? "s" : ""} cotée${prices.size > 1 ? "s" : ""} sur ${wishes.length})` : ""}.
+            </>
+          )}
         </p>
 
         {wishes.length === 0 ? (
@@ -69,8 +95,13 @@ export default async function WishlistPage() {
                       {wish.set_name}{" "}
                       <span className="num text-faint">· {wish.local_id}</span>
                     </p>
-                    <p className="mt-1 text-xs text-accent">
-                      Je l&apos;ai trouvée →
+                    <p className="mt-1 flex items-baseline justify-between gap-2 text-xs">
+                      <span className="text-accent">Je l&apos;ai trouvée →</span>
+                      {prices.has(wish.tcgdex_id) && (
+                        <span className="num shrink-0 text-muted" title="Cote Cardmarket">
+                          {formatEur(prices.get(wish.tcgdex_id)!)}
+                        </span>
+                      )}
                     </p>
                   </div>
                 </Link>

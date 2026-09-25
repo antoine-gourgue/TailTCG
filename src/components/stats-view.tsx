@@ -515,13 +515,9 @@ function SealedRow({ r, right }: { r: SealedRank; right: React.ReactNode }) {
   );
 }
 
-/** Sur mobile, les graphiques gardent une largeur lisible et défilent */
+/** Les graphiques se dessinent à la largeur disponible (voir useContainerWidth) */
 function Scrollable({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="-mx-1 min-w-0 overflow-x-auto px-1 sm:overflow-visible">
-      <div className="min-w-[540px] sm:min-w-0">{children}</div>
-    </div>
-  );
+  return <div className="min-w-0">{children}</div>;
 }
 
 function SetRow({ set }: { set: SetStat }) {

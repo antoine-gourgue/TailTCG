@@ -120,6 +120,9 @@ export default async function PregradesPage() {
               « Pré-grader » : centrage mesuré, coins zoomés, verdict — et le
               boîtier apparaîtra ici.
             </p>
+            <Link href="/" className="btn btn-primary mt-2">
+              Ouvrir une carte
+            </Link>
           </div>
         ) : (
           <ul className="rise-in grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4">

@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { MoreHorizontal, Trash2 } from "lucide-react";
 import { useActionState, useState } from "react";
 import {
   createSourceForm,
@@ -150,6 +151,7 @@ function EditSourceForm({
 
 function SourceRow({ source }: { source: SourceWithStats }) {
   const [editing, setEditing] = useState(false);
+  const [menu, setMenu] = useState(false);
 
   return (
     <li className="panel p-4">
@@ -191,22 +193,44 @@ function SourceRow({ source }: { source: SourceWithStats }) {
             )}
           </p>
         </div>
-        <div className="flex shrink-0 gap-3 text-sm">
+        <div className="relative flex shrink-0 items-center gap-1 text-sm">
           <button
             type="button"
             onClick={() => setEditing((v) => !v)}
-            className="text-muted transition hover:text-foreground"
+            className="rounded-lg px-2 py-1 text-muted transition hover:bg-raised hover:text-foreground"
           >
             {editing ? "Fermer" : "Modifier"}
           </button>
-          <ConfirmAction
-            action={deleteSource}
-            fields={{ source_id: source.id }}
-            title={`Supprimer « ${source.name} » ?`}
-            message="Les cartes achetées là resteront dans ta collection mais perdront leur source."
-            trigger="Supprimer"
-            triggerClassName="text-loss transition hover:opacity-80"
-          />
+          {/* La suppression est à l'abri d'un faux clic, derrière le menu ⋯ */}
+          <button
+            type="button"
+            onClick={() => setMenu((v) => !v)}
+            aria-label="Plus d'actions"
+            aria-haspopup="menu"
+            aria-expanded={menu}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition hover:bg-raised hover:text-foreground"
+          >
+            <MoreHorizontal size={16} aria-hidden />
+          </button>
+          {menu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} aria-hidden />
+              <div role="menu" className="panel absolute right-0 top-full z-20 mt-1 min-w-40 !p-1">
+                <ConfirmAction
+                  action={deleteSource}
+                  fields={{ source_id: source.id }}
+                  title={`Supprimer « ${source.name} » ?`}
+                  message="Les cartes achetées là resteront dans ta collection mais perdront leur source."
+                  trigger={
+                    <span className="flex items-center gap-2">
+                      <Trash2 size={14} aria-hidden /> Supprimer
+                    </span>
+                  }
+                  triggerClassName="flex w-full rounded-lg px-3 py-2 text-left text-sm text-loss transition hover:bg-raised"
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
       {editing && <EditSourceForm source={source} onDone={() => setEditing(false)} />}

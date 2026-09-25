@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { formatEur } from "@/lib/domain";
+import { useContainerWidth } from "@/lib/use-container-width";
 
 export type ValuePoint = { recorded_at: string; value: number };
 /** Composante empilée de la courbe (ex. cartes, scellés) */
 export type ValueLayer = { label: string; points: ValuePoint[] };
 
-const W = 640;
 const H = 200;
+const MIN_W = 300;
 const PAD = { top: 14, right: 72, bottom: 26, left: 8 };
 const LAYER_COLORS = ["var(--accent)", "var(--sealed)"];
 /** Au-delà, les points ne sont plus dessinés un à un (relevés quotidiens) */
@@ -44,6 +45,9 @@ export function ValueHistoryChart({ points, layers }: { points: ValuePoint[]; la
   const [hover, setHover] = useState<number | null>(null);
   // -1 : total empilé, sinon l'index de la couche affichée seule
   const [view, setView] = useState(-1);
+  // Dessiné à la largeur réelle : textes lisibles sur mobile sans défilement
+  const [box, width] = useContainerWidth<HTMLDivElement>();
+  const W = Math.max(width, MIN_W);
   const hasLayers = !!layers && layers.length > 0;
   const stacked = hasLayers && view < 0;
   const data = sortPoints(hasLayers && view >= 0 ? layers[view].points : points);
@@ -159,7 +163,7 @@ export function ValueHistoryChart({ points, layers }: { points: ValuePoint[]; la
   return (
     <div>
       {header}
-      <div className="relative">
+      <div className="relative" ref={box}>
         <svg
           viewBox={`0 0 ${W} ${H}`}
           role="img"
