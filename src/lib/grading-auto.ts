@@ -68,6 +68,38 @@ function strongestLine(g: Gray, from: number, to: number, vertical: boolean): { 
   return { pos: (bestPos + 0.5) / n, confidence };
 }
 
+/**
+ * Premier bord franc en partant de l'extérieur (bord de la carte) : on ne
+ * prend pas la transition la plus forte de la bande, qui serait souvent la
+ * bordure imprimée, mais la première qui dépasse la moitié du maximum.
+ */
+function firstLine(g: Gray, from: number, to: number, vertical: boolean, fromOutside: "start" | "end"): { pos: number; confidence: number } {
+  const { w, h, L } = g;
+  const n = vertical ? w : h;
+  const a = Math.max(1, Math.floor(from * n));
+  const b = Math.min(n - 2, Math.ceil(to * n));
+  const other = vertical ? h : w;
+  const o0 = Math.floor(other * 0.25);
+  const o1 = Math.floor(other * 0.75);
+  const grads: number[] = [];
+  for (let p = a; p <= b; p++) {
+    let sum = 0;
+    for (let q = o0; q < o1; q += 2) {
+      const i = vertical ? q * w + p : p * w + q;
+      const j = vertical ? q * w + p + 1 : (p + 1) * w + q;
+      sum += Math.abs(L[j] - L[i]);
+    }
+    grads.push(sum);
+  }
+  const max = Math.max(...grads);
+  const sorted = [...grads].sort((x, y) => x - y);
+  const median = sorted[Math.floor(sorted.length / 2)] || 1;
+  const confidence = Math.min(1, Math.max(0, (max / median - 2) / 8));
+  const order = fromOutside === "start" ? grads.map((_, i) => i) : grads.map((_, i) => grads.length - 1 - i);
+  const hit = order.find((i) => grads[i] >= max * 0.5) ?? order[0];
+  return { pos: (a + hit + 0.5) / n, confidence };
+}
+
 /** Pixel « blanchi » : clair et peu saturé (fibre du carton à nu) */
 function isWhite(rgba: Uint8ClampedArray, i: number): boolean {
   const r = rgba[i];
@@ -115,29 +147,36 @@ export function analyzeRectified(canvas: HTMLCanvasElement): AutoAnalysis | null
   if (!g) return null;
   const { w, h } = g;
 
-  /* ——— Bords extérieurs (la carte occupe le calque à ~3 % près) puis intérieurs ——— */
-  const oL = strongestLine(g, 0, 0.08, true);
-  const oR = strongestLine(g, 0.92, 1, true);
-  const oT = strongestLine(g, 0, 0.08, false);
-  const oB = strongestLine(g, 0.92, 1, false);
+  /* ——— Bords extérieurs : le calque garde une marge de fond autour de la carte (prise au
+     scan : ~6 %, photo cadrée à la main : ~3 %), la transition fond → carte est franche ——— */
+  const oL = firstLine(g, 0, 0.11, true, "start");
+  const oR = firstLine(g, 0.89, 1, true, "end");
+  const oT = firstLine(g, 0, 0.11, false, "start");
+  const oB = firstLine(g, 0.89, 1, false, "end");
   const outer = {
     oL: oL.confidence > 0.3 ? oL.pos : 0.032,
     oR: oR.confidence > 0.3 ? oR.pos : 0.968,
     oT: oT.confidence > 0.3 ? oT.pos : 0.032,
     oB: oB.confidence > 0.3 ? oB.pos : 0.968,
   };
-  const iL = strongestLine(g, outer.oL + 0.02, outer.oL + 0.2, true);
-  const iR = strongestLine(g, outer.oR - 0.2, outer.oR - 0.02, true);
-  const iT = strongestLine(g, outer.oT + 0.02, outer.oT + 0.2, false);
-  const iB = strongestLine(g, outer.oB - 0.2, outer.oB - 0.02, false);
+  /* ——— Bord intérieur de la bordure imprimée (jaune, bleue…) : c'est elle que mesurent les
+     gradeurs. Elle fait 3 à 8 % de la largeur : on ne cherche pas plus loin, pour ne pas
+     accrocher le cadre de l'illustration ou une ligne de texte ——— */
+  const inner = (from: number, span: number, vertical: boolean, dir: 1 | -1) =>
+    dir > 0 ? strongestLine(g, from + 0.012, from + span, vertical) : strongestLine(g, from - span, from - 0.012, vertical);
+  const iL = inner(outer.oL, 0.11, true, 1);
+  const iR = inner(outer.oR, 0.11, true, -1);
+  const iT = inner(outer.oT, 0.09, false, 1);
+  const iB = inner(outer.oB, 0.09, false, -1);
   const centeringConfidence = Math.min(iL.confidence, iR.confidence, iT.confidence, iB.confidence);
-  const guides: Guides | null = centeringConfidence > 0.25 ? { ...outer, iL: iL.pos, iR: iR.pos, iT: iT.pos, iB: iB.pos } : null;
+  const guides: Guides | null = centeringConfidence > 0.35 ? { ...outer, iL: iL.pos, iR: iR.pos, iT: iT.pos, iB: iB.pos } : null;
 
   /* ——— Bordure unie ? (bande gauche entre bord extérieur et intérieur, hauteur centrale) ——— */
   const bx0 = Math.round((outer.oL + 0.006) * w);
   const bx1 = Math.round(((guides?.iL ?? outer.oL + 0.05) - 0.006) * w);
   const border = lumaStd(g, bx0, Math.round(h * 0.3), Math.max(bx0 + 2, bx1), Math.round(h * 0.7));
-  const borderUniform = border.std < 18 && bx1 - bx0 >= 4;
+  // photo réelle : grain, léger dégradé d'éclairage → tolérance plus large qu'en synthèse
+  const borderUniform = border.std < 28 && bx1 - bx0 >= Math.round(w * 0.015);
   // bordure déjà très claire (cartes à bord blanc) : le blanchiment n'est pas séparable
   const borderLight = border.mean > 200;
 
@@ -175,6 +214,52 @@ export function analyzeRectified(canvas: HTMLCanvasElement): AutoAnalysis | null
   }
 
   return { guides, centeringConfidence, borderUniform: analyzable, corners, cornerWhite, edgeDefects, edgeWhite };
+}
+
+/**
+ * La carte est-elle à l'endroit ? Sur une carte classique, l'illustration
+ * (colorée) occupe le haut et la zone de texte (claire, peu saturée) le bas.
+ * Renvoie "upright", "upside-down" ou "unknown" (full art, verso…).
+ */
+export function orientationOf(canvas: HTMLCanvasElement): "upright" | "upside-down" | "unknown" {
+  const g = gray(canvas);
+  if (!g) return "unknown";
+  const { w, h, rgba } = g;
+  const sat = (y0: number, y1: number) => {
+    let n = 0;
+    let s = 0;
+    for (let y = Math.round(h * y0); y < Math.round(h * y1); y += 2)
+      for (let x = Math.round(w * 0.12); x < Math.round(w * 0.88); x += 2) {
+        const i = (y * w + x) * 4;
+        const mx = Math.max(rgba[i], rgba[i + 1], rgba[i + 2]);
+        const mn = Math.min(rgba[i], rgba[i + 1], rgba[i + 2]);
+        s += mx ? (mx - mn) / mx : 0;
+        n++;
+      }
+    return n ? s / n : 0;
+  };
+  const d = sat(0.16, 0.48) - sat(0.56, 0.9);
+  return d > 0.06 ? "upright" : d < -0.06 ? "upside-down" : "unknown";
+}
+
+/** Data URL → même image tournée de 180° (WebP) */
+export function rotate180(dataUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth;
+      c.height = img.naturalHeight;
+      const ctx = c.getContext("2d");
+      if (!ctx) return reject(new Error("canvas"));
+      ctx.translate(c.width, c.height);
+      ctx.rotate(Math.PI);
+      ctx.drawImage(img, 0, 0);
+      resolve(c.toDataURL("image/webp", 0.9));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
 }
 
 /** Charge une image (data URL ou http) dans un canvas de travail */

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, Check, RotateCcw, SkipForward } from "lucide-react";
 import { ScanEngine, type Quad } from "@/lib/scan/engine";
 import { loadImage, warpCardToCanvas, type Pt } from "@/lib/perspective";
+import { analyzeRectified, canvasFromUrl, orientationOf, rotate180 } from "@/lib/grading-auto";
 import { Sheet } from "@/components/sheet";
 
 /* Réglages de la prise automatique */
@@ -18,6 +19,8 @@ const MIN_WIDTH = 0.3;
 const REARM_MOVE = 0.15;
 const OUT_W = 900;
 const OUT_H = Math.round((900 * 88) / 63);
+/** le cadre détecté colle aux bords : on l'élargit pour garder les tranches et un peu de fond */
+const QUAD_MARGIN = 0.035;
 
 type Phase = "recto" | "verso" | "done";
 
@@ -81,7 +84,7 @@ export function GradeCapture({ onDone, onClose }: { onDone: (recto: string, vers
       return e / 4 / vw;
     }
 
-    async function shoot(video: HTMLVideoElement, q: Quad): Promise<string> {
+    async function shoot(video: HTMLVideoElement, q: Quad, face: Phase): Promise<string> {
       // image pleine résolution → calque 900×1257 en WebP
       const frame = document.createElement("canvas");
       frame.width = video.videoWidth;
@@ -91,9 +94,22 @@ export function GradeCapture({ onDone, onClose }: { onDone: (recto: string, vers
       const out = document.createElement("canvas");
       out.width = OUT_W;
       out.height = OUT_H;
-      const norm = q.corners.map(([x, y]) => ({ x: x / video.videoWidth, y: y / video.videoHeight })) as [Pt, Pt, Pt, Pt];
+      // cadre élargi autour de son centre : les vraies tranches restent dans le calque
+      const cx = q.corners.reduce((a, p) => a + p[0], 0) / 4;
+      const cy = q.corners.reduce((a, p) => a + p[1], 0) / 4;
+      const norm = q.corners.map(([x, y]) => ({
+        x: (cx + (x - cx) * (1 + QUAD_MARGIN)) / video.videoWidth,
+        y: (cy + (y - cy) * (1 + QUAD_MARGIN)) / video.videoHeight,
+      })) as [Pt, Pt, Pt, Pt];
       warpCardToCanvas(img, norm, out, { grid: 20 });
-      return out.toDataURL("image/webp", 0.9);
+      let url = out.toDataURL("image/webp", 0.9);
+      // recto d'une carte classique tenu à l'envers (illustration en bas) → on retourne ;
+      // sur une full art on ne tranche pas, le bouton « Pivoter » reste là
+      if (face === "recto") {
+        const small = await canvasFromUrl(url, 300);
+        if (analyzeRectified(small)?.guides && orientationOf(small) === "upside-down") url = await rotate180(url);
+      }
+      return url;
     }
 
     function loop() {
@@ -118,7 +134,7 @@ export function GradeCapture({ onDone, onClose }: { onDone: (recto: string, vers
             if (armed && held >= STABLE_MS) {
               capturing.current = true;
               try {
-                const url = await shoot(video, q);
+                const url = await shoot(video, q, phaseRef.current);
                 if (phaseRef.current === "recto") {
                   shots.current.recto = url;
                   if (on) {
@@ -169,6 +185,14 @@ export function GradeCapture({ onDone, onClose }: { onDone: (recto: string, vers
 
   function finish() {
     if (shots.current.recto) onDone(shots.current.recto, shots.current.verso);
+  }
+
+  async function rotate(face: "recto" | "verso") {
+    const cur = shots.current[face];
+    if (!cur) return;
+    const next = await rotate180(cur);
+    shots.current[face] = next;
+    (face === "recto" ? setRecto : setVerso)(next);
   }
 
   function retake() {
@@ -222,8 +246,8 @@ export function GradeCapture({ onDone, onClose }: { onDone: (recto: string, vers
 
         {(recto || verso) && (
           <div className="flex justify-center gap-3">
-            {recto && <Thumb url={recto} label="Recto" />}
-            {verso && <Thumb url={verso} label="Verso" />}
+            {recto && <Thumb url={recto} label="Recto" onRotate={() => void rotate("recto")} />}
+            {verso && <Thumb url={verso} label="Verso" onRotate={() => void rotate("verso")} />}
           </div>
         )}
 
@@ -249,12 +273,17 @@ export function GradeCapture({ onDone, onClose }: { onDone: (recto: string, vers
   );
 }
 
-function Thumb({ url, label }: { url: string; label: string }) {
+function Thumb({ url, label, onRotate }: { url: string; label: string; onRotate: () => void }) {
   return (
     <figure className="text-center">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={url} alt={label} className="h-28 w-auto rounded-lg border border-edge-strong shadow" />
-      <figcaption className="mt-1 text-[11px] text-muted">{label}</figcaption>
+      <figcaption className="mt-1 flex items-center justify-center gap-2 text-[11px] text-muted">
+        {label}
+        <button type="button" onClick={onRotate} className="rounded px-1 text-accent-strong underline-offset-2 hover:underline" title="Pivoter de 180°">
+          Pivoter
+        </button>
+      </figcaption>
     </figure>
   );
 }

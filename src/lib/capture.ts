@@ -7,7 +7,7 @@ const UUID_RE =
 export type CaptureRow = {
   id: string;
   owner_id: string;
-  kind: "detect" | "photos";
+  kind: "detect" | "photos" | "grade";
   item_id: string | null;
   status: "pending" | "done" | "cancelled";
   result: unknown;

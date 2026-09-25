@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ScanLine, Search, Sparkles, X } from "lucide-react";
 import { GradeCapture } from "@/components/grade-capture";
+import { PhoneGradeCapture } from "@/components/phone-grade-capture";
 import { PregradeWizard } from "@/components/pregrade-wizard";
 import { CardImage } from "@/components/card-image";
 import { Sheet } from "@/components/sheet";
@@ -30,6 +31,7 @@ function fold(s: string): string {
 /** Data URL WebP → JPEG (la reconnaissance attend du JPEG) */
 async function toJpeg(dataUrl: string): Promise<Blob> {
   const img = new Image();
+  img.crossOrigin = "anonymous";
   await new Promise<void>((res, rej) => {
     img.onload = () => res();
     img.onerror = rej;
@@ -48,7 +50,8 @@ async function toJpeg(dataUrl: string): Promise<Blob> {
  * collection, puis ouvrir l'atelier déjà analysé — ou choisir la carte à la main.
  */
 export function PregradeLauncher({ items }: { items: LauncherItem[] }) {
-  const [mode, setMode] = useState<"idle" | "capture" | "pick" | "wizard">("idle");
+  const [mode, setMode] = useState<"idle" | "capture" | "phone" | "pick" | "wizard">("idle");
+  const isTouch = () => window.matchMedia("(pointer: coarse)").matches;
   const [capture, setCapture] = useState<Capture | null>(null);
   const [target, setTarget] = useState<LauncherItem | null>(null);
   const [busy, setBusy] = useState(false);
@@ -107,7 +110,7 @@ export function PregradeLauncher({ items }: { items: LauncherItem[] }) {
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => setMode("capture")} className="btn btn-primary" disabled={busy}>
+        <button type="button" onClick={() => setMode(isTouch() ? "capture" : "phone")} className="btn btn-primary" disabled={busy}>
           <ScanLine size={15} aria-hidden />
           {busy ? "Reconnaissance…" : "Pré-grader au scan"}
         </button>
@@ -138,6 +141,7 @@ export function PregradeLauncher({ items }: { items: LauncherItem[] }) {
       )}
 
       {mode === "capture" && <GradeCapture onDone={onCaptured} onClose={() => setMode("idle")} />}
+      {mode === "phone" && <PhoneGradeCapture onDone={onCaptured} onClose={() => setMode("idle")} />}
 
       {mode === "pick" && (
         <Sheet

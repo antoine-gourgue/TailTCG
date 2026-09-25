@@ -1,6 +1,7 @@
 import { Logo } from "@/components/logo";
 import { loadCaptureByToken } from "@/lib/capture";
 import { CapturePhone } from "@/components/capture/capture-phone";
+import { GradeCapturePhone } from "@/components/capture/grade-capture-phone";
 
 export const metadata = { title: "Capture — TailTCG" };
 
@@ -35,7 +36,7 @@ export default async function CapturePage({
           <p className="text-sm text-muted">Cadre bien la carte, prends une ou plusieurs photos.</p>
         </div>
       )}
-      <CapturePhone token={token} kind={session.kind} />
+      {session.kind === "grade" ? <GradeCapturePhone token={token} /> : <CapturePhone token={token} kind={session.kind} />}
     </main>
   );
 }

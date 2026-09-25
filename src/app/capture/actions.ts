@@ -4,9 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 
 export type CaptureSession = { id: string; token: string } | { error: string };
 
-/** Desktop : ouvre une session de capture (jeton à flasher ; 30 min pour scanner une pile de cartes, 10 min pour des photos) */
+/** Desktop : ouvre une session de capture (jeton à flasher ; 30 min pour scanner une pile de cartes, 10 min pour des photos ou une pré-gradation) */
 export async function createCaptureSession(
-  kind: "detect" | "photos",
+  kind: "detect" | "photos" | "grade",
   itemId?: string
 ): Promise<CaptureSession> {
   const supabase = await createClient();

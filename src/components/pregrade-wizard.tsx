@@ -10,12 +10,17 @@ import {
   Sparkles,
   ScanLine,
 } from "lucide-react";
+
+/** Écran tactile (téléphone, tablette) : on scanne sur place ; sinon on passe par le téléphone (QR) */
+const isTouch = () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
 import { saveGrading } from "@/app/items/actions";
 import { GRADE_LABELS } from "@/lib/grading";
 import { loadImage, warpCardToCanvas, type Pt } from "@/lib/perspective";
 import { detectCardInImage } from "@/lib/scan/still";
 import { analyzeRectified, canvasFromUrl } from "@/lib/grading-auto";
 import { GradeCapture } from "@/components/grade-capture";
+import { PhoneGradeCapture } from "@/components/phone-grade-capture";
+import { Smartphone } from "lucide-react";
 import { estimateAll, CRITERION_LABEL, gradeLabel, ratioLabel, type GraderEstimate } from "@/lib/graders";
 import type { Annotation } from "@/lib/grading-defects";
 import { DefectAnnotator } from "@/components/defect-annotator";
@@ -93,13 +98,17 @@ const DEFAULT_GUIDES: Guides = {
   iB: 0.82,
 };
 
-// Après redressement, la carte occupe le calque à 3 % près
+// Après redressement, la carte occupe le calque à 3 % près ; repères intérieurs
+// symétriques par défaut (50/50 tant qu'on n'a pas mesuré), sur la bordure imprimée
 const RECTIFIED_GUIDES: Guides = {
-  ...DEFAULT_GUIDES,
   oL: 0.032,
   oR: 0.968,
   oT: 0.032,
   oB: 0.968,
+  iL: 0.1,
+  iR: 0.9,
+  iT: 0.09,
+  iB: 0.91,
 };
 
 type Quad = [Pt, Pt, Pt, Pt];
@@ -167,7 +176,7 @@ export function PregradeWizard({
 }) {
   const router = useRouter();
   const [step, setStep] = useState(initialCapture ? 2 : 0);
-  const [capturing, setCapturing] = useState(startWithScan && !initialCapture);
+  const [capturing, setCapturing] = useState<"local" | "phone" | null>(() => (startWithScan && !initialCapture ? (isTouch() ? "local" : "phone") : null));
   // Ce que l'analyse automatique a rempli : rappelé à l'écran pour inviter à vérifier
   const [autoNote, setAutoNote] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -338,7 +347,11 @@ export function PregradeWizard({
     } catch {
       // l'analyse est un confort : en cas d'échec, tout reste manuel
     }
-    setAutoNote(filled.length > 0 ? `Analyse automatique : ${filled.join(", ")}. Vérifie et corrige si besoin.` : null);
+    setAutoNote(
+      filled.length > 0
+        ? `Analyse automatique : ${filled.join(", ")}. Vérifie et corrige si besoin.`
+        : "Analyse automatique : bordure non reconnue sur cette carte (full art, reflet ou cadrage) — tout est à placer à la main.",
+    );
   }
 
   // Calques fournis à l'ouverture (page Pré-gradées) : analyse automatique une fois monté
@@ -351,7 +364,7 @@ export function PregradeWizard({
 
   // Prises de vues au scan : calques déjà redressés → analyse, puis étape Centrage
   async function onCaptured(rectoUrl: string, versoUrl: string | null) {
-    setCapturing(false);
+    setCapturing(null);
     setRectified(rectoUrl);
     setRectifiedV(versoUrl);
     setGuides(RECTIFIED_GUIDES);
@@ -461,7 +474,8 @@ export function PregradeWizard({
         </div>
       }
     >
-        {capturing && <GradeCapture onDone={onCaptured} onClose={() => setCapturing(false)} />}
+        {capturing === "local" && <GradeCapture onDone={onCaptured} onClose={() => setCapturing(null)} />}
+        {capturing === "phone" && <PhoneGradeCapture onDone={onCaptured} onClose={() => setCapturing(null)} />}
         {/* Contenu */}
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
           {autoNote && step >= 2 && step <= 5 && (
@@ -471,10 +485,18 @@ export function PregradeWizard({
             </p>
           )}
           {step === 0 && (
-            <button type="button" onClick={() => setCapturing(true)} className="btn btn-primary mb-4 w-full !justify-center">
-              <ScanLine size={15} aria-hidden />
-              Scanner la carte avec l&apos;appareil photo
-            </button>
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+              <button type="button" onClick={() => setCapturing(isTouch() ? "local" : "phone")} className="btn btn-primary flex-1 !justify-center">
+                {isTouch() ? <ScanLine size={15} aria-hidden /> : <Smartphone size={15} aria-hidden />}
+                {isTouch() ? "Scanner la carte avec l'appareil photo" : "Scanner avec ton téléphone (QR code)"}
+              </button>
+              {!isTouch() && (
+                <button type="button" onClick={() => setCapturing("local")} className="btn btn-ghost !justify-center">
+                  <ScanLine size={15} aria-hidden />
+                  Webcam
+                </button>
+              )}
+            </div>
           )}
           {step === 0 && (
             <StepPhotos
@@ -951,8 +973,7 @@ function StepCentering({
     <div>
       <p className="mb-1 text-sm font-medium">
         Place les lignes <span className="text-accent-strong">rouges</span> sur les
-        bords de la carte, les <span className="text-gain">vertes</span> sur le
-        cadre de l&apos;illustration.
+        bords de la carte, les <span className="text-gain">vertes</span> sur le bord intérieur de la bordure imprimée.
       </p>
       <p className="mb-3 text-xs text-muted">
         Les ratios se mesurent en direct — c&apos;est la note la plus objective
