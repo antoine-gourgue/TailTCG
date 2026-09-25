@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app-shell";
 import { buildSealedTree } from "@/lib/sealed";
-import { loadSealedProducts, sealedCotes } from "@/lib/sealed-prices";
+import { getSealedCatalog } from "@/lib/sealed-prices";
 import { CatalogClient } from "./catalog-client";
 
 export const metadata = {
@@ -20,8 +20,9 @@ export default async function AjouterScellePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const rows = await loadSealedProducts();
-  const tree = buildSealedTree(rows, await sealedCotes(rows));
+  // Catalogue en cache partagé : la page ne refait pas 2 700 lignes + le guide à chaque ouverture
+  const { products: rows, cotes } = await getSealedCatalog();
+  const tree = buildSealedTree(rows, new Map(cotes));
 
   return (
     <AppShell>

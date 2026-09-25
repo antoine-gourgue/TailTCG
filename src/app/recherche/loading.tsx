@@ -1,7 +1,6 @@
-import { PageLoader } from "@/components/page-loader";
+import { ShellLoading } from "@/components/shell-loading";
 
-// Catalogue : le loader TailTCG tant que sets, cartes, visuels et cotes ne
-// sont pas tous récupérés (TCGdex, puis la base) — jamais de page partielle
+// Chargement : la coquille reste en place, le contenu se dessine en squelette
 export default function Loading() {
-  return <PageLoader />;
+  return <ShellLoading />;
 }

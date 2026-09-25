@@ -20,6 +20,9 @@ import {
   UserRound,
   ChevronRight,
   Package,
+  Boxes,
+  ScanLine,
+  RectangleVertical,
   type LucideIcon,
 } from "lucide-react";
 import { signOut } from "@/app/actions";
@@ -27,21 +30,29 @@ import { formatEur } from "@/lib/domain";
 import type { ShellData } from "@/lib/shell-store";
 import { Logo } from "@/components/logo";
 
-// Navigation mobile : barre haute sobre (logo + recherche), barre d'onglets
-// (Collection · Cartes · + · Classeurs · Profil). L'onglet Profil ouvre
-// une sheet avec le reste de la navigation, le thème et le compte.
+// Navigation mobile : barre haute sobre (logo + recherche), dock
+// (Collection · Cartes · + · Scellés · Menu). Le « + » propose carte, scellé
+// ou scan ; l'onglet Menu ouvre une sheet avec le reste de la navigation,
+// le thème et le compte.
 
 type Tab = { href: string; label: string; Icon: LucideIcon };
 
 const TABS: Tab[] = [
   { href: "/collection", label: "Collection", Icon: BarChart3 },
   { href: "/", label: "Cartes", Icon: LayoutGrid },
-  { href: "/classeurs", label: "Classeurs", Icon: NotebookTabs },
+  { href: "/scelles", label: "Scellés", Icon: Boxes },
 ];
 
-/** Pages accessibles depuis la sheet Profil */
+/** Choix du bouton « + » */
+const ADD: (Tab & { sub: string })[] = [
+  { href: "/recherche", label: "Une carte", sub: "Depuis le catalogue", Icon: RectangleVertical },
+  { href: "/scelles/ajouter", label: "Un scellé", sub: "ETB, display, coffret…", Icon: Boxes },
+  { href: "/scan", label: "Scanner une carte", sub: "Avec l'appareil photo", Icon: ScanLine },
+];
+
+/** Pages accessibles depuis la sheet Menu */
 const MORE: Tab[] = [
-  { href: "/scelles", label: "Scellés", Icon: Package },
+  { href: "/classeurs", label: "Classeurs", Icon: NotebookTabs },
   { href: "/wishlist", label: "Recherchées", Icon: Star },
   { href: "/boosters", label: "Boosters", Icon: Package },
   { href: "/pregrades", label: "Pré-gradées", Icon: Award },
@@ -79,13 +90,14 @@ export function MobileNav({
 }) {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
   const drag = useRef({ startY: 0, dy: 0, active: false });
 
   const more = shell?.isAdmin
     ? [...MORE, { href: "/admin", label: "Admin", Icon: ShieldCheck }]
     : MORE;
-  const profileActive = more.some((m) => isTabActive(m.href, pathname));
+  const addActive = ADD.some((a) => isTabActive(a.href, pathname)) || pathname.startsWith("/ajouter");
   const initial = (shell?.displayName?.[0] ?? shell?.email?.[0] ?? "?").toUpperCase();
 
   function close() {
@@ -98,13 +110,15 @@ export function MobileNav({
   }
 
   useEffect(() => {
-    if (!open) return;
+    if (!open && !addOpen) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setClosing(true);
+      if (e.key !== "Escape") return;
+      if (addOpen) setAddOpen(false);
+      else setClosing(true);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open, addOpen]);
 
   // Glisser la sheet vers le bas pour la fermer
   function onDown(e: React.PointerEvent) {
@@ -173,31 +187,59 @@ export function MobileNav({
         {TABS.slice(0, 2).map((t) => (
           <TabLink key={t.href} tab={t} active={isTabActive(t.href, pathname)} />
         ))}
-        <Link
-          href="/recherche"
-          aria-label="Ajouter une carte"
+        <button
+          type="button"
+          onClick={() => setAddOpen((v) => !v)}
+          aria-label="Ajouter"
+          aria-haspopup="menu"
+          aria-expanded={addOpen}
           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink shadow-md transition active:scale-95 ${
-            isTabActive("/recherche", pathname)
-              ? "ring-2 ring-accent/40 ring-offset-2 ring-offset-surface"
-              : ""
+            addActive || addOpen ? "ring-2 ring-accent/40 ring-offset-2 ring-offset-surface" : ""
           }`}
         >
-          <Plus size={22} strokeWidth={2.4} aria-hidden />
-        </Link>
+          <Plus size={22} strokeWidth={2.4} className={`transition-transform ${addOpen ? "rotate-45" : ""}`} aria-hidden />
+        </button>
         <TabLink tab={TABS[2]} active={isTabActive(TABS[2].href, pathname)} />
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-haspopup="dialog"
           aria-expanded={open}
-          className={tabClass(profileActive || open)}
+          aria-label="Menu"
+          className={tabClass(open)}
         >
-          <UserRound size={profileActive || open ? 19 : 21} strokeWidth={profileActive || open ? 2.1 : 1.8} aria-hidden />
-          {(profileActive || open) && <span className="text-[13px] font-semibold">Profil</span>}
+          <UserRound size={open ? 19 : 21} strokeWidth={open ? 2.1 : 1.8} aria-hidden />
+          {open && <span className="text-[13px] font-semibold">Menu</span>}
         </button>
       </nav>
 
-      {/* ——— Sheet Profil ——— */}
+      {/* ——— Menu « + » : carte, scellé ou scan ——— */}
+      {addOpen && (
+        <div className="md:hidden">
+          <div className="fixed inset-0 z-30 bg-black/40" onClick={() => setAddOpen(false)} aria-hidden />
+          <div
+            role="menu"
+            aria-label="Ajouter"
+            className="rise-in panel fixed inset-x-4 z-40 !p-1.5"
+            style={{ bottom: "calc(0.75rem + 62px + 0.5rem + env(safe-area-inset-bottom))" }}
+          >
+            {ADD.map((a) => (
+              <Link key={a.href} href={a.href} role="menuitem" onClick={() => setAddOpen(false)} className={`${row} text-foreground`}>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent-strong">
+                  <a.Icon size={18} strokeWidth={1.9} aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium">{a.label}</span>
+                  <span className="block text-xs text-muted">{a.sub}</span>
+                </span>
+                <ChevronRight size={16} className="text-faint" aria-hidden />
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ——— Sheet Menu ——— */}
       {open && (
         <div className="md:hidden">
           <div
@@ -209,7 +251,7 @@ export function MobileNav({
             ref={sheetRef}
             role="dialog"
             aria-modal="true"
-            aria-label="Profil et navigation"
+            aria-label="Menu et compte"
             className={`${
               closing ? "sheet-out" : "sheet-in"
             } fixed inset-x-0 bottom-0 z-50 flex max-h-[88dvh] flex-col rounded-t-2xl border-t border-edge bg-surface shadow-2xl`}

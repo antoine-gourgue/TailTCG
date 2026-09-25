@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import L from "leaflet";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { useTheme } from "@/components/theme-toggle";
 import "leaflet/dist/leaflet.css";
 import { formatEur } from "@/lib/domain";
 import type { SourceWithStats } from "./shops-client";
@@ -40,6 +41,8 @@ function FitToShops({
 }
 
 export default function ShopMap({ shops }: { shops: SourceWithStats[] }) {
+  // Fond de carte assorti au thème : un plan clair sur une interface sombre éblouit
+  const { theme } = useTheme();
   const located = shops.filter((s) => s.lat != null && s.lng != null);
   const points = located.map((s) => [s.lat!, s.lng!] as [number, number]);
   const pointsKey = points.map((p) => p.join(",")).join("|");
@@ -52,8 +55,10 @@ export default function ShopMap({ shops }: { shops: SourceWithStats[] }) {
       className="z-0 h-64 w-full rounded-2xl border border-edge md:h-105"
     >
       <TileLayer
-        attribution='&copy; les contributeurs <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        key={theme}
+        attribution='&copy; les contributeurs <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        url={`https://{s}.basemaps.cartocdn.com/${theme === "dark" ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png`}
+        subdomains="abcd"
       />
       <FitToShops points={points} pointsKey={pointsKey} />
       {located.map((shop) => (

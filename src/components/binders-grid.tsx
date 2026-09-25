@@ -55,7 +55,7 @@ export function BindersGrid({ binders }: { binders: BinderTile[] }) {
 
   return (
     <>
-      <ul className="rise-in grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="rise-in grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
         {ids.map((id, i) => {
           const b = byId.get(id);
           if (!b) return null;
@@ -79,7 +79,7 @@ export function BindersGrid({ binders }: { binders: BinderTile[] }) {
                 href={`/classeurs/${b.id}`}
                 draggable={false}
                 title="Glisser pour réordonner"
-                className="panel group block cursor-grab overflow-hidden p-4 transition hover:border-edge-strong active:cursor-grabbing"
+                className="panel group block cursor-grab overflow-hidden p-2.5 transition hover:border-edge-strong active:cursor-grabbing sm:p-4"
               >
                 <BinderCover
                   style={b.style}
@@ -89,10 +89,10 @@ export function BindersGrid({ binders }: { binders: BinderTile[] }) {
                   texture={b.texture}
                   layout={b.layout}
                 />
-                <p className="mt-3 truncate text-base font-semibold group-hover:text-accent-strong">
+                <p className="mt-2 truncate text-sm font-semibold group-hover:text-accent-strong sm:mt-3 sm:text-base">
                   {b.name}
                 </p>
-                <p className="mt-0.5 text-sm text-muted">
+                <p className="mt-0.5 text-xs text-muted sm:text-sm">
                   <span className="num">{b.count}</span> carte
                   {b.count > 1 ? "s" : ""}
                   {b.value != null && (

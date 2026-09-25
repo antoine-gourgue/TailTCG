@@ -1,4 +1,6 @@
 import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
@@ -36,12 +38,12 @@ export function guideReference(row: {
   return null;
 }
 
-/** Prix de référence (guide local) pour plusieurs idProduct, en une requête. */
-export async function fetchGuidePrices(idProducts: (number | null | undefined)[]): Promise<Map<number, number>> {
+/** Prix de référence (guide local) pour plusieurs idProduct, par tranches. `client` : pour un contexte sans cookies (cache, admin). */
+export async function fetchGuidePrices(idProducts: (number | null | undefined)[], client?: SupabaseClient<Database>): Promise<Map<number, number>> {
   const ids = [...new Set(idProducts.filter((n): n is number => typeof n === "number" && Number.isFinite(n)))];
   const out = new Map<number, number>();
   if (ids.length === 0) return out;
-  const supabase = await createClient();
+  const supabase = client ?? (await createClient());
   for (let i = 0; i < ids.length; i += 500) {
     const { data } = await supabase
       .from("cardmarket_price_guide")

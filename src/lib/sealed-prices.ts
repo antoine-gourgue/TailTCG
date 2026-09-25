@@ -1,5 +1,9 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchGuidePrices } from "@/lib/cardmarket";
 
 /**
@@ -14,8 +18,8 @@ export type SealedPriceInput = { id: number; cardmarket_id: number | null; price
 export type SealedCote = { value: number; source: "cardmarket" | "tcgplayer" };
 
 /** Cote par produit (clé : id produit). Une seule requête au guide pour tous les idProduct. */
-export async function sealedCotes(products: SealedPriceInput[]): Promise<Map<number, SealedCote>> {
-  const guide = await fetchGuidePrices(products.map((p) => p.cardmarket_id));
+export async function sealedCotes(products: SealedPriceInput[], client?: SupabaseClient<Database>): Promise<Map<number, SealedCote>> {
+  const guide = await fetchGuidePrices(products.map((p) => p.cardmarket_id), client);
   const out = new Map<number, SealedCote>();
   for (const p of products) {
     const cm = p.cardmarket_id != null ? guide.get(p.cardmarket_id) : undefined;
@@ -36,7 +40,10 @@ export const SEALED_SELECT =
  * soit `limit` : on pagine par tranches jusqu'à épuisement.
  */
 export async function loadSealedProducts() {
-  const supabase = await createClient();
+  return loadSealedProductsWith(await createClient());
+}
+
+async function loadSealedProductsWith(supabase: SupabaseClient<Database>) {
   const PAGE = 1000;
   const out = [];
   for (let from = 0; ; from += PAGE) {
@@ -47,6 +54,22 @@ export async function loadSealedProducts() {
   }
   return out;
 }
+
+/**
+ * Catalogue complet + cotes pour la page « Ajouter » : données publiques,
+ * identiques pour tous, gardées 1 h (le catalogue et le guide changent une
+ * fois par nuit). Les cotes voyagent en entrées de Map, le cache étant JSON.
+ */
+export const getSealedCatalog = unstable_cache(
+  async () => {
+    const admin = createAdminClient();
+    const products = await loadSealedProductsWith(admin);
+    const cotes = await sealedCotes(products, admin);
+    return { products, cotes: [...cotes.entries()] };
+  },
+  ["sealed-catalog"],
+  { revalidate: 3600 },
+);
 
 export type SnapshotPoint = { day: string; price: number };
 

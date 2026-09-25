@@ -107,7 +107,8 @@ function openPalette() {
   window.dispatchEvent(new CustomEvent(OPEN_PALETTE_EVENT));
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+/** `skeleton` : coquille seule (état de chargement), sans voile d'images ni palettes */
+export function AppShell({ children, skeleton = false }: { children: React.ReactNode; skeleton?: boolean }) {
   const pathname = usePathname();
   const { theme, toggle: toggleTheme } = useTheme();
   const shell = useShellData();
@@ -214,11 +215,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* ——— Navigation mobile : barre haute sobre + onglets + sheet Profil ——— */}
       <MobileNav pathname={pathname} shell={shell} theme={theme} onToggleTheme={toggleTheme} onOpenPalette={openPalette} />
 
-      {/* ——— Contenu ——— */}
-      <ImageGate />
-      <CommandPalette />
-      {shell && !shell.displayName && <DisplayNameGate />}
-      <div className="app-main">{children}</div>
+      {/* ——— Contenu : le voile d'images ne couvre que cette zone, la navigation reste visible ——— */}
+      {!skeleton && <CommandPalette />}
+      {!skeleton && shell && !shell.displayName && <DisplayNameGate />}
+      <div className="app-main relative">
+        {!skeleton && <ImageGate />}
+        {children}
+      </div>
     </>
   );
 }

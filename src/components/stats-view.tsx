@@ -106,7 +106,7 @@ export function StatsView({ d, s }: { d: StatsData; s?: SealedStats }) {
             icon={Coins}
             label="Valeur estimée"
             value={formatEur(c.value)}
-            sub={c.value == null ? "Aucune cote ni valeur saisie" : c.monthDelta != null ? `${signed(c.monthDelta)} sur 30 jours` : `${plural(c.count, "objet")}, cartes et scellés`}
+            sub={c.value == null ? "Aucune cote ni valeur saisie" : c.monthDelta != null ? `${signed(c.monthDelta)} sur 30 jours, achats inclus` : `${plural(c.count, "objet")}, cartes et scellés`}
           />
           <StatTile
             icon={Store}

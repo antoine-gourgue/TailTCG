@@ -34,6 +34,7 @@ export function CardImage({
   className = "h-full w-full object-cover",
   direct = false,
   fallback = null,
+  placeholder = "full",
 }: {
   base: string | null;
   alt: string;
@@ -43,6 +44,8 @@ export function CardImage({
   direct?: boolean;
   /** URL de secours (photo perso) si aucun scan n'existe */
   fallback?: string | null;
+  /** `compact` : icône seule, pour les petites vignettes */
+  placeholder?: "full" | "compact";
 }) {
   const isDirect =
     direct || (base?.startsWith("http") && !base.includes("assets.tcgdex.net"));
@@ -58,6 +61,13 @@ export function CardImage({
   );
 
   if (!src) {
+    if (placeholder === "compact") {
+      return (
+        <div className="flex h-full w-full items-center justify-center bg-raised text-faint" title="Pas d'image">
+          <ImageOff size={14} strokeWidth={1.6} aria-hidden />
+        </div>
+      );
+    }
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-2 border border-edge p-3 text-center text-faint">
         <ImageOff size={22} strokeWidth={1.6} aria-hidden />

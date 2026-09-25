@@ -690,11 +690,14 @@ export function CollectionClient({
           <Stat label="Cartes" value={summary.count} />
           {!hideValues && (
             <>
-              <Stat label="Investi" value={formatEur(summary.invested)} />
               <Stat label="Valeur estimée" value={formatEur(summary.value)} />
-              {summary.market != null && (
-                <Stat label="Valeur Cardmarket" value={formatEur(summary.market)} />
-              )}
+              {/* Sur mobile, l'essentiel seulement : le détail vit sur Collection */}
+              <div className="hidden sm:contents">
+                <Stat label="Investi" value={formatEur(summary.invested)} />
+                {summary.market != null && (
+                  <Stat label="Valeur Cardmarket" value={formatEur(summary.market)} />
+                )}
+              </div>
               <Stat
                 label="Plus-value"
                 value={
@@ -725,7 +728,7 @@ export function CollectionClient({
                   : "border-edge text-muted hover:text-foreground"
               }`}
             >
-              <ListChecks size={13} aria-hidden /> Sélectionner
+              <ListChecks size={13} aria-hidden /> <span className="hidden sm:inline">Sélectionner</span>
             </button>
           )}
           <div className="flex overflow-hidden rounded-lg border border-edge">
@@ -739,7 +742,7 @@ export function CollectionClient({
                   : "text-muted hover:text-foreground"
               }`}
             >
-              <LayoutGrid size={13} aria-hidden /> Grille
+              <LayoutGrid size={13} aria-hidden /> <span className="hidden sm:inline">Grille</span>
             </button>
             <button
               type="button"
@@ -751,7 +754,7 @@ export function CollectionClient({
                   : "text-muted hover:text-foreground"
               }`}
             >
-              <List size={13} aria-hidden /> Tableau
+              <List size={13} aria-hidden /> <span className="hidden sm:inline">Tableau</span>
             </button>
           </div>
         </div>
@@ -885,9 +888,14 @@ export function CollectionClient({
                   </p>
                   {!hideValues && (
                     <p className="mt-1 flex items-baseline gap-1.5 text-xs">
-                      <span className="num text-faint">{formatEur(item.purchase_price ?? 0)}</span>
-                      <span className="text-faint">→</span>
-                      <span className="num font-medium">{formatEur(estimatedOf(item))}</span>
+                      <span className="num text-faint" title="Prix d'achat">
+                        <span className="hidden sm:inline">payé </span>
+                        {formatEur(item.purchase_price ?? 0)}
+                      </span>
+                      <span className="text-faint" aria-hidden>→</span>
+                      <span className="num font-medium" title={item.current_price != null ? "Valeur estimée" : "Cote Cardmarket (aucune valeur saisie)"}>
+                        {formatEur(estimatedOf(item))}
+                      </span>
                       <span className="ml-auto">
                         <GainText value={gainOf(item)} />
                       </span>

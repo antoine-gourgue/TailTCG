@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/logo";
 
-// Voile de chargement : le logo animé reste affiché tant que les images
-// visibles à l'écran ne sont pas toutes arrivées, puis fondu de sortie.
+// Voile de chargement sur la zone de contenu : le logo animé reste affiché
+// tant que les images visibles ne sont pas arrivées, au plus 1,2 s (au-delà,
+// la page s'affiche et les images retardataires apparaissent d'elles-mêmes).
 export function ImageGate() {
   const [state, setState] = useState<"waiting" | "fading" | "done">("waiting");
 
@@ -29,7 +30,8 @@ export function ImageGate() {
     }
 
     // Un tick pour laisser le DOM se poser, puis on attend les images du
-    // premier écran (garde-fou à 6 s pour ne jamais bloquer)
+    // premier écran (garde-fou court : mieux vaut une image qui arrive après
+    // qu'une page entière qui attend)
     const start = setTimeout(() => {
       const pending = pendingVisibleImages();
       if (pending.length === 0) {
@@ -47,7 +49,7 @@ export function ImageGate() {
       }
     }, 80);
 
-    const failsafe = setTimeout(reveal, 6000);
+    const failsafe = setTimeout(reveal, 1200);
 
     return () => {
       cancelled = true;
@@ -61,7 +63,7 @@ export function ImageGate() {
   return (
     <div
       aria-hidden
-      className={`fixed inset-0 z-[60] flex flex-col items-center justify-center gap-5 bg-background transition-opacity duration-300 ${
+      className={`absolute inset-0 z-30 flex flex-col items-center justify-center gap-5 bg-background transition-opacity duration-300 ${
         state === "fading" ? "pointer-events-none opacity-0" : "opacity-100"
       }`}
     >

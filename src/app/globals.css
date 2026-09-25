@@ -15,7 +15,7 @@
   --border-strong: #45434b;
   --foreground: #ecebee;
   --muted: #9d9aa5;
-  --faint: #6b6873;
+  --faint: #86828e;
 
   --accent: #f0483e;
   --accent-strong: #ff6b5e;
@@ -43,7 +43,7 @@
   --border-strong: #cbc8c1;
   --foreground: #211f23;
   --muted: #716d78;
-  --faint: #a5a1ab;
+  --faint: #7f7b88;
 
   --accent: #d92d20;
   --accent-strong: #b42318;
@@ -128,8 +128,8 @@ body {
 
 @media (min-width: 768px) {
   .app-main {
-    /* Sidebar flottante : 0.75rem de marge + 15rem de large + respiration */
-    padding-left: 16.5rem;
+    /* Sidebar flottante : 0.75rem de marge + 16rem de large + respiration */
+    padding-left: 17.5rem;
     padding-bottom: 0;
     transition: padding-left 0.25s cubic-bezier(0.3, 0.7, 0.3, 1);
   }
@@ -139,7 +139,7 @@ body {
   }
 
   .app-sidebar {
-    width: 15rem;
+    width: 16rem;
     transition: width 0.25s cubic-bezier(0.3, 0.7, 0.3, 1);
   }
 

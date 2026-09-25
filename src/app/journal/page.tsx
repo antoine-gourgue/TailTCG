@@ -171,7 +171,7 @@ export default async function JournalPage() {
                           <span className="font-medium">{e.title}</span>{" "}
                           <span className="text-muted">{e.detail}</span>
                         </span>
-                        {e.amount != null && (
+                        {e.amount != null && e.amount > 0 && (
                           <span className="num shrink-0 text-sm font-medium">
                             {formatEur(e.amount)}
                           </span>
