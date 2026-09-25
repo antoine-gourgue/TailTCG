@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
 import { GradedSlab } from "@/components/graded-slab";
+import { PregradeLauncher, type LauncherItem } from "@/components/pregrade-launcher";
 
 export const metadata = {
   title: "Pré-gradées — TailTCG",
@@ -27,7 +28,8 @@ export default async function PregradesPage() {
       .order("created_at", { ascending: false }),
     supabase
       .from("collection_value")
-      .select("id, card_name, set_name, local_id, image_url"),
+      .select("id, tcgdex_id, card_name, set_name, local_id, image_url")
+      .is("sold_at", null),
   ]);
 
   // Dernière évaluation par exemplaire
@@ -37,13 +39,7 @@ export default async function PregradesPage() {
   }
 
   const signedItems = await signStorageImages(
-    (items ?? []) as {
-      id: string;
-      card_name: string;
-      set_name: string;
-      local_id: string;
-      image_url: string;
-    }[],
+    (items ?? []) as LauncherItem[],
     user.id
   );
   const itemById = new Map(signedItems.map((i) => [i.id, i]));
@@ -101,13 +97,17 @@ export default async function PregradesPage() {
   return (
     <AppShell>
       <main className="page py-8">
-        <h1 className="display mb-1 text-3xl font-bold tracking-tight">
-          Pré-gradées
-        </h1>
-        <p className="mb-6 text-sm text-muted">
-          Tes cartes évaluées avec l&apos;atelier de pré-gradation, présentées
-          en boîtier.
-        </p>
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="display mb-1 text-3xl font-bold tracking-tight">
+              Pré-gradées
+            </h1>
+            <p className="text-sm text-muted">
+              Scanne une carte : recto, verso, analyse — et son boîtier apparaît ici avec l&apos;estimation chez chaque société.
+            </p>
+          </div>
+          <PregradeLauncher items={signedItems} />
+        </div>
 
         {slabs.length === 0 ? (
           <div className="panel rise-in flex flex-col items-center gap-3 p-12 text-center">
@@ -115,14 +115,11 @@ export default async function PregradesPage() {
             <p className="display text-xl font-semibold">
               Aucune carte pré-gradée
             </p>
-            <p className="max-w-sm text-sm text-muted">
-              Ouvre une carte, ajoute une photo recto (et verso), puis lance
-              « Pré-grader » : centrage mesuré, coins zoomés, verdict — et le
-              boîtier apparaîtra ici.
+            <p className="max-w-md text-sm text-muted">
+              Lance « Pré-grader au scan » : la caméra prend le recto puis le verso, la carte est reconnue
+              et retrouvée dans ta collection, le centrage, les coins et les tranches sont analysés — tu vérifies, tu enregistres.
+              Tu peux aussi ouvrir une carte depuis <Link href="/" className="text-accent-strong underline-offset-2 hover:underline">Cartes</Link>.
             </p>
-            <Link href="/" className="btn btn-primary mt-2">
-              Ouvrir une carte
-            </Link>
           </div>
         ) : (
           <ul className="rise-in grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4">

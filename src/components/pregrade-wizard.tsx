@@ -151,20 +151,23 @@ export function PregradeButton({
   );
 }
 
-function PregradeWizard({
+export function PregradeWizard({
   itemId,
   photos,
   startWithScan = false,
+  initialCapture,
   onClose,
 }: {
   itemId: string;
   photos: GalleryPhoto[];
   startWithScan?: boolean;
+  /** calques déjà pris (page Pré-gradées) : on saute cadrage et redressement */
+  initialCapture?: { recto: string; verso: string | null };
   onClose: () => void;
 }) {
   const router = useRouter();
-  const [step, setStep] = useState(0);
-  const [capturing, setCapturing] = useState(startWithScan);
+  const [step, setStep] = useState(initialCapture ? 2 : 0);
+  const [capturing, setCapturing] = useState(startWithScan && !initialCapture);
   // Ce que l'analyse automatique a rempli : rappelé à l'écran pour inviter à vérifier
   const [autoNote, setAutoNote] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -174,11 +177,12 @@ function PregradeWizard({
   const [face, setFace] = useState<"r" | "v">("r");
   const [quad, setQuad] = useState<Quad>(DEFAULT_QUAD);
   const [quadV, setQuadV] = useState<Quad>(DEFAULT_QUAD);
-  const [rectified, setRectified] = useState<string | null>(null);
-  const [rectifiedV, setRectifiedV] = useState<string | null>(null);
+  const [rectified, setRectified] = useState<string | null>(initialCapture?.recto ?? null);
+  const [rectifiedV, setRectifiedV] = useState<string | null>(initialCapture?.verso ?? null);
   const [rectifying, setRectifying] = useState(false);
-  const [guides, setGuides] = useState<Guides>(DEFAULT_GUIDES);
-  const [guidesV, setGuidesV] = useState<Guides>(DEFAULT_GUIDES);
+  const [guides, setGuides] = useState<Guides>(initialCapture ? RECTIFIED_GUIDES : DEFAULT_GUIDES);
+  const [guidesV, setGuidesV] = useState<Guides>(initialCapture ? RECTIFIED_GUIDES : DEFAULT_GUIDES);
+  const analyzedInitial = useRef(false);
   const [corners, setCorners] = useState<(number | null)[]>([null, null, null, null]);
   const [cornersV, setCornersV] = useState<(number | null)[]>([null, null, null, null]);
   const [edgeDefects, setEdgeDefects] = useState<Set<string>>(new Set());
@@ -336,6 +340,14 @@ function PregradeWizard({
     }
     setAutoNote(filled.length > 0 ? `Analyse automatique : ${filled.join(", ")}. Vérifie et corrige si besoin.` : null);
   }
+
+  // Calques fournis à l'ouverture (page Pré-gradées) : analyse automatique une fois monté
+  useEffect(() => {
+    if (!initialCapture || analyzedInitial.current) return;
+    analyzedInitial.current = true;
+    void autoAnalyze(initialCapture.recto, initialCapture.verso);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Prises de vues au scan : calques déjà redressés → analyse, puis étape Centrage
   async function onCaptured(rectoUrl: string, versoUrl: string | null) {
