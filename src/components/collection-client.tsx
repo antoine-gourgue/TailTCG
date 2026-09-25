@@ -887,7 +887,7 @@ export function CollectionClient({
                     )}
                   </p>
                   {!hideValues && (
-                    <p className="mt-1 flex items-baseline gap-1.5 text-xs">
+                    <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-[11px] sm:text-xs">
                       <span className="num text-faint" title="Prix d'achat">
                         <span className="hidden sm:inline">payé </span>
                         {formatEur(item.purchase_price ?? 0)}
@@ -896,7 +896,7 @@ export function CollectionClient({
                       <span className="num font-medium" title={item.current_price != null ? "Valeur estimée" : "Cote Cardmarket (aucune valeur saisie)"}>
                         {formatEur(estimatedOf(item))}
                       </span>
-                      <span className="ml-auto">
+                      <span className="ml-auto whitespace-nowrap">
                         <GainText value={gainOf(item)} />
                       </span>
                     </p>

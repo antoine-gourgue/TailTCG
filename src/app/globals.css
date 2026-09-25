@@ -85,6 +85,10 @@
 
 html {
   color-scheme: dark;
+  /* iOS : un contenu plus large que l'écran rend la page « panoramique » et
+     les éléments fixes semblent bouger ; on rogne aussi au niveau racine */
+  overflow-x: clip;
+  overscroll-behavior-x: none;
 }
 
 :root[data-theme="light"] {
