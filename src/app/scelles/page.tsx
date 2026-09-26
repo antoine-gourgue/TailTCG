@@ -81,6 +81,7 @@ export default async function ScellesPage() {
   const totalEst = lines.reduce((n, l) => n + (l.estimated ?? 0), 0);
   const gain = lines.reduce((n, l) => n + (l.gain ?? 0), 0);
   const usEstimated = lines.filter((l) => l.cote?.source === "tcgplayer").length;
+  const lowBased = lines.filter((l) => l.cote?.source === "cardmarket-low").length;
   // Variation 7 j de l'ensemble, pondérée par la valeur des produits relevés
   const withV7 = lines.filter((l) => l.v7 != null && l.estimated != null);
   const v7Base = withV7.reduce((n, l) => n + l.estimated!, 0);
@@ -130,7 +131,15 @@ export default async function ScellesPage() {
               <div className="flex flex-col gap-0.5">
                 <span className="label-xs">Valeur estimée</span>
                 <span className="display num text-xl font-bold leading-none">{formatEur(totalEst)}</span>
-                <span className="text-xs text-muted">{usEstimated > 0 ? `cote Cardmarket · ${usEstimated} estimé${usEstimated > 1 ? "s" : ""} d'après le marché US` : "cote Cardmarket"}</span>
+                <span className="text-xs text-muted">
+                  {[
+                    "cote Cardmarket",
+                    lowBased > 0 ? `${lowBased} sur annonce (pas de vente)` : null,
+                    usEstimated > 0 ? `${usEstimated} estimé${usEstimated > 1 ? "s" : ""} d'après le marché US` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
               </div>
               {totalPaid > 0 && (
                 <div className="flex flex-col gap-0.5">
@@ -198,7 +207,19 @@ export default async function ScellesPage() {
                       {l.since && <p className="text-[11px] text-faint">Acheté le {fmtShort(l.since)}</p>}
                       <div className="mt-auto flex items-baseline justify-between gap-2 pt-2">
                         <span className="num text-xs text-muted">{l.paid > 0 ? `payé ${formatEur(l.paid)}` : "prix non renseigné"}</span>
-                        <span className={`num text-sm font-bold ${l.estimated == null ? "text-faint" : ""}`} title={l.manual != null ? "Estimation saisie à la main" : l.cote?.source === "tcgplayer" ? "Estimation d'après le marché US" : "Cote Cardmarket"}>
+                        <span
+                          className={`num text-sm font-bold ${l.estimated == null ? "text-faint" : ""}`}
+                          title={
+                            l.manual != null
+                              ? "Estimation saisie à la main"
+                              : l.cote?.source === "tcgplayer"
+                                ? "Estimation d'après le marché US"
+                                : l.cote?.source === "cardmarket-low"
+                                  ? "À partir de : annonce Cardmarket la moins chère, pas encore de vente"
+                                  : "Cote Cardmarket"
+                          }
+                        >
+                          {l.cote?.source === "cardmarket-low" && l.manual == null && <span className="mr-1 text-[10px] font-normal text-faint">dès</span>}
                           {l.estimated != null ? formatEur(l.estimated) : "—"}
                           {l.cote?.source === "tcgplayer" && l.manual == null && <span className="ml-1 text-[10px] font-normal text-faint">≈ US</span>}
                         </span>

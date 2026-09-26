@@ -406,10 +406,21 @@ export async function enrichCardDetails(cards: TcgdexCardBrief[], lang: CatalogL
  * vente > 0 dans l'ordre `avg30 → avg7 → avg → avg1 → trend`. La moyenne 30 j
  * mène (stable) ; `trend` est en dernier car parfois aberrant (ex. Mentali
  * Prime : trend 17,55 € alors que la moyenne 30 j est 124,40 €). **Jamais
- * `low`** (annonce la plus basse, toutes langues/états). Colonnes normales
+ * `low`** (annonce la plus basse, toutes langues/états) n'est pris qu'en tout dernier recours, quand aucune vente n'existe. Colonnes normales
  * uniquement (les `*-holo` décrivent la variante reverse-holo).
  */
-export const CM_REFERENCE_ORDER = ["avg30", "avg7", "avg", "avg1", "trend"] as const;
+export const CM_REFERENCE_ORDER = ["avg30", "avg7", "avg", "avg1", "trend", "low"] as const;
+export type CmReferenceField = (typeof CM_REFERENCE_ORDER)[number];
+
+/** Référence et colonne d'origine (`low` = annonce la moins chère, faute de vente : à signaler comme « à partir de ») */
+export function cardmarketReferenceField(cm: CardmarketPricing | null | undefined): { value: number; field: CmReferenceField } | null {
+  if (!cm) return null;
+  for (const field of CM_REFERENCE_ORDER) {
+    const v = cm[field as keyof CardmarketPricing];
+    if (typeof v === "number" && v > 0) return { value: v, field };
+  }
+  return null;
+}
 export function cardmarketReference(
   cm: CardmarketPricing | null | undefined
 ): number | null {

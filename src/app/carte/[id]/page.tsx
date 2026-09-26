@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cardmarketUrl } from "@/lib/tcgdex";
 import { catalogCard } from "@/lib/catalog";
-import { resolveCardmarketPrice } from "@/lib/cardmarket";
+import { resolveCardmarketRef } from "@/lib/cardmarket";
 import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
 import { signStorageImages } from "@/lib/images";
 import { formatEur, CONDITIONS } from "@/lib/domain";
@@ -115,7 +115,8 @@ export default async function CartePage({
     item.tcgdex_id,
     tcgdexCard?.pricing?.cardmarket?.idProduct
   );
-  const marketPrice = await resolveCardmarketPrice(marketId, tcgdexCard?.pricing?.cardmarket);
+  const marketRef = await resolveCardmarketRef(marketId, tcgdexCard?.pricing?.cardmarket);
+  const marketPrice = marketRef?.value ?? null;
 
   // Visuel des cartes hors catalogue : photo signée depuis le bucket privé
   const [{ image_url: displayImage }] = await signStorageImages(
@@ -437,10 +438,11 @@ export default async function CartePage({
                   className="group ml-auto flex items-center gap-3 rounded-xl border border-edge bg-raised/60 px-4 py-2 transition hover:border-accent/50 hover:bg-raised"
                 >
                   <span className="flex flex-col gap-0.5">
-                    <span className="label-xs">Cote Cardmarket</span>
+                    <span className="label-xs">{marketRef?.field === "low" ? "À partir de · Cardmarket" : "Cote Cardmarket"}</span>
                     <span className="num text-lg font-bold leading-none">
                       {formatEur(marketPrice)}
                     </span>
+                    {marketRef?.field === "low" && <span className="text-[11px] text-muted">annonce la moins chère, pas encore de vente</span>}
                   </span>
                   <ExternalLink
                     size={15}

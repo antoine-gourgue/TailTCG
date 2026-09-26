@@ -121,10 +121,16 @@ export function ProductDetail({
           {/* Cote et variations */}
           <div className="panel mt-6 flex flex-wrap items-center gap-x-10 gap-y-4 px-6 py-4">
             <Stat
-              label={cote?.source === "tcgplayer" ? "Estimation" : "Cote Cardmarket"}
+              label={cote?.source === "tcgplayer" ? "Estimation" : cote?.source === "cardmarket-low" ? "À partir de" : "Cote Cardmarket"}
               value={cote ? formatEur(cote.value) : "—"}
               tone={cote ? undefined : "faint"}
-              sub={cote?.source === "tcgplayer" ? "Pas coté sur Cardmarket : marché US converti" : undefined}
+              sub={
+                cote?.source === "tcgplayer"
+                  ? "Pas coté sur Cardmarket : marché US converti"
+                  : cote?.source === "cardmarket-low"
+                    ? "Annonce Cardmarket la moins chère — pas encore de vente"
+                    : undefined
+              }
             />
             {v7 != null && <Stat label="7 jours" value={pct(v7)} tone={varTone(v7)} />}
             {v30 != null && <Stat label="30 jours" value={pct(v30)} tone={varTone(v30)} />}

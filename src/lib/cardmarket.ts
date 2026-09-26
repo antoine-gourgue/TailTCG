@@ -4,7 +4,7 @@ import type { Database } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
-import { CM_REFERENCE_ORDER, cardmarketReference, pickCardmarket, type CardmarketPricing } from "@/lib/tcgdex";
+import { CM_REFERENCE_ORDER, cardmarketReference, cardmarketReferenceField, pickCardmarket, type CardmarketPricing, type CmReferenceField } from "@/lib/tcgdex";
 
 /**
  * Prix Cardmarket servi depuis le miroir local du fichier public quotidien
@@ -20,9 +20,21 @@ type GuideRow = {
   avg30: number | null;
   avg1: number | null;
   avg: number | null;
+  low: number | null;
 };
 
-const SELECT = "id_product, trend, avg7, avg30, avg1, avg";
+const SELECT = "id_product, trend, avg7, avg30, avg1, avg, low";
+
+export type GuideRef = { value: number; field: CmReferenceField };
+
+/** Comme guideReference, avec la colonne d'origine */
+export function guideReferenceField(row: Omit<GuideRow, "id_product">): GuideRef | null {
+  for (const field of CM_REFERENCE_ORDER) {
+    const v = (row as Record<string, number | null>)[field];
+    if (typeof v === "number" && v > 0) return { value: v, field };
+  }
+  return null;
+}
 
 export function guideReference(row: {
   trend: number | null;
@@ -30,6 +42,7 @@ export function guideReference(row: {
   avg30: number | null;
   avg1: number | null;
   avg: number | null;
+  low?: number | null;
 }): number | null {
   for (const field of CM_REFERENCE_ORDER) {
     const v = (row as Record<string, number | null>)[field];
@@ -38,10 +51,10 @@ export function guideReference(row: {
   return null;
 }
 
-/** Prix de référence (guide local) pour plusieurs idProduct, par tranches. `client` : pour un contexte sans cookies (cache, admin). */
-export async function fetchGuidePrices(idProducts: (number | null | undefined)[], client?: SupabaseClient<Database>): Promise<Map<number, number>> {
+/** Référence + origine (guide local) pour plusieurs idProduct, par tranches. `client` : pour un contexte sans cookies (cache, admin). */
+export async function fetchGuideRefs(idProducts: (number | null | undefined)[], client?: SupabaseClient<Database>): Promise<Map<number, GuideRef>> {
   const ids = [...new Set(idProducts.filter((n): n is number => typeof n === "number" && Number.isFinite(n)))];
-  const out = new Map<number, number>();
+  const out = new Map<number, GuideRef>();
   if (ids.length === 0) return out;
   const supabase = client ?? (await createClient());
   for (let i = 0; i < ids.length; i += 500) {
@@ -50,11 +63,30 @@ export async function fetchGuidePrices(idProducts: (number | null | undefined)[]
       .select(SELECT)
       .in("id_product", ids.slice(i, i + 500));
     for (const row of (data ?? []) as GuideRow[]) {
-      const ref = guideReference(row);
-      if (ref != null) out.set(row.id_product, ref);
+      const ref = guideReferenceField(row);
+      if (ref) out.set(row.id_product, ref);
     }
   }
   return out;
+}
+
+/** Prix de référence (guide local) pour plusieurs idProduct. */
+export async function fetchGuidePrices(idProducts: (number | null | undefined)[], client?: SupabaseClient<Database>): Promise<Map<number, number>> {
+  const refs = await fetchGuideRefs(idProducts, client);
+  return new Map([...refs].map(([id, r]) => [id, r.value]));
+}
+
+/** Référence et origine d'une carte : guide local d'abord (par idProduct), bloc TCGdex en repli. */
+export async function resolveCardmarketRef(
+  idProduct: number | null | undefined,
+  block: CardmarketPricing | null | undefined,
+): Promise<GuideRef | null> {
+  if (typeof idProduct === "number" && Number.isFinite(idProduct)) {
+    const refs = await fetchGuideRefs([idProduct]);
+    const r = refs.get(idProduct);
+    if (r) return r;
+  }
+  return cardmarketReferenceField(block);
 }
 
 /** Prix d'une carte : guide local d'abord (par idProduct), bloc TCGdex en repli. */
