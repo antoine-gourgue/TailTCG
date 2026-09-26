@@ -429,16 +429,35 @@ async function occupantOf(
   except?: PocketRef
 ): Promise<PocketRef | null> {
   const [{ data: items }, { data: wanted }] = await Promise.all([
-    db.from("binder_items").select("item_id").eq("binder_id", binderId).eq("position", pocket),
+    db
+      .from("binder_items")
+      .select("item_id, items(deleted_at)")
+      .eq("binder_id", binderId)
+      .eq("position", pocket),
     db.from("binder_placeholders").select("id").eq("binder_id", binderId).eq("position", pocket),
   ]);
   for (const r of items ?? []) {
+    // Une carte supprimée de la collection (corbeille) n'occupe plus sa pochette :
+    // la page ne l'affiche pas, la pochette est libre — voir purgeGhosts
+    if (r.items?.deleted_at) continue;
     if (!(except?.kind === "i" && except.id === r.item_id)) return { kind: "i", id: r.item_id };
   }
   for (const r of wanted ?? []) {
     if (!(except?.kind === "w" && except.id === r.id)) return { kind: "w", id: r.id };
   }
   return null;
+}
+
+/** Retire de la pochette les liens vers des cartes supprimées (invisibles, mais qui bloquaient la place) */
+async function purgeGhosts(db: Db, binderId: string, pocket: number): Promise<void> {
+  const { data } = await db
+    .from("binder_items")
+    .select("item_id, items(deleted_at)")
+    .eq("binder_id", binderId)
+    .eq("position", pocket);
+  const ghosts = (data ?? []).filter((r) => r.items?.deleted_at).map((r) => r.item_id);
+  if (ghosts.length === 0) return;
+  await db.from("binder_items").delete().eq("binder_id", binderId).in("item_id", ghosts);
 }
 
 /** Pages : déplace une carte vers une pochette — échange si elle est occupée */
@@ -452,6 +471,7 @@ export async function movePocket(binderId: string, key: string, toPocket: number
   if (from === undefined) return { error: "Carte absente du classeur" };
   const occupant = await occupantOf(db, binderId, toPocket, ref);
   if (occupant && from == null) return { error: "Pochette occupée" };
+  await purgeGhosts(db, binderId, toPocket);
 
   const errors = await Promise.all([
     setPocket(db, binderId, ref, toPocket),
@@ -471,6 +491,7 @@ export async function placeItemInPocket(binderId: string, itemId: string, pocket
   const db = await createClient();
   const ref: PocketRef = { kind: "i", id: itemId };
   if (await occupantOf(db, binderId, pocket, ref)) return { error: "Pochette occupée" };
+  await purgeGhosts(db, binderId, pocket);
   const current = await pocketOf(db, binderId, ref);
   const error =
     current !== undefined
@@ -488,6 +509,9 @@ export async function placeItemInPocket(binderId: string, itemId: string, pocket
 }
 
 /** Pages : range une carte du catalogue qu'on ne possède pas (hors collection) */
+/** Hôtes d'images de cartes du catalogue TailTCG */
+const CARD_IMAGE_HOSTS = /^https:\/\/(assets\.tcgdex\.net|limitlesstcg\.nyc3\.cdn\.digitaloceanspaces\.com|images\.pokemontcg\.io)\//;
+
 export async function placeWantedInPocket(
   binderId: string,
   card: {
@@ -510,6 +534,7 @@ export async function placeWantedInPocket(
 
   const db = await createClient();
   if (await occupantOf(db, binderId, pocket)) return { error: "Pochette occupée" };
+  await purgeGhosts(db, binderId, pocket);
   const { error } = await db.from("binder_placeholders").insert({
     id: card.id,
     binder_id: binderId,
@@ -517,11 +542,8 @@ export async function placeWantedInPocket(
     card_name: name.slice(0, 120),
     set_name: card.set_name.trim().slice(0, 120),
     local_id: card.local_id.trim().slice(0, 20),
-    // Seuls les visuels du CDN TCGdex sont acceptés
-    image_url:
-      card.image_url && /^https:\/\/assets\.tcgdex\.net\//.test(card.image_url)
-        ? card.image_url
-        : null,
+    // Seuls les visuels des CDN connus sont acceptés (TCGdex, Limitless, pokemontcg.io)
+    image_url: card.image_url && CARD_IMAGE_HOSTS.test(card.image_url) ? card.image_url : null,
     position: pocket,
   });
 

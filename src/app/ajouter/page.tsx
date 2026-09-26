@@ -93,8 +93,16 @@ export default async function AjouterPage({
     kicker = "Carte hors catalogue";
     defaultLanguage = "JP";
   } else {
-    const card = await catalogCard(cardId, lang);
+    // Carte rangée dans un classeur depuis le catalogue japonais : son
+    // identifiant n'existe pas en FR, on la cherche alors côté JA
+    let card = await catalogCard(cardId, lang);
+    let cardLang = lang;
+    if (!card && lang === "fr") {
+      card = await catalogCard(cardId, "ja");
+      if (card) cardLang = "ja";
+    }
     if (!card) redirect("/recherche");
+    defaultLanguage = ITEM_LANGUAGE[cardLang];
 
     meta = {
       tcgdexId: card.id,

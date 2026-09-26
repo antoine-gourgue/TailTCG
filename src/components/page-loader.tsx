@@ -19,3 +19,19 @@ export function PageLoader() {
     </div>
   );
 }
+
+/** Le même loader, en petit, pour une zone qui charge dans la page (liste, résultats) */
+export function InlineLoader({ className = "" }: { className?: string }) {
+  return (
+    <div className={`flex flex-col items-center justify-center gap-3 py-10 ${className}`} role="status" aria-label="Chargement">
+      <span className="logo-loader">
+        <Logo variant="mark" size={40} interactive={false} />
+      </span>
+      <span className="flex items-center gap-1" aria-hidden>
+        <span className="loader-dot h-1 w-1 rounded-full bg-accent" />
+        <span className="loader-dot h-1 w-1 rounded-full bg-accent" />
+        <span className="loader-dot h-1 w-1 rounded-full bg-accent" />
+      </span>
+    </div>
+  );
+}

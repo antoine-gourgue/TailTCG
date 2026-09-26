@@ -1245,6 +1245,28 @@ export type Database = {
         Args: { p_trade: string; p_user: string }
         Returns: string
       }
+      search_catalog: {
+        Args: { max_rows?: number; q: string }
+        Returns: {
+          card_lang: string | null
+          id: string
+          image: string | null
+          lang: string
+          local_id: string
+          name: string
+          name_en: string | null
+          rarity: string | null
+          set_id: string
+          source: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "catalog_cards"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
     }
     Enums: {
       [_ in never]: never

@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { Book, Check, ChevronLeft, ChevronRight, Minus, Pencil, Plus, Search, X } from "lucide-react";
 import { useCleanView } from "@/components/binder-clean-view";
 import { Sheet } from "@/components/sheet";
+import { InlineLoader } from "@/components/page-loader";
 import { CardImage } from "@/components/card-image";
 import { CardSpotlight } from "@/components/card-spotlight";
 import { BinderCover, type CoverItem } from "@/components/binder-cover";
@@ -47,7 +48,7 @@ import {
   ringPositions,
   type BinderDesign,
 } from "@/lib/binder-design";
-import type { CardSearchResult } from "@/lib/tcgdex";
+import type { CatalogSearchResult } from "@/lib/tcgdex";
 
 // Classeur simulé, dimensionné pour tenir exactement dans l'écran : couverture
 // fermée à la place de la page de droite, qui pivote autour des anneaux pour
@@ -151,7 +152,7 @@ type Overrides = {
   extra: Map<string, PocketItem>;
   removed: Set<string>;
 };
-type Catalog = { q: string; cards: CardSearchResult[]; error: boolean };
+type Catalog = { q: string; cards: CatalogSearchResult[]; error: boolean };
 /** Place disponible pour le classeur : position dans le document et largeur */
 type Frame = { top: number; width: number; vh: number };
 /** Taille d'une page et de ses pochettes, en pixels */
@@ -339,7 +340,6 @@ export function BinderPages({
   const [fSet, setFSet] = useState("");
   const [fGen, setFGen] = useState("");
   const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [catalogLoading, setCatalogLoading] = useState(false);
   /** Pokédex complet, chargé à la première ouverture de l'onglet */
   const [dex, setDex] = useState<PokedexEntry[] | null>(null);
   const [toast, setToast] = useState<{
@@ -506,19 +506,18 @@ export function BinderPages({
     setPicker(null);
   }
 
-  // Catalogue TCGdex : recherche différée pendant la frappe
+  // Catalogue TailTCG (base : FR, JA, Limitless…) : recherche différée pendant la frappe
   useEffect(() => {
     if (!pickerOpen || mode !== "catalogue") return;
     const query = q.trim();
     if (query.length < 2) return;
     const ctrl = new AbortController();
     const t = window.setTimeout(async () => {
-      setCatalogLoading(true);
       try {
-        const r = await fetch(`/api/tcgdex/search?q=${encodeURIComponent(query)}`, {
+        const r = await fetch(`/api/catalog/search?q=${encodeURIComponent(query)}`, {
           signal: ctrl.signal,
         });
-        const d = (await r.json()) as { cards?: CardSearchResult[] };
+        const d = (await r.json()) as { cards?: CatalogSearchResult[] };
         setCatalog({
           q: query,
           // Les cartes perso ont déjà leur place dans la collection
@@ -527,8 +526,6 @@ export function BinderPages({
         });
       } catch {
         if (!ctrl.signal.aborted) setCatalog({ q: query, cards: [], error: true });
-      } finally {
-        if (!ctrl.signal.aborted) setCatalogLoading(false);
       }
     }, SEARCH_DEBOUNCE_MS);
     return () => {
@@ -665,14 +662,14 @@ export function BinderPages({
     const { error } = await placeItemInPocket(binderId, c.id, pocket);
     if (error) {
       setOv(before);
-      setToast({ message: "Carte non rangée", tone: "error" });
+      setToast({ message: `Carte non rangée : ${error}`, tone: "error" });
       return;
     }
     router.refresh();
   }
 
   /** Range une carte du catalogue qu'on ne possède pas (hors collection) */
-  async function placeWanted(c: CardSearchResult, pocket: number) {
+  async function placeWanted(c: CatalogSearchResult, pocket: number) {
     setToast({ message: `${c.name} · ${pocketLabel(pocket)}` });
     // Remplacement : l'ancienne carte de cette pochette est retirée
     const occupant = byPocket.get(pocket);
@@ -718,7 +715,7 @@ export function BinderPages({
     );
     if (error) {
       setOv(before);
-      setToast({ message: "Carte non rangée", tone: "error" });
+      setToast({ message: `Carte non rangée : ${error}`, tone: "error" });
       return;
     }
     router.refresh();
@@ -1542,14 +1539,13 @@ export function BinderPages({
         </p>
       );
     }
-    if (catalogLoading && !catalogFresh) {
-      return <p className="text-sm text-muted">Recherche dans le catalogue…</p>;
-    }
-    if (!catalog || !catalogFresh) return null;
+    // Dès la frappe (avant même l'envoi différé) et pendant la recherche : le loader
+    if (!catalogFresh) return <InlineLoader />;
+    if (!catalog) return null;
     if (catalog.error) {
       return (
         <p className="text-sm text-loss">
-          TCGdex est injoignable, réessaie dans un instant.
+          Le catalogue est injoignable, réessaie dans un instant.
         </p>
       );
     }
@@ -1587,6 +1583,9 @@ export function BinderPages({
                     <span className="tile-badge z-10 left-1.5 top-1.5 !bg-accent !text-accent-ink">
                       Collection
                     </span>
+                  )}
+                  {c.lang === "ja" && (
+                    <span className="tile-badge z-10 right-1.5 top-1.5 !bg-black/75 !text-white">JP</span>
                   )}
                   {wanted ? (
                     <>
@@ -1807,7 +1806,7 @@ export function BinderPages({
           <div className="flex flex-col gap-2.5 border-b border-edge px-5 py-3">
             <div className="inline-flex self-start rounded-lg border border-edge bg-surface p-0.5">
               {modeBtn("collection", "Ma collection")}
-              {modeBtn("catalogue", "Catalogue TCGdex")}
+              {modeBtn("catalogue", "Catalogue TailTCG")}
               {modeBtn("pokedex", "Pokédex")}
             </div>
             <div className="flex gap-2">
@@ -1827,7 +1826,7 @@ export function BinderPages({
                       ? "Nom, numéro…"
                       : mode === "pokedex"
                         ? "Nom ou numéro du Pokémon…"
-                        : "Nom de la carte, numéro…"
+                        : "Nom (FR, EN, JP), numéro…"
                   }
                   className="field !pl-9 text-[13px]"
                 />

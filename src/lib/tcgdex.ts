@@ -52,6 +52,12 @@ export type CardSearchResult = {
   setName: string;
 };
 
+/** Résultat de la recherche dans le catalogue TailTCG (base) : langue et origine en plus */
+export type CatalogSearchResult = CardSearchResult & {
+  lang: CatalogLang;
+  source: "tcgdex" | "limitless" | "pokemontcg" | "custom";
+};
+
 /** "ex15-2" → "ex15" (le localId est après le dernier tiret) */
 export function setIdFromCardId(cardId: string): string {
   const i = cardId.lastIndexOf("-");
@@ -490,7 +496,7 @@ async function fetchCardBriefs(queryString: string): Promise<TcgdexCardBrief[]> 
 }
 
 /** "027" et "27" désignent le même numéro */
-function sameLocalId(a: string, b: string): boolean {
+export function sameLocalId(a: string, b: string): boolean {
   const na = Number.parseInt(a, 10);
   const nb = Number.parseInt(b, 10);
   if (!Number.isNaN(na) && !Number.isNaN(nb)) return na === nb;
