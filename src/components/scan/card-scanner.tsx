@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Check, ExternalLink, Loader2, RefreshCw, ScanLine, Sparkles, X } from "lucide-react";
+import { Check, ExternalLink, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
 import { CardImage } from "@/components/card-image";
 import { formatEur } from "@/lib/domain";
 import type { Pt } from "@/lib/scan/detect.mjs";
@@ -28,6 +28,11 @@ const NEURAL_FLOOR = 0.6;
 /** Le cadre reste affiché ce temps après la dernière carte vue par le neural :
  *  sans carte récente, on n'affiche aucun cadre (il ne saute plus partout) */
 const FRAME_HOLD_MS = 900;
+/** Cadre orange tant que la carte n'est pas reconnue, vert dès qu'elle l'est */
+const SEEK = { stroke: "#f97316", fill: "rgba(249,115,22,.10)" };
+const LOCK = { stroke: "#34d399", fill: "rgba(16,185,129,.14)" };
+/** Cadre-guide (format carte) affiché quand aucune carte n'est accrochée : fraction de la hauteur d'écran */
+const GUIDE_H_FRAC = 0.5;
 /** Cadrages essayés (part rognée sur chaque bord) : un seul = plus réactif */
 const NEURAL_INSETS = [0];
 /** Modèle + index hébergés sur Supabase Storage (bucket public scan-assets) */
@@ -165,6 +170,8 @@ export function CardScanner({
   const neuralLastId = useRef<string | null>(null);
   /** Dernier instant où le neural a vu une carte (cos ≥ NEURAL_FLOOR) : gère l'affichage du cadre */
   const cardSeenAt = useRef(0);
+  /** Dernier verdict neural « ce n'est pas une carte » : seul cas où le cadre détecté est masqué */
+  const notCardAt = useRef(0);
   /** Débogage neural (dev, ?scandebug) : affiche le cosinus/marge en direct pour régler les seuils */
   const scanDebug = useRef(false);
   const [neuralDebug, setNeuralDebug] = useState<{ name: string; cos: number; margin: number; streak: number } | null>(null);
@@ -350,20 +357,25 @@ export function CardScanner({
     const offX = (vw * cover - elW) / 2;
     const offY = (vh * cover - elH) / 2;
     const pts = corners.map(([x, y]) => [x * cover - offX, y * cover - offY] as Pt);
+    const c = tone === "lock" ? LOCK : SEEK;
     ctx.globalAlpha = alpha;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    // liseré
+    // voile + liseré de la couleur d'état
     ctx.beginPath();
     pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
     ctx.closePath();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = tone === "lock" ? "rgba(74,222,128,.55)" : "rgba(255,255,255,.45)";
+    ctx.fillStyle = c.fill;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = c.stroke;
+    ctx.globalAlpha = alpha * 0.8;
     ctx.stroke();
+    ctx.globalAlpha = alpha;
     // coins : un trait le long de chaque côté, sur 18 % de sa longueur
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = tone === "lock" ? "rgba(74,222,128,.95)" : "rgba(255,255,255,.9)";
-    ctx.shadowColor = "rgba(0,0,0,.6)";
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = c.stroke;
+    ctx.shadowColor = "rgba(0,0,0,.5)";
     ctx.shadowBlur = 6;
     for (let i = 0; i < 4; i++) {
       const p = pts[i];
@@ -378,6 +390,39 @@ export function CardScanner({
     ctx.globalAlpha = 1;
   }
 
+  /** Cadre-guide au format carte, pointillé, quand aucune carte n'est accrochée (la zone que lit aussi le repli) */
+  function drawGuide(tone: "seek" | "lock") {
+    const video = videoRef.current;
+    const canvas = overlayRef.current;
+    if (!video || !canvas) return;
+    const elW = video.clientWidth;
+    const elH = video.clientHeight;
+    if (canvas.width !== elW || canvas.height !== elH) {
+      canvas.width = elW;
+      canvas.height = elH;
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, elW, elH);
+    const c = tone === "lock" ? LOCK : SEEK;
+    const h = elH * GUIDE_H_FRAC;
+    const w = Math.min(h * (63 / 88), elW * 0.86);
+    const x = (elW - w) / 2;
+    const y = elH * 0.46 - h / 2;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, w * 0.05);
+    ctx.fillStyle = tone === "lock" ? c.fill : "rgba(249,115,22,.05)";
+    ctx.fill();
+    ctx.setLineDash([18, 14]);
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = c.stroke;
+    ctx.globalAlpha = 0.9;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+  }
+
   // Rendu du cadre à chaque rafraîchissement d'écran : il glisse vers la
   // dernière détection (lissage exponentiel) et s'efface en fondu quand la
   // carte a disparu depuis un moment.
@@ -387,21 +432,31 @@ export function CardScanner({
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
       const t = target.current;
-      // Neural prêt : pas de cadre tant qu'aucune carte n'a été vue récemment
-      // (le cadre ne saute plus sur un visage, une fenêtre, le décor).
-      const noCard = neuralReady.current && now - cardSeenAt.current > FRAME_HOLD_MS;
-      if (phaseRef.current !== "scanning" || !t || noCard) {
-        if (shown.current) {
-          shown.current = null;
-          drawOverlay(null, "seek");
-        }
+      // Carte reconnue (ou versions à départager) : le cadre reste, en vert, sous la fiche
+      if (phaseRef.current === "found" || phaseRef.current === "choose") {
+        if (shown.current) drawOverlay(shown.current, "lock");
+        else drawGuide("lock");
+        return;
+      }
+      if (phaseRef.current !== "scanning") {
+        shown.current = null;
+        drawOverlay(null, "seek");
+        return;
+      }
+      // Le cadre s'affiche dès la détection (orange) ; il ne se masque que si
+      // la reconnaissance vient de dire « ce n'est pas une carte » (visage,
+      // fenêtre, écran) — pas avant qu'elle ait pu se prononcer.
+      const notCard = neuralReady.current && notCardAt.current > cardSeenAt.current && now - notCardAt.current < FRAME_HOLD_MS;
+      if (!t || notCard) {
+        shown.current = null;
+        drawGuide("seek");
         return;
       }
       const age = now - t.at;
       if (age > HOLD_MS + 250) {
         target.current = null;
         shown.current = null;
-        drawOverlay(null, "seek");
+        drawGuide("seek");
         return;
       }
       const video = videoRef.current;
@@ -457,6 +512,7 @@ export function CardScanner({
       setNeuralDebug({ name: top.name, cos: Number(top.cos.toFixed(3)), margin: Number(margin.toFixed(3)), streak: neuralStreak.current });
     // Une carte est plausiblement là : autorise l'affichage du cadre
     if (top.cos >= NEURAL_FLOOR) cardSeenAt.current = performance.now();
+    else notCardAt.current = performance.now();
     // Candidat sûr : on construit la stabilité, puis on verrouille en local
     if (top.cos >= NEURAL_MATCH && margin >= NEURAL_MARGIN) {
       neuralStreak.current = neuralLastId.current === top.id ? neuralStreak.current + 1 : 1;
@@ -590,6 +646,7 @@ export function CardScanner({
           } else {
             chosen = res.quads[altIndex.current % res.quads.length];
             next = { corners: chosen.corners, hits: 1 };
+            notCardAt.current = 0;
           }
         }
         track.current = next;
@@ -679,13 +736,13 @@ export function CardScanner({
       </>
     ) : seen ? (
       <>
-        <Loader2 size={14} className="animate-spin" aria-hidden />
-        Analyse…
+        <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-orange-400" aria-hidden />
+        Carte repérée, ne bouge plus
       </>
     ) : (
       <>
-        <ScanLine size={14} aria-hidden />
-        Montre une carte
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-white/50" aria-hidden />
+        Place une carte dans le cadre
       </>
     );
 

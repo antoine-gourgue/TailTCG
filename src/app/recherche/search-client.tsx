@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import type { CardSearchResult, SerieWithSets, CatalogLang } from "@/lib/tcgdex";
+import type { CatalogSearchResult, SerieWithSets, CatalogLang } from "@/lib/tcgdex";
 import { CardImage } from "@/components/card-image";
 import { ExtensionsBrowser } from "@/components/extensions-browser";
 import { PhoneCaptureButton } from "@/components/capture/phone-capture-button";
@@ -21,7 +21,7 @@ export function SearchClient({
   pokedexCount?: number;
 }) {
   const [query, setQuery] = useState("");
-  const [cards, setCards] = useState<CardSearchResult[]>([]);
+  const [cards, setCards] = useState<CatalogSearchResult[]>([]);
   const [status, setStatus] = useState<Status>("idle");
   const abortRef = useRef<AbortController | null>(null);
 
@@ -47,11 +47,11 @@ export function SearchClient({
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(
-          `/api/tcgdex/search?q=${encodeURIComponent(q)}`,
+          `/api/catalog/search?q=${encodeURIComponent(q)}`,
           { signal: controller.signal }
         );
         if (!res.ok) throw new Error(String(res.status));
-        const data: { cards: CardSearchResult[] } = await res.json();
+        const data: { cards: CatalogSearchResult[] } = await res.json();
         setCards(data.cards);
         setStatus("done");
       } catch (err) {
@@ -74,7 +74,7 @@ export function SearchClient({
           type="search"
           value={query}
           onChange={(e) => handleChange(e.target.value)}
-          placeholder="Nom ou nom + numéro… (ex. pikachu 27)"
+          placeholder="Nom FR, EN ou JP, numéro… (ex. pikachu 27)"
           autoFocus
           className="field !w-auto flex-1 !px-4 !py-3 !text-base"
         />
@@ -105,7 +105,7 @@ export function SearchClient({
 
       {status === "error" && (
         <p className="text-sm text-loss">
-          TCGdex est injoignable, réessaie dans un instant.
+          Le catalogue est injoignable, réessaie dans un instant.
         </p>
       )}
 
@@ -133,13 +133,16 @@ export function SearchClient({
           </p>
           <ul className="rise-in grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {cards.map((card) => (
-              <li key={card.id}>
+              <li key={`${card.lang}/${card.id}`}>
                 <Link
-                  href={`/ajouter?card=${encodeURIComponent(card.id)}`}
+                  href={`/ajouter?card=${encodeURIComponent(card.id)}${card.lang !== "fr" ? `&lang=${card.lang}` : ""}`}
                   className="group block"
                 >
                   <div className="card-tile aspect-[63/88]">
                     <CardImage base={card.image} alt={card.name} />
+                    {card.lang === "ja" && (
+                      <span className="tile-badge z-10 right-1.5 top-1.5 !bg-black/75 !text-white">JP</span>
+                    )}
                   </div>
                   <div className="mt-2.5 px-0.5">
                     <p className="truncate text-sm font-medium leading-tight group-hover:text-accent-strong">
