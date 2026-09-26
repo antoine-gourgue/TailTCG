@@ -1021,3 +1021,87 @@ input:disabled,
   60% { opacity: 1; }
   100% { transform: perspective(900px) rotateY(0deg) scale(1); opacity: 1; }
 }
+
+/* ————— Maquette du scanner (landing) : cadre orange → vert, flash, bandeau — en boucle ————— */
+@keyframes mk-seek {
+  0%,
+  46% {
+    opacity: 1;
+  }
+  52%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes mk-lock {
+  0%,
+  46% {
+    opacity: 0;
+  }
+  52%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes mk-flash {
+  0%,
+  47% {
+    opacity: 0;
+  }
+  51% {
+    opacity: 0.5;
+  }
+  60%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes mk-banner {
+  0%,
+  50% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  57%,
+  94% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+.mk-seek {
+  animation: mk-seek 6s ease-in-out infinite;
+}
+.mk-lock {
+  animation: mk-lock 6s ease-in-out infinite;
+}
+.mk-flash {
+  animation: mk-flash 6s ease-in-out infinite;
+}
+.mk-banner {
+  animation: mk-banner 6s ease-in-out infinite;
+}
+/* Lignes de la maquette « scan » : chaque carte reconnue apparaît à son tour */
+[data-shown] .mk-row {
+  animation: mk-pop 0.5s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.mk-row {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mk-seek,
+  .mk-flash {
+    animation: none;
+    opacity: 0;
+  }
+  .mk-lock,
+  .mk-banner,
+  .mk-row {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
