@@ -678,7 +678,7 @@ export default async function CartePage({
                       <div className="mb-1 flex flex-wrap items-start justify-between gap-2">
                         <h2 className="display text-base font-semibold">Évolution de la cote Cardmarket</h2>
                         {mLast != null && (
-                          <span className="text-right">
+                          <span className="ml-auto text-right">
                             <span className="num block text-base font-bold leading-none">{formatEur(mLast)}</span>
                             {mDelta != null && marketPoints.length > 1 && (
                               <span className={`num block text-[11px] ${mDelta > 0 ? "text-gain" : mDelta < 0 ? "text-loss" : "text-muted"}`}>
