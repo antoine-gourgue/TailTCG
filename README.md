@@ -10,6 +10,10 @@
 
   [tailtcg.vercel.app](https://tailtcg.vercel.app)
 
+  <a href="docs/demo.mp4"><img src="docs/demo.gif" width="800" alt="TailTCG en 25 secondes : scan mains libres, cote Cardmarket, classeurs, pré-gradation, vitrine" /></a>
+
+  <sub>Démo en 25 s — <a href="docs/demo.mp4">version MP4</a> · source du film dans <code>scripts/demo-film/</code></sub>
+
   ![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=nextdotjs)
   ![React 19](https://img.shields.io/badge/React-19-149eca?logo=react)
   ![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth%20%2B%20Storage-3fcf8e?logo=supabase)

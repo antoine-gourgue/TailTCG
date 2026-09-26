@@ -1,0 +1,332 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#131215;color:#ecebee;font-family:"Instrument Sans",system-ui,sans-serif}
+.num{font-family:"Geist Mono",monospace;font-variant-numeric:tabular-nums}
+.display{letter-spacing:-.025em;font-weight:700}
+.scene{position:absolute;inset:0;opacity:0}
+.glow{position:absolute;left:50%;top:50%;width:900px;height:900px;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(240,72,62,.28),transparent 62%);filter:blur(40px);opacity:0}
+.caption{position:absolute;left:96px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;width:490px}
+.kicker{font-size:13px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#ff6b5e}
+.h{font-size:64px;line-height:1.02;margin:14px 0 0}
+.h .a{color:#ff6b5e}
+.sub{font-size:21px;line-height:1.45;color:#9d9aa5;margin-top:22px;max-width:450px}
+.el{opacity:0}
+.panel{background:#1b1a1e;border:1px solid #2e2d33;border-radius:22px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+/* téléphone */
+.phone{position:absolute;right:170px;top:90px;width:280px;height:590px;border-radius:44px;border:7px solid #26252a;background:#000;box-shadow:0 40px 90px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.08);overflow:hidden}
+.phone .table{position:absolute;inset:0;background:radial-gradient(120% 70% at 50% 35%,#5a4c40,#1a1715 72%)}
+.phone .card{position:absolute;left:50%;top:118px;width:172px;transform:translateX(-50%) rotate(-5deg)}
+.phone .card img{width:100%;display:block;border-radius:8px;box-shadow:0 18px 40px rgba(0,0,0,.6)}
+.frame{position:absolute;inset:-6px;border-radius:10px;opacity:0}
+.frame i{position:absolute;width:24px;height:24px;border:5px solid currentColor}
+.frame i:nth-child(1){left:0;top:0;border-right:0;border-bottom:0;border-top-left-radius:8px}
+.frame i:nth-child(2){right:0;top:0;border-left:0;border-bottom:0;border-top-right-radius:8px}
+.frame i:nth-child(3){left:0;bottom:0;border-right:0;border-top:0;border-bottom-left-radius:8px}
+.frame i:nth-child(4){right:0;bottom:0;border-left:0;border-top:0;border-bottom-right-radius:8px}
+.frame.seek{color:#f97316;background:rgba(249,115,22,.10);box-shadow:inset 0 0 0 3px rgba(249,115,22,.5)}
+.frame.lock{color:#34d399;background:rgba(16,185,129,.16);box-shadow:inset 0 0 0 3px rgba(52,211,153,.5)}
+.flash{position:absolute;inset:0;background:#10b981;opacity:0}
+.topbar{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:center;padding:20px 16px 0;font-weight:600;font-size:14px;background:linear-gradient(#000a,transparent);height:90px}
+.topbar .x{width:30px;height:30px;border-radius:50%;background:#ffffff26}
+.topbar .n{background:#4ade80;color:#000;border-radius:99px;padding:2px 8px;font-size:10px;font-weight:700}
+.pill{position:absolute;left:0;right:0;margin:0 auto;width:max-content;bottom:22px;background:#0009;backdrop-filter:blur(6px);border-radius:99px;padding:7px 14px;font-size:11px;white-space:nowrap;display:flex;gap:8px;align-items:center}
+.pill b{width:8px;height:8px;border-radius:50%;display:inline-block}
+.banner{position:absolute;left:12px;right:12px;bottom:70px;display:flex;gap:10px;align-items:center;background:#000c;border:1px solid #ffffff26;border-radius:16px;padding:10px;backdrop-filter:blur(8px);opacity:0}
+.banner img{width:40px;border-radius:4px}
+.banner .t1{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#6ee7b7}
+.banner .t2{font-size:13px;font-weight:700;margin-top:2px}
+.banner .t3{font-size:10px;color:#ffffffb3;margin-top:2px}
+.banner .t3 em{font-style:normal;color:#6ee7b7;font-weight:700;margin-left:6px}
+/* dashboard */
+.dash{position:absolute;right:80px;width:590px;top:150px;padding:24px}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tile{border:1px solid #2e2d33;background:#24232733;border-radius:14px;padding:12px 14px}
+.tile .l{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9d9aa5}
+.tile .v{font-size:22px;font-weight:700;margin-top:4px}
+.chart{margin-top:18px;display:block;overflow:visible}
+/* classeur */
+.binder{position:absolute;right:150px;top:110px;width:560px;height:500px;display:flex;border-radius:14px 26px 26px 14px;background:#1b1a1e;border:1px solid #2e2d33;box-shadow:0 40px 90px rgba(0,0,0,.6);overflow:hidden}
+.rings{width:58px;background:#f0483e;border-right:1px solid #2e2d33;display:flex;flex-direction:column;justify-content:space-evenly;align-items:center;padding:20px 0}
+.rings i{width:12px;height:12px;border-radius:50%;background:#1b1a1e;border:1px solid #0006}
+.page{flex:1;padding:18px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-content:start;background:#24232733}
+.page img{width:100%;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.5);display:block}
+.bname{position:absolute;right:150px;top:626px;width:560px;font-weight:700;font-size:20px}
+.bname span{display:block;font-size:14px;font-weight:400;color:#9d9aa5;margin-top:2px}
+/* slab + vitrine */
+.slab{position:absolute;left:626px;top:120px;width:272px;border-radius:20px;background:linear-gradient(#ffffff14,#ffffff08,#ffffff10);border:1px solid #45434b;padding:8px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.slab .hd{display:flex;align-items:center;gap:8px;background:#f5f1e6;color:#1a1a1a;border-radius:10px;padding:8px 10px}
+.slab .hd svg{width:26px;height:26px}
+.slab .hd .n1{font-size:13px;font-weight:700;line-height:1.1}
+.slab .hd .n2{font-size:8.5px;color:#0008;white-space:nowrap}
+.slab .grade{margin-left:auto;border-left:1px solid #0002;padding-left:8px;text-align:center;opacity:0}
+.slab .grade b{display:block;font-size:26px;line-height:1}
+.slab .grade s{display:block;text-decoration:none;font-size:7px;letter-spacing:.1em;text-transform:uppercase;color:#0009;font-weight:600}
+.slab .cd{margin-top:8px;background:#0003;border-radius:12px;padding:8px}
+.slab .cd img{width:100%;display:block;border-radius:8px}
+.win{position:absolute;left:920px;top:150px;width:300px;border-radius:18px;overflow:hidden;background:#1b1a1e;border:1px solid #2e2d33;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.win .bar{display:flex;align-items:center;gap:6px;padding:9px 12px;background:#24232799;border-bottom:1px solid #2e2d33}
+.win .bar i{width:8px;height:8px;border-radius:50%}
+.win .url{margin-left:8px;flex:1;font-size:10px;color:#86828e;background:#1b1a1e;border-radius:6px;padding:2px 8px}
+.win .body{padding:14px}
+.win .who{display:flex;align-items:center;gap:8px}
+.win .who svg{width:24px;height:24px}
+.win .who .n1{font-size:14px;font-weight:700;line-height:1.1}
+.win .who .n2{font-size:10px;color:#9d9aa5}
+.win .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.win .grid img{width:100%;border-radius:6px;display:block}
+.copied{margin-top:12px;display:inline-flex;align-items:center;gap:6px;background:#4ade8026;color:#4ade80;border-radius:99px;padding:5px 10px;font-size:11px;font-weight:600;opacity:0}
+.cap2{position:absolute;left:96px;top:0;bottom:0;width:480px;display:flex;flex-direction:column;justify-content:center}
+/* outro */
+.outro{display:flex;flex-direction:column;align-items:center;justify-content:center}
+.outro .url{font-size:30px;font-weight:700;margin-top:26px}
+.outro .line{font-size:18px;color:#9d9aa5;margin-top:12px}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<linearGradient id="holo" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stop-color="#4FD8E8" stop-opacity="0"/><stop offset="22%" stop-color="#4FD8E8" stop-opacity=".95"/><stop offset="44%" stop-color="#8B5CF6" stop-opacity=".95"/><stop offset="66%" stop-color="#F472B6" stop-opacity=".95"/><stop offset="86%" stop-color="#F4C361" stop-opacity=".95"/><stop offset="100%" stop-color="#F4C361" stop-opacity="0"/></linearGradient>
+<linearGradient id="face" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#20242F"/><stop offset="100%" stop-color="#151821"/></linearGradient>
+<linearGradient id="sweep" x1="0" y1="1" x2="1" y2="0"><stop offset="32%" stop-color="#fff" stop-opacity="0"/><stop offset="50%" stop-color="#fff" stop-opacity=".5"/><stop offset="68%" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<clipPath id="clip"><rect x="17.5" y="11" width="29" height="41" rx="3.2"/></clipPath>
+<linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f0483e" stop-opacity=".35"/><stop offset="100%" stop-color="#f0483e" stop-opacity="0"/></linearGradient>
+</defs></svg>
+<div class="glow" id="glow"></div>
+
+<!-- 1. Intro -->
+<section class="scene" id="s1">
+  <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+    <div id="logo1" style="width:520px;opacity:0"><svg class="lk" viewBox="0 0 215 64" xmlns="http://www.w3.org/2000/svg"><rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(-13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/>
+<rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/>
+<path d="M55 2 C 44 20, 27 37, 1 53 C 27 42, 48 26, 58 8 Z" fill="url(#holo)" opacity=".85"/>
+<rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="url(#face)"/>
+<g clip-path="url(#clip)">
+  <rect x="21.5" y="15.5" width="21" height="16" rx="1.6" fill="url(#holo)"/>
+  <rect x="21.5" y="35" width="21" height="2.2" rx="1.1" fill="#3A4152"/>
+  <rect x="21.5" y="39.6" width="14.5" height="2.2" rx="1.1" fill="#333949"/>
+  <rect x="21.5" y="44.2" width="17.5" height="2.2" rx="1.1" fill="#2C3140"/>
+  <rect class="sweep" x="6" y="-8" width="14" height="80" fill="url(#sweep)" transform="rotate(24 32 32) translate(-40 0)"/>
+</g>
+<rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="none" stroke="#E8B44A" stroke-width="1.3"/><path class="wordA" d="M88.84 42.0V24.6H82.72V21.0H98.92V24.6H92.8V42.0ZM101.78000000000002 42.0 107.30000000000001 21.0H114.2L119.72000000000001 42.0H115.64000000000001L114.50000000000001 37.38H107.00000000000001L105.86000000000001 42.0ZM107.93 33.72H113.57000000000001L111.02000000000001 23.490000000000002H110.48ZM123.84000000000002 42.0V21.0H127.80000000000001V42.0ZM133.36 42.0V21.0H137.32000000000002V38.4H146.92000000000002V42.0Z" fill="#F2F3F5"/><path class="wordB" d="M156.08 42.0V24.6H149.96V21.0H166.16V24.6H160.04000000000002V42.0ZM178.44000000000003 42.42Q174.54000000000002 42.42 172.26000000000002 40.245000000000005Q169.98000000000002 38.07 169.98000000000002 34.02V28.98Q169.98000000000002 24.93 172.26000000000002 22.755000000000003Q174.54000000000002 20.580000000000002 178.44000000000003 20.580000000000002Q182.31000000000003 20.580000000000002 184.425 22.695Q186.54000000000002 24.810000000000002 186.54000000000002 28.5V28.68H182.64000000000001V28.380000000000003Q182.64000000000001 26.520000000000003 181.60500000000002 25.32Q180.57000000000002 24.12 178.44000000000003 24.12Q176.34000000000003 24.12 175.14000000000004 25.410000000000004Q173.94000000000003 26.700000000000003 173.94000000000003 28.92V34.08Q173.94000000000003 36.27 175.14000000000004 37.575Q176.34000000000003 38.88 178.44000000000003 38.88Q180.57000000000002 38.88 181.60500000000002 37.665000000000006Q182.64000000000001 36.45 182.64000000000001 34.62V34.08H186.54000000000002V34.5Q186.54000000000002 38.19 184.425 40.305Q182.31000000000003 42.42 178.44000000000003 42.42ZM198.64000000000004 42.42Q196.48000000000005 42.42 194.72500000000002 41.445Q192.97000000000003 40.47 191.93500000000003 38.595Q190.90000000000003 36.72 190.90000000000003 34.02V28.98Q190.90000000000003 24.93 193.18000000000004 22.755000000000003Q195.46000000000004 20.580000000000002 199.36000000000004 20.580000000000002Q203.23000000000005 20.580000000000002 205.34500000000003 22.635Q207.46000000000004 24.69 207.46000000000004 28.200000000000003V28.32H203.56000000000003V28.08Q203.56000000000003 26.4 202.52500000000003 25.259999999999998Q201.49000000000004 24.12 199.36000000000004 24.12Q197.26000000000005 24.12 196.06000000000006 25.410000000000004Q194.86000000000004 26.700000000000003 194.86000000000004 28.92V34.08Q194.86000000000004 36.27 196.06000000000006 37.605000000000004Q197.26000000000005 38.94 199.42000000000004 38.94Q201.58000000000004 38.94 202.57000000000005 37.8Q203.56000000000003 36.66 203.56000000000003 34.92V34.62H198.58000000000004V31.259999999999998H207.46000000000004V42.0H203.80000000000004V39.99H203.26000000000005Q203.05000000000004 40.5 202.58500000000004 41.07Q202.12000000000003 41.64 201.19000000000005 42.03Q200.26000000000005 42.42 198.64000000000004 42.42Z" fill="#E8B44A"/></svg></div>
+    <p id="tag1" class="display el" style="font-size:38px;margin:34px 0 0;text-align:center">Ta collection Pokémon,<br><span class="a" style="color:#ff6b5e">enfin à sa hauteur.</span></p>
+  </div>
+</section>
+
+<!-- 2. Scan -->
+<section class="scene" id="s2">
+  <div class="caption">
+    <p class="kicker el" id="k2">Scan mains libres</p>
+    <p class="h display el" id="h2">Pointe.<br><span class="a el" id="h2b">C'est ajouté.</span></p>
+    <p class="sub el" id="sub2">La carte est cadrée au pixel, reconnue sur ton téléphone parmi 94 000 cartes, et ajoutée d'elle-même. Rien n'est envoyé sur un serveur.</p>
+  </div>
+  <div class="phone el" id="phone">
+    <div class="table"></div>
+    <div class="card"><img src="https://assets.tcgdex.net/fr/sv/sv03.5/006/high.png" alt="">
+      <div class="frame seek" id="fseek"><i></i><i></i><i></i><i></i></div>
+      <div class="frame lock" id="flock"><i></i><i></i><i></i><i></i></div>
+    </div>
+    <div class="flash" id="flash"></div>
+    <div class="topbar"><span class="x"></span><span>Scanner</span><span class="n num" id="cnt">2 ajoutées</span></div>
+    <div class="banner" id="banner"><img src="https://assets.tcgdex.net/fr/sv/sv03.5/006/low.webp" alt=""><div><div class="t1">✓ Ajoutée</div><div class="t2">Dracaufeu ex</div><div class="t3">151 · n° 006 <em class="num">42,00 €</em></div></div></div>
+    <div class="pill el" id="pill"><b id="dot" style="background:#fb923c"></b><span id="pilltxt">Carte repérée, ne bouge plus</span></div>
+  </div>
+</section>
+
+<!-- 3. Cote -->
+<section class="scene" id="s3">
+  <div class="caption">
+    <p class="kicker el" id="k3">Cote Cardmarket</p>
+    <p class="h display el" id="h3">La valeur,<br><span class="a">chaque nuit.</span></p>
+    <p class="sub el" id="sub3">Valeur estimée, valeur Cardmarket, plus-value depuis le prix payé : pour chaque carte, chaque scellé, et toute la collection sur une courbe.</p>
+  </div>
+  <div class="dash panel el" id="dash">
+    <div class="tiles">
+      <div class="tile el" id="t1"><div class="l">Valeur estimée</div><div class="v num" id="v1">0,00 €</div></div>
+      <div class="tile el" id="t2"><div class="l">Cardmarket</div><div class="v num" id="v2">0,00 €</div></div>
+      <div class="tile el" id="t3"><div class="l">Plus-value</div><div class="v num" id="v3" style="color:#4ade80">+0,00 €</div></div>
+    </div>
+    <svg class="chart" viewBox="0 0 560 170" width="540" height="164">
+      <path id="areaP" d="M0.0,158.0 L19.3,157.8 L38.6,146.7 L57.9,149.3 L77.2,139.7 L96.6,136.2 L115.9,135.5 L135.2,124.0 L154.5,118.6 L173.8,118.4 L193.1,107.3 L212.4,117.0 L231.7,107.3 L251.0,103.8 L270.3,103.1 L289.7,91.6 L309.0,79.2 L328.3,79.0 L347.6,67.9 L366.9,70.5 L386.2,60.9 L405.5,57.4 L424.8,56.7 L444.1,45.2 L463.4,39.8 L482.8,39.6 L502.1,28.6 L521.4,31.1 L540.7,21.5 L560.0,18.0 L560,170 L0,170 Z" fill="url(#area)" opacity="0"/>
+      <path id="lineP" d="M0.0,158.0 L19.3,157.8 L38.6,146.7 L57.9,149.3 L77.2,139.7 L96.6,136.2 L115.9,135.5 L135.2,124.0 L154.5,118.6 L173.8,118.4 L193.1,107.3 L212.4,117.0 L231.7,107.3 L251.0,103.8 L270.3,103.1 L289.7,91.6 L309.0,79.2 L328.3,79.0 L347.6,67.9 L366.9,70.5 L386.2,60.9 L405.5,57.4 L424.8,56.7 L444.1,45.2 L463.4,39.8 L482.8,39.6 L502.1,28.6 L521.4,31.1 L540.7,21.5 L560.0,18.0" fill="none" stroke="#f0483e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>
+      <circle id="dotP" cx="560.0" cy="18.0" r="5" fill="#f0483e" opacity="0"/>
+      <circle id="dotR" cx="560.0" cy="18.0" r="5" fill="none" stroke="#f0483e" stroke-width="2" opacity="0"/>
+    </svg>
+    <div class="num el" id="dates" style="display:flex;justify-content:space-between;color:#86828e;font-size:11px;margin-top:6px"><span>28/08</span><span>06/09</span><span>16/09</span><span>26/09</span></div>
+  </div>
+</section>
+
+<!-- 4. Classeurs -->
+<section class="scene" id="s4">
+  <div class="caption">
+    <p class="kicker el" id="k4">Classeurs</p>
+    <p class="h display el" id="h4">Range-les<br><span class="a">à ton image.</span></p>
+    <p class="sub el" id="sub4">Pages à anneaux, couverture sur mesure, glisser-déposer. Une carte peut vivre dans plusieurs classeurs.</p>
+  </div>
+  <div class="binder el" id="binder">
+    <div class="rings"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="page">
+      <img class="el bc" src="https://assets.tcgdex.net/fr/sv/sv03.5/199/high.png" alt="">
+      <img class="el bc" src="https://assets.tcgdex.net/fr/sv/sv04.5/054/high.png" alt="">
+      <img class="el bc" src="https://assets.tcgdex.net/fr/sv/sv03.5/006/high.png" alt="">
+      <img class="el bc" src="https://assets.tcgdex.net/fr/base/base1/4/high.png" alt="">
+      <img class="el bc" src="https://assets.tcgdex.net/fr/sv/sv03.5/183/high.png" alt="">
+      <img class="el bc" src="https://assets.tcgdex.net/fr/sv/sv03/125/high.png" alt="">
+    </div>
+  </div>
+  <div class="bname el" id="bname">Mes Dracaufeu<span>12 cartes · <b class="num" style="font-weight:600;color:#ecebee">1 240,00 €</b></span></div>
+</section>
+
+<!-- 5. Pré-gradation + vitrine -->
+<section class="scene" id="s5">
+  <div class="cap2">
+    <p class="kicker el" id="k5">Et le reste</p>
+    <p class="h display el" id="h5">Pré-grade.<br><span class="a">Partage.</span></p>
+    <p class="sub el" id="sub5">Centrage mesuré, estimation chez PSA, PCA, CCC, CGC et BGS. Et une vitrine que tes amis parcourent d'un lien.</p>
+  </div>
+  <div class="slab el" id="slab">
+    <div class="hd"><svg class="" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(-13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/>
+<rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/>
+<path d="M55 2 C 44 20, 27 37, 1 53 C 27 42, 48 26, 58 8 Z" fill="url(#holo)" opacity=".85"/>
+<rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="url(#face)"/>
+<g clip-path="url(#clip)">
+  <rect x="21.5" y="15.5" width="21" height="16" rx="1.6" fill="url(#holo)"/>
+  <rect x="21.5" y="35" width="21" height="2.2" rx="1.1" fill="#3A4152"/>
+  <rect x="21.5" y="39.6" width="14.5" height="2.2" rx="1.1" fill="#333949"/>
+  <rect x="21.5" y="44.2" width="17.5" height="2.2" rx="1.1" fill="#2C3140"/>
+  <rect class="sweep" x="6" y="-8" width="14" height="80" fill="url(#sweep)" transform="rotate(24 32 32) translate(-40 0)"/>
+</g>
+<rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="none" stroke="#E8B44A" stroke-width="1.3"/></svg><div><div class="n1">Dracaufeu</div><div class="n2">Set de base · 4/102</div><div class="n2 num">CEN 9 · COI 10 · BOR 9,5 · SUR 9</div></div><div class="grade num" id="grade"><b>9</b><s>Mint</s></div></div>
+    <div class="cd"><img src="https://assets.tcgdex.net/fr/base/base1/4/high.png" alt=""></div>
+  </div>
+  <div class="win el" id="win">
+    <div class="bar"><i style="background:#fb718599"></i><i style="background:#f0483e99"></i><i style="background:#4ade8099"></i><span class="url num">tailtcg.vercel.app/v/sacha</span></div>
+    <div class="body">
+      <div class="who"><svg class="" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(-13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/>
+<rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/>
+<path d="M55 2 C 44 20, 27 37, 1 53 C 27 42, 48 26, 58 8 Z" fill="url(#holo)" opacity=".85"/>
+<rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="url(#face)"/>
+<g clip-path="url(#clip)">
+  <rect x="21.5" y="15.5" width="21" height="16" rx="1.6" fill="url(#holo)"/>
+  <rect x="21.5" y="35" width="21" height="2.2" rx="1.1" fill="#3A4152"/>
+  <rect x="21.5" y="39.6" width="14.5" height="2.2" rx="1.1" fill="#333949"/>
+  <rect x="21.5" y="44.2" width="17.5" height="2.2" rx="1.1" fill="#2C3140"/>
+  <rect class="sweep" x="6" y="-8" width="14" height="80" fill="url(#sweep)" transform="rotate(24 32 32) translate(-40 0)"/>
+</g>
+<rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="none" stroke="#E8B44A" stroke-width="1.3"/></svg><div><div class="n1">La collection de Sacha</div><div class="n2">Vitrine en lecture seule · 132 cartes · 22 scellés</div></div></div>
+      <div class="grid">
+        <img class="el wc" src="https://assets.tcgdex.net/fr/sv/sv03.5/006/low.webp" alt="">
+        <img class="el wc" src="https://assets.tcgdex.net/fr/sv/sv03.5/025/low.webp" alt="">
+        <img class="el wc" src="https://assets.tcgdex.net/fr/sv/sv03.5/133/low.webp" alt="">
+        <img class="el wc" src="https://assets.tcgdex.net/fr/sv/sv08/057/low.webp" alt="">
+      </div>
+      <div class="copied" id="copied">✓ Lien copié</div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Outro -->
+<section class="scene outro" id="s6">
+  <div id="logo6" style="width:420px;opacity:0"><svg class="lk" viewBox="0 0 215 64" xmlns="http://www.w3.org/2000/svg"><rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(-13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/>
+<rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/>
+<path d="M55 2 C 44 20, 27 37, 1 53 C 27 42, 48 26, 58 8 Z" fill="url(#holo)" opacity=".85"/>
+<rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="url(#face)"/>
+<g clip-path="url(#clip)">
+  <rect x="21.5" y="15.5" width="21" height="16" rx="1.6" fill="url(#holo)"/>
+  <rect x="21.5" y="35" width="21" height="2.2" rx="1.1" fill="#3A4152"/>
+  <rect x="21.5" y="39.6" width="14.5" height="2.2" rx="1.1" fill="#333949"/>
+  <rect x="21.5" y="44.2" width="17.5" height="2.2" rx="1.1" fill="#2C3140"/>
+  <rect class="sweep" x="6" y="-8" width="14" height="80" fill="url(#sweep)" transform="rotate(24 32 32) translate(-40 0)"/>
+</g>
+<rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="none" stroke="#E8B44A" stroke-width="1.3"/><path class="wordA" d="M88.84 42.0V24.6H82.72V21.0H98.92V24.6H92.8V42.0ZM101.78000000000002 42.0 107.30000000000001 21.0H114.2L119.72000000000001 42.0H115.64000000000001L114.50000000000001 37.38H107.00000000000001L105.86000000000001 42.0ZM107.93 33.72H113.57000000000001L111.02000000000001 23.490000000000002H110.48ZM123.84000000000002 42.0V21.0H127.80000000000001V42.0ZM133.36 42.0V21.0H137.32000000000002V38.4H146.92000000000002V42.0Z" fill="#F2F3F5"/><path class="wordB" d="M156.08 42.0V24.6H149.96V21.0H166.16V24.6H160.04000000000002V42.0ZM178.44000000000003 42.42Q174.54000000000002 42.42 172.26000000000002 40.245000000000005Q169.98000000000002 38.07 169.98000000000002 34.02V28.98Q169.98000000000002 24.93 172.26000000000002 22.755000000000003Q174.54000000000002 20.580000000000002 178.44000000000003 20.580000000000002Q182.31000000000003 20.580000000000002 184.425 22.695Q186.54000000000002 24.810000000000002 186.54000000000002 28.5V28.68H182.64000000000001V28.380000000000003Q182.64000000000001 26.520000000000003 181.60500000000002 25.32Q180.57000000000002 24.12 178.44000000000003 24.12Q176.34000000000003 24.12 175.14000000000004 25.410000000000004Q173.94000000000003 26.700000000000003 173.94000000000003 28.92V34.08Q173.94000000000003 36.27 175.14000000000004 37.575Q176.34000000000003 38.88 178.44000000000003 38.88Q180.57000000000002 38.88 181.60500000000002 37.665000000000006Q182.64000000000001 36.45 182.64000000000001 34.62V34.08H186.54000000000002V34.5Q186.54000000000002 38.19 184.425 40.305Q182.31000000000003 42.42 178.44000000000003 42.42ZM198.64000000000004 42.42Q196.48000000000005 42.42 194.72500000000002 41.445Q192.97000000000003 40.47 191.93500000000003 38.595Q190.90000000000003 36.72 190.90000000000003 34.02V28.98Q190.90000000000003 24.93 193.18000000000004 22.755000000000003Q195.46000000000004 20.580000000000002 199.36000000000004 20.580000000000002Q203.23000000000005 20.580000000000002 205.34500000000003 22.635Q207.46000000000004 24.69 207.46000000000004 28.200000000000003V28.32H203.56000000000003V28.08Q203.56000000000003 26.4 202.52500000000003 25.259999999999998Q201.49000000000004 24.12 199.36000000000004 24.12Q197.26000000000005 24.12 196.06000000000006 25.410000000000004Q194.86000000000004 26.700000000000003 194.86000000000004 28.92V34.08Q194.86000000000004 36.27 196.06000000000006 37.605000000000004Q197.26000000000005 38.94 199.42000000000004 38.94Q201.58000000000004 38.94 202.57000000000005 37.8Q203.56000000000003 36.66 203.56000000000003 34.92V34.62H198.58000000000004V31.259999999999998H207.46000000000004V42.0H203.80000000000004V39.99H203.26000000000005Q203.05000000000004 40.5 202.58500000000004 41.07Q202.12000000000003 41.64 201.19000000000005 42.03Q200.26000000000005 42.42 198.64000000000004 42.42Z" fill="#E8B44A"/></svg></div>
+  <p class="url el" id="url6">tailtcg.vercel.app</p>
+  <p class="line el" id="line6">Gratuit · Sans pub · Fait par un collectionneur</p>
+</section>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const eo = (p) => 1 - Math.pow(1 - p, 3);
+const eio = (p) => (p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+const back = (p) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2); };
+const fmt = (v) => v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+/* apparition : fondu + translation */
+function rise(el, t, a, b, dy = 24, ease = eo) { const p = ease(seg(t, a, b)); el.style.opacity = p; el.style.transform = `translateY(${(1 - p) * dy}px)`; }
+function pop(el, t, a, b, from = .86) { const p = seg(t, a, b); el.style.opacity = clamp(p * 1.6); el.style.transform = `scale(${from + (1 - from) * back(p)})`; }
+function fadeScene(el, t, inA, inB, outA, outB) { el.style.opacity = seg(t, inA, inB) * (1 - seg(t, outA, outB)); }
+
+const S = { s1: $("s1"), s2: $("s2"), s3: $("s3"), s4: $("s4"), s5: $("s5"), s6: $("s6") };
+const bc = [...document.querySelectorAll(".bc")];
+const wc = [...document.querySelectorAll(".wc")];
+const sweeps = [...document.querySelectorAll("#logo1 .sweep, #logo6 .sweep")];
+
+window.__seek = function (t) {
+  /* halo */
+  const g = $("glow");
+  const gp = eo(seg(t, 0, 1.6));
+  g.style.opacity = (0.55 * gp) * (t < 21 ? 1 : 1) ;
+  g.style.transform = `translate(-50%,-50%) scale(${0.7 + 0.5 * gp})`;
+
+  /* 1. Intro 0 → 3.4 */
+  fadeScene(S.s1, t, 0, 0.01, 3.0, 3.4);
+  pop($("logo1"), t, 0.15, 0.95, 0.7);
+  const sw = seg(t, 0.9, 1.9);
+  sweeps[0].setAttribute("transform", `rotate(24 32 32) translate(${-40 + 90 * sw} 0)`);
+  rise($("tag1"), t, 1.3, 2.0, 18);
+
+  /* 2. Scan 3.1 → 8.8 */
+  fadeScene(S.s2, t, 3.1, 3.5, 8.4, 8.8);
+  rise($("k2"), t, 3.4, 3.9, 14); rise($("h2"), t, 3.5, 4.1, 26); rise($("h2b"), t, 6.1, 6.6, 18); rise($("sub2"), t, 3.8, 4.4, 20);
+  rise($("phone"), t, 3.2, 4.0, 90, eio);
+  const fs = seg(t, 4.3, 4.7);
+  const lk = seg(t, 5.7, 6.0);
+  $("fseek").style.opacity = fs * (1 - lk); $("fseek").style.transform = `scale(${1.12 - 0.12 * eo(fs)})`;
+  $("flock").style.opacity = lk;
+  const fl = seg(t, 5.7, 5.85) * (1 - seg(t, 5.85, 6.4));
+  $("flash").style.opacity = 0.5 * fl;
+  rise($("banner"), t, 5.85, 6.35, 16);
+  rise($("pill"), t, 4.5, 4.9, 8);
+  const locked = t >= 5.8;
+  $("dot").style.background = locked ? "#34d399" : "#fb923c";
+  $("pilltxt").textContent = locked ? "Ajoutée · carte suivante" : "Carte repérée";
+  $("cnt").textContent = locked ? "3 ajoutées" : "2 ajoutées";
+  $("cnt").style.transform = `scale(${1 + 0.25 * Math.sin(Math.PI * seg(t, 5.8, 6.2))})`;
+
+  /* 3. Cote 8.6 → 13.8 */
+  fadeScene(S.s3, t, 8.6, 9.0, 13.4, 13.8);
+  rise($("k3"), t, 8.9, 9.4, 14); rise($("h3"), t, 9.0, 9.6, 26); rise($("sub3"), t, 9.3, 9.9, 20);
+  rise($("dash"), t, 8.8, 9.5, 60, eio);
+  pop($("t1"), t, 9.4, 9.9); pop($("t2"), t, 9.55, 10.05); pop($("t3"), t, 9.7, 10.2);
+  const cu = eo(seg(t, 9.7, 11.2));
+  $("v1").textContent = fmt(934.6 * cu); $("v2").textContent = fmt(901.2 * cu); $("v3").textContent = "+" + fmt(267.42 * cu);
+  $("lineP").style.strokeDashoffset = 1 - eio(seg(t, 10.0, 12.0));
+  $("areaP").style.opacity = seg(t, 11.3, 12.2);
+  $("dotP").style.opacity = seg(t, 12.0, 12.3);
+  const rp = (t - 12.1) % 1.4 / 1.4; $("dotR").style.opacity = t > 12.1 ? (1 - rp) * 0.8 : 0; $("dotR").setAttribute("r", 5 + 14 * (t > 12.1 ? rp : 0));
+  $("dates").style.opacity = seg(t, 10.0, 10.5);
+
+  /* 4. Classeurs 13.6 → 17.8 */
+  fadeScene(S.s4, t, 13.6, 14.0, 17.4, 17.8);
+  rise($("k4"), t, 13.9, 14.4, 14); rise($("h4"), t, 14.0, 14.6, 26); rise($("sub4"), t, 14.3, 14.9, 20);
+  const bp = eio(seg(t, 13.8, 14.6)); $("binder").style.opacity = bp; $("binder").style.transform = `translateX(${(1 - bp) * 120}px)`;
+  bc.forEach((im, i) => { const p = seg(t, 14.5 + i * 0.2, 14.95 + i * 0.2); im.style.opacity = clamp(p * 1.5); im.style.transform = `scale(${0.8 + 0.2 * back(p)}) rotate(${(1 - p) * -4}deg)`; });
+  rise($("bname"), t, 16.0, 16.5, 10);
+
+  /* 5. Pré-grade + vitrine 17.6 → 21.4 */
+  fadeScene(S.s5, t, 17.6, 18.0, 21.0, 21.4);
+  rise($("k5"), t, 17.9, 18.4, 14); rise($("h5"), t, 18.0, 18.6, 26); rise($("sub5"), t, 18.3, 18.9, 20);
+  rise($("slab"), t, 17.8, 18.5, 60, eio);
+  const gs = seg(t, 18.9, 19.3); $("grade").style.opacity = gs; $("grade").style.transform = `scale(${2.2 - 1.2 * eo(gs)}) rotate(${(1 - eo(gs)) * -12}deg)`;
+  rise($("win"), t, 18.4, 19.1, 60, eio);
+  wc.forEach((im, i) => { const p = seg(t, 19.0 + i * 0.12, 19.4 + i * 0.12); im.style.opacity = p; im.style.transform = `scale(${0.85 + 0.15 * back(p)})`; });
+  pop($("copied"), t, 19.9, 20.3, 0.7);
+
+  /* 6. Outro 21.2 → 25 */
+  fadeScene(S.s6, t, 21.2, 21.7, 99, 100);
+  pop($("logo6"), t, 21.3, 22.0, 0.8);
+  const sw2 = seg(t, 22.0, 23.0); sweeps[1].setAttribute("transform", `rotate(24 32 32) translate(${-40 + 90 * sw2} 0)`);
+  rise($("url6"), t, 22.0, 22.5, 14); rise($("line6"), t, 22.3, 22.8, 12);
+};
+window.__seek(0);
+window.__readyP = Promise.all([document.fonts.ready, ...[...document.images].map((im) => im.decode().catch(() => null))]).then(() => (window.__ready = true));
+</script></body></html>
