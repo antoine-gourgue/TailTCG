@@ -1,20 +1,22 @@
-// Worker de DÉTECTION de carte : un réseau de coins (MobileNetV3 → 4 coins +
-// présence, entraîné sur des cartes en perspective sur fonds réels — le
-// modèle `card-corners.onnx` du scanner GoupixDex de Léo) remplace les
-// contours OpenCV. Chaque image donne les coins PRÉCIS de la carte en ~5 ms :
-// le cadre colle à la carte en continu, et la carte redressée (warp
-// perspective exact) part à la reconnaissance dès qu'elle est nette.
+// Worker de DÉTECTION de carte (port du cardDetector de GoupixDex) : un réseau
+// de coins (MobileNetV3 → 4 coins + présence, entraîné sur des cartes en
+// perspective sur fonds réels) remplace les contours OpenCV. Chaque image
+// donne les coins PRÉCIS de la carte en ~5 ms : le cadre colle à la carte en
+// continu, et de chaque image nette partent les crops d'identification
+// (embedding) et la carte redressée (pHash).
 //
 // Protocole (fil principal ⇄ worker) :
 //   → { type:"init", modelUrl, wasmPath }             ← { type:"ready" } | { type:"error", message }
-//   → { type:"detect", id, buf, w, h, vw, vh, crop }  ← { type:"result", id, corners, presence, card, ms }
+//   → { type:"detect", id, buf, w, h, vw, vh, crop }  ← { type:"result", id, corners, presence, idcrops, card, ms }
 // `corners` : coins en pixels VIDÉO (TL, TR, BR, BL), ou null sans carte.
 import * as ort from "onnxruntime-web/wasm";
+import { cachedArrayBuffer } from "./asset-cache";
 import type { Pt } from "./detect.mjs";
 
 export type CornersIn =
   | { type: "init"; modelUrl: string; wasmPath: string }
   | { type: "detect"; id: number; buf: ArrayBuffer; w: number; h: number; vw: number; vh: number; crop: boolean };
+export type CardOut = { buf: ArrayBuffer; w: number; h: number; guide: boolean } | null;
 export type CornersOut =
   | { type: "ready" }
   | { type: "error"; message: string }
@@ -23,8 +25,10 @@ export type CornersOut =
       id: number;
       corners: Pt[] | null;
       presence: number;
-      /** Carte redressée (RGBA CARD_W×CARD_H) quand demandée et nette, ou repli zone-guide */
-      card: { buf: ArrayBuffer; w: number; h: number; guide: boolean } | null;
+      /** Crops d'identification RGBA 256×256 (intérieur de la carte, deux échelles), seulement sur image nette */
+      idcrops: ArrayBuffer[] | null;
+      /** Carte redressée RGBA (pHash), ou zone-guide centrale faute de coins */
+      card: CardOut;
       ms: number;
     };
 
@@ -33,36 +37,42 @@ const ctx = self as unknown as {
   onmessage: ((e: MessageEvent<CornersIn>) => void) | null;
 };
 
-/** Entrée du réseau : letterbox carré (bandes grises), normalisation ImageNet */
 const NET_EDGE = 224;
 const PAD = 114;
 const IMAGENET_MEAN = [0.485, 0.456, 0.406];
 const IMAGENET_STD = [0.229, 0.224, 0.225];
-/** Sigmoïde de présence sous laquelle l'image est déclarée sans carte (seuil bas + validation géométrique) */
+/** Sigmoïde de présence sous laquelle l'image est sans carte (seuil bas + validation géométrique) */
 const PRESENCE_MIN = 0.5;
 /** Cadre légèrement resserré pour épouser la carte au ras */
 const SHRINK = 0.95;
-/** Carte redressée envoyée à la reconnaissance (format 63:88) */
-const CARD_W = 360;
-const CARD_H = 504;
-/** Netteté minimale (variance du laplacien sur le centre 256×256) pour tenter la reconnaissance :
- *  cartes nettes ~300-400, très floues < 150 — le cadre, lui, suit toujours */
-const SHARP_EDGE = 256;
-const SHARPNESS_MIN = 130;
-/** Cadence maximale des cartes redressées (la reconnaissance en aval est plus lourde) */
-const CROP_MIN_INTERVAL_MS = 300;
-/** Repli zone-guide : sans coins depuis tant d'images (doigt, reflet de pochette), on envoie quand
- *  même la zone centrale au format carte — la carte y est souvent déjà */
+/** Crops d'identification : côté, échelles (fraction du bbox — l'embedding préfère l'intérieur de la carte) et jitter alterné */
+const CROP_EDGE = 256;
+const ID_CROP_SCALES = [0.6, 0.48];
+const ID_CROP_JITTER = [
+  { dx: 0, dy: 0 },
+  { dx: -0.04, dy: 0 },
+  { dx: 0.04, dy: 0 },
+  { dx: 0, dy: -0.04 },
+  { dx: 0, dy: 0.04 },
+];
+/** Netteté minimale (variance du laplacien du crop médian) pour lancer l'embedding : nettes ~300-400, floues < 150 */
+const ID_SHARPNESS_MIN = 130;
+/** Carte redressée pour la pHash (format 63:88) */
+const PHASH_CARD_W = 180;
+const PHASH_CARD_H = 252;
+/** Cadence maximale des crops (la reconnaissance en aval est plus lourde) */
+const ID_CROP_MIN_INTERVAL_MS = 300;
+/** Repli zone-guide : sans coins depuis tant d'images (doigt, reflet), la zone centrale au format carte part à la pHash */
 const FALLBACK_AFTER = 6;
 const GUIDE_H_FRAC = 0.62;
 const CARD_ASPECT = 63 / 88;
 
 let session: ort.InferenceSession | null = null;
 let lastCropAt = 0;
+let jitterCursor = 0;
 let missCount = 0;
 
 type XY = { x: number; y: number };
-type CardOut = { buf: ArrayBuffer; w: number; h: number; guide: boolean } | null;
 
 /** Le quadrilatère prédit ressemble-t-il à une carte ? (convexe, aire plausible, côtés carte) */
 function quadLooksLikeCard(c: Float32Array): boolean {
@@ -85,7 +95,6 @@ function quadLooksLikeCard(c: Float32Array): boolean {
     else if (sign !== signRef) return false;
   }
   area = Math.abs(area) / 2;
-  // Une carte tenue occupe une fraction de l'image : un quad plein écran = le décor accroché
   if (area < 0.03 || area > 0.5) return false;
   const wEdge = (Math.hypot(q[1].x - q[0].x, q[1].y - q[0].y) + Math.hypot(q[2].x - q[3].x, q[2].y - q[3].y)) / 2;
   const hEdge = (Math.hypot(q[3].x - q[0].x, q[3].y - q[0].y) + Math.hypot(q[2].x - q[1].x, q[2].y - q[1].y)) / 2;
@@ -207,22 +216,16 @@ function letterboxRgba(rgba: Uint8ClampedArray, w: number, h: number, dst: numbe
   return out;
 }
 
-/** Carte redressée + netteté du centre : null si trop floue pour la reconnaissance */
-function cardCrop(rgba: Uint8ClampedArray, w: number, h: number, quad: XY[], gate: boolean): Uint8ClampedArray | null {
-  const card = warpQuadToRect(rgba, w, h, quad, CARD_W, CARD_H);
-  if (gate) {
-    const center = cropRgba(card, CARD_W, CARD_H, CARD_W * 0.2, CARD_H * 0.2, CARD_W * 0.6, CARD_H * 0.6, SHARP_EDGE);
-    if (sharpness(center, SHARP_EDGE) < SHARPNESS_MIN) return null;
-  }
-  return card;
+function post(id: number, corners: Pt[] | null, presence: number, idcrops: ArrayBuffer[] | null, card: CardOut, t0: number) {
+  const transfer: Transferable[] = [];
+  if (idcrops) transfer.push(...idcrops);
+  if (card) transfer.push(card.buf);
+  ctx.postMessage({ type: "result", id, corners, presence, idcrops, card, ms: performance.now() - t0 }, transfer);
 }
 
 async function detect(d: Extract<CornersIn, { type: "detect" }>) {
   const t0 = performance.now();
-  if (!session) {
-    ctx.postMessage({ type: "result", id: d.id, corners: null, presence: 0, card: null, ms: 0 });
-    return;
-  }
+  if (!session) return post(d.id, null, 0, null, null, t0);
   const rgba = new Uint8ClampedArray(d.buf);
   const scale = NET_EDGE / Math.max(d.w, d.h);
   const padX = (NET_EDGE - d.w * scale) / 2;
@@ -239,29 +242,27 @@ async function detect(d: Extract<CornersIn, { type: "detect" }>) {
   const corners = out.corners.data as Float32Array;
   const presence = 1 / (1 + Math.exp(-(out.presence.data as Float32Array)[0]));
   const now = Date.now();
-  const wantCrop = d.crop && now - lastCropAt >= CROP_MIN_INTERVAL_MS;
+  const wantCrop = d.crop && now - lastCropAt >= ID_CROP_MIN_INTERVAL_MS;
 
   if (presence < PRESENCE_MIN || !quadLooksLikeCard(corners)) {
     missCount++;
     let card: CardOut = null;
-    // Repli : la détection échoue depuis un moment (doigt, pochette) — la zone-guide centrale au format carte
     if (wantCrop && missCount >= FALLBACK_AFTER) {
       lastCropAt = now;
       const gh = d.h * GUIDE_H_FRAC;
       const gw = gh * CARD_ASPECT;
       const gx = (d.w - gw) / 2;
       const gy = (d.h - gh) / 2;
-      const guide = [
+      const guide: XY[] = [
         { x: gx, y: gy },
         { x: gx + gw, y: gy },
         { x: gx + gw, y: gy + gh },
         { x: gx, y: gy + gh },
       ];
-      const c = cardCrop(rgba, d.w, d.h, guide, false);
-      if (c) card = { buf: c.buffer as ArrayBuffer, w: CARD_W, h: CARD_H, guide: true };
+      const c = warpQuadToRect(rgba, d.w, d.h, guide, PHASH_CARD_W, PHASH_CARD_H);
+      card = { buf: c.buffer as ArrayBuffer, w: PHASH_CARD_W, h: PHASH_CARD_H, guide: true };
     }
-    ctx.postMessage({ type: "result", id: d.id, corners: null, presence, card, ms: performance.now() - t0 }, card ? [card.buf] : []);
-    return;
+    return post(d.id, null, presence, null, card, t0);
   }
   missCount = 0;
   // Coins normalisés (repère letterbox) → repère de l'image analysée
@@ -281,12 +282,36 @@ async function detect(d: Extract<CornersIn, { type: "detect" }>) {
   const fy = d.vh / d.h;
   const videoQuad: Pt[] = frameQuad.map((p) => [(cx + (p.x - cx) * SHRINK) * fx, (cy + (p.y - cy) * SHRINK) * fy] as Pt);
   let card: CardOut = null;
+  let idcrops: ArrayBuffer[] | null = null;
   if (wantCrop) {
     lastCropAt = now;
-    const c = cardCrop(rgba, d.w, d.h, frameQuad, true);
-    if (c) card = { buf: c.buffer as ArrayBuffer, w: CARD_W, h: CARD_H, guide: false };
+    // pHash : carte redressée pleine, à chaque image throttlée (même un peu floue — la pHash refuse d'elle-même)
+    const c = warpQuadToRect(rgba, d.w, d.h, frameQuad, PHASH_CARD_W, PHASH_CARD_H);
+    card = { buf: c.buffer as ArrayBuffer, w: PHASH_CARD_W, h: PHASH_CARD_H, guide: false };
+    // Embedding : crops intérieurs ancrés sur la carte, seulement sur image NETTE
+    let bx0 = Infinity;
+    let by0 = Infinity;
+    let bx1 = -Infinity;
+    let by1 = -Infinity;
+    for (const p of frameQuad) {
+      bx0 = Math.min(bx0, p.x);
+      by0 = Math.min(by0, p.y);
+      bx1 = Math.max(bx1, p.x);
+      by1 = Math.max(by1, p.y);
+    }
+    const j = ID_CROP_JITTER[jitterCursor % ID_CROP_JITTER.length];
+    const bw = bx1 - bx0;
+    const bh = by1 - by0;
+    const ccx = bx0 + bw / 2 + j.dx * bw;
+    const ccy = by0 + bh / 2 + j.dy * bh;
+    const crops = ID_CROP_SCALES.map((k) => cropRgba(rgba, d.w, d.h, ccx - (bw * k) / 2, ccy - (bh * k) / 2, bw * k, bh * k, CROP_EDGE));
+    const mid = crops[Math.floor(ID_CROP_SCALES.length / 2)];
+    if (sharpness(mid, CROP_EDGE) >= ID_SHARPNESS_MIN) {
+      jitterCursor++;
+      idcrops = crops.map((c) => c.buffer as ArrayBuffer);
+    }
   }
-  ctx.postMessage({ type: "result", id: d.id, corners: videoQuad, presence, card, ms: performance.now() - t0 }, card ? [card.buf] : []);
+  post(d.id, videoQuad, presence, idcrops, card, t0);
 }
 
 ctx.onmessage = async (e) => {
@@ -295,12 +320,10 @@ ctx.onmessage = async (e) => {
     if (m.type === "init") {
       ort.env.wasm.wasmPaths = m.wasmPath;
       ort.env.wasm.numThreads = 1;
-      const resp = await fetch(m.modelUrl);
-      if (!resp.ok) throw new Error(`modèle HTTP ${resp.status}`);
-      session = await ort.InferenceSession.create(await resp.arrayBuffer(), { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+      session = await ort.InferenceSession.create(await cachedArrayBuffer(m.modelUrl), { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
       ctx.postMessage({ type: "ready" });
     } else if (m.type === "detect") {
-      await detect(m).catch(() => ctx.postMessage({ type: "result", id: m.id, corners: null, presence: 0, card: null, ms: 0 }));
+      await detect(m).catch(() => post(m.id, null, 0, null, null, performance.now()));
     }
   } catch (err) {
     ctx.postMessage({ type: "error", message: String(err) });
