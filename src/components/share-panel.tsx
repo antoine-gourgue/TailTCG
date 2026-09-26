@@ -101,7 +101,7 @@ export function SharePanel({
           Inclure les valeurs
           <span className="mt-0.5 block text-xs text-muted">
             Prix payés, plus-values, total investi et boutiques visibles par
-            tes visiteurs. Décoché, la vitrine ne montre que tes cartes.
+            tes visiteurs. Décoché, la vitrine montre tes cartes et tes scellés sans aucun prix.
           </span>
         </span>
       </label>

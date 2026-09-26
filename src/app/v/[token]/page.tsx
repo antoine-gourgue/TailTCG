@@ -7,6 +7,9 @@ import { formatEur } from "@/lib/domain";
 import { binderColorHex } from "@/lib/binder-colors";
 import { binderDesign } from "@/lib/binder-design";
 import { coverRenderFor } from "@/lib/binder-cover-server";
+import { Boxes } from "lucide-react";
+import { kindLabel, sealedSetName } from "@/lib/sealed";
+import { sealedCotes } from "@/lib/sealed-prices";
 import { Logo } from "@/components/logo";
 import { BinderCover } from "@/components/binder-cover";
 import { CardImage } from "@/components/card-image";
@@ -246,6 +249,44 @@ export default async function SharedCollectionPage({
     };
   }));
 
+  // Produits scellés : regroupés par produit, cote seulement si les valeurs sont partagées
+  type SealedProduct = {
+    id: number;
+    name: string;
+    kind: string;
+    set_name: string;
+    set_name_fr: string | null;
+    image: string;
+    cardmarket_id: number | null;
+    price_usd: number | null;
+  };
+  const { data: sealedRows } = await admin
+    .from("sealed_items")
+    .select("quantity, purchase_price, manual_price, product:sealed_products(id, name, kind, set_name, set_name_fr, image, cardmarket_id, price_usd)")
+    .eq("owner_id", settings.owner_id);
+  const sealedByProduct = new Map<number, { product: SealedProduct; quantity: number; paid: number; pricedQty: number; manual: number | null }>();
+  for (const r of sealedRows ?? []) {
+    const product = (Array.isArray(r.product) ? r.product[0] : r.product) as SealedProduct | null;
+    if (!product) continue;
+    const g = sealedByProduct.get(product.id) ?? { product, quantity: 0, paid: 0, pricedQty: 0, manual: null };
+    g.quantity += r.quantity;
+    if (r.purchase_price != null) {
+      g.paid += r.purchase_price * r.quantity;
+      g.pricedQty += r.quantity;
+    }
+    if (r.manual_price != null) g.manual = r.manual_price;
+    sealedByProduct.set(product.id, g);
+  }
+  const sealedGroups = [...sealedByProduct.values()].sort((a, b) => a.product.name.localeCompare(b.product.name, "fr"));
+  const sealedCoteOf = showValues && sealedGroups.length > 0 ? await sealedCotes(sealedGroups.map((g) => g.product), admin) : new Map();
+  const sealedTiles = sealedGroups.map((g) => {
+    const unit = showValues ? (g.manual ?? sealedCoteOf.get(g.product.id)?.value ?? null) : null;
+    const estimated = unit != null ? unit * g.quantity : null;
+    const gain = showValues && unit != null && g.pricedQty > 0 ? unit * g.pricedQty - g.paid : null;
+    return { ...g, estimated, gain };
+  });
+  const sealedCount = sealedTiles.reduce((n, t) => n + t.quantity, 0);
+
   return (
     <main className="page py-8">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
@@ -344,6 +385,52 @@ export default async function SharedCollectionPage({
                     )}
                   </p>
                 </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {sealedTiles.length > 0 && (
+        <section className="mb-8">
+          <h2 className="display mb-3 text-lg font-semibold">
+            Scellés <span className="num ml-1 text-sm font-normal text-muted">{sealedCount}</span>
+          </h2>
+          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {sealedTiles.map((t) => (
+              <li key={t.product.id} className="flex h-full flex-col overflow-hidden rounded-2xl border border-edge bg-surface">
+                <div className="relative flex aspect-square items-center justify-center bg-white p-4">
+                  {t.product.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={t.product.image} alt="" className="max-h-full max-w-full object-contain" loading="lazy" />
+                  ) : (
+                    <Boxes size={40} className="text-neutral-400" aria-hidden />
+                  )}
+                  {t.quantity > 1 && (
+                    <span className="num absolute right-2 top-2 rounded-full bg-black/75 px-2 py-0.5 text-xs font-semibold text-white">× {t.quantity}</span>
+                  )}
+                </div>
+                <div className="flex flex-1 flex-col gap-1 p-3">
+                  <p className="line-clamp-2 text-sm font-semibold leading-tight">{t.product.name}</p>
+                  <p className="truncate text-xs text-muted">
+                    {kindLabel(t.product.kind)} · {sealedSetName(t.product)}
+                  </p>
+                  {showValues && (
+                    <div className="mt-auto flex items-baseline justify-between gap-2 pt-2">
+                      <span className="num text-xs text-muted">{t.paid > 0 ? `payé ${formatEur(t.paid)}` : ""}</span>
+                      <span className={`num text-sm font-bold ${t.estimated == null ? "text-faint" : ""}`}>{t.estimated != null ? formatEur(t.estimated) : "—"}</span>
+                    </div>
+                  )}
+                  {t.gain != null && (
+                    <p className={`num flex items-baseline justify-between text-xs font-semibold ${t.gain > 0 ? "text-gain" : t.gain < 0 ? "text-loss" : "text-muted"}`}>
+                      <span className="font-normal text-faint">plus-value</span>
+                      <span>
+                        {t.gain > 0 ? "+" : ""}
+                        {formatEur(t.gain)}
+                      </span>
+                    </p>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
