@@ -124,12 +124,21 @@ export default async function CartePage({
     user.id
   );
 
-  const [{ data: valueHistory }, { data: lastGrading }] = await Promise.all([
+  const [{ data: valueHistory }, { data: lastGrading }, { data: marketSnaps }] = await Promise.all([
     supabase
       .from("item_value_history")
       .select("id, recorded_at, value")
       .eq("item_id", id)
       .order("recorded_at"),
+    // Cote Cardmarket relevée chaque nuit pour cette carte (référence du guide)
+    item.tcgdex_id && !item.tcgdex_id.startsWith("custom:")
+      ? createAdminClient()
+          .from("price_snapshots")
+          .select("captured_at, reference")
+          .eq("tcgdex_id", item.tcgdex_id)
+          .not("reference", "is", null)
+          .order("captured_at")
+      : Promise.resolve({ data: null }),
     supabase
       .from("item_gradings")
       .select(
@@ -644,21 +653,58 @@ export default async function CartePage({
         {/* Pleine largeur : la courbe respire, la galerie garde sa hauteur */}
         {!editing && (
           <div className="mt-8 flex flex-col gap-8">
-            {valueHistory && valueHistory.length > 0 && (
-              <section className="panel p-5">
-                <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="display text-base font-semibold">
-                    Évolution de ma valeur estimée
-                  </h2>
-                  <ValueHistoryManager entries={valueHistory} />
+            {(() => {
+              const marketPoints = (marketSnaps ?? []).map((m) => ({ recorded_at: String(m.captured_at).slice(0, 10), value: Number(m.reference) }));
+              const mFirst = marketPoints[0]?.value ?? null;
+              const mLast = marketPoints[marketPoints.length - 1]?.value ?? null;
+              const mDelta = mFirst != null && mLast != null && mFirst > 0 ? ((mLast - mFirst) / mFirst) * 100 : null;
+              const showValue = !!valueHistory && valueHistory.length > 0;
+              const showMarket = marketPoints.length > 0;
+              if (!showValue && !showMarket) return null;
+              return (
+                <div className={`grid grid-cols-1 gap-8 ${showValue && showMarket ? "xl:grid-cols-2" : ""}`}>
+                  {showValue && (
+                    <section className="panel p-5">
+                      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                        <h2 className="display text-base font-semibold">Évolution de ma valeur estimée</h2>
+                        <ValueHistoryManager entries={valueHistory!} />
+                      </div>
+                      <p className="mb-3 text-xs text-faint">Chaque actualisation est datée — bouton « Actualiser la valeur » en haut de page.</p>
+                      <ValueHistoryChart points={valueHistory!} />
+                    </section>
+                  )}
+                  {showMarket && (
+                    <section className="panel p-5">
+                      <div className="mb-1 flex flex-wrap items-start justify-between gap-2">
+                        <h2 className="display text-base font-semibold">Évolution de la cote Cardmarket</h2>
+                        {mLast != null && (
+                          <span className="text-right">
+                            <span className="num block text-base font-bold leading-none">{formatEur(mLast)}</span>
+                            {mDelta != null && marketPoints.length > 1 && (
+                              <span className={`num block text-[11px] ${mDelta > 0 ? "text-gain" : mDelta < 0 ? "text-loss" : "text-muted"}`}>
+                                {mDelta > 0 ? "+" : ""}
+                                {mDelta.toFixed(1).replace(".", ",")} % depuis le premier relevé
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mb-3 text-xs text-faint">
+                        Relevé chaque nuit d&apos;après le guide Cardmarket · {marketPoints.length} relevé{marketPoints.length > 1 ? "s" : ""}
+                      </p>
+                      {marketPoints.length >= 2 ? (
+                        <ValueHistoryChart points={marketPoints} minSpanRatio={0.08} />
+                      ) : (
+                        <p className="text-sm text-muted">
+                          Premier relevé le {marketPoints[0].recorded_at.slice(8, 10)}/{marketPoints[0].recorded_at.slice(5, 7)} :{" "}
+                          <span className="num text-foreground">{formatEur(marketPoints[0].value)}</span>. La courbe se dessine dès le prochain.
+                        </p>
+                      )}
+                    </section>
+                  )}
                 </div>
-                <p className="mb-3 text-xs text-faint">
-                  Chaque actualisation est datée — bouton « Actualiser la
-                  valeur » en haut de page.
-                </p>
-                <ValueHistoryChart points={valueHistory} />
-              </section>
-            )}
+              );
+            })()}
             <PhotoGallery itemId={item.id ?? id} photos={photos} />
           </div>
         )}

@@ -390,6 +390,8 @@ export function CollectionClient({
       value: hasValue ? value : null,
       gain: hasValue ? value - invested : null,
       market: hasMarket ? market : null,
+      // plus-value « marché » : au cours Cardmarket, sur les cartes cotées
+      marketGain: hasMarket ? market - invested : null,
     };
   }, [filtered]);
 
@@ -690,16 +692,13 @@ export function CollectionClient({
           <Stat label="Cartes" value={summary.count} />
           {!hideValues && (
             <>
-              <Stat label="Valeur estimée" value={formatEur(summary.value)} />
               {/* Sur mobile, l'essentiel seulement : le détail vit sur Collection */}
               <div className="hidden sm:contents">
                 <Stat label="Investi" value={formatEur(summary.invested)} />
-                {summary.market != null && (
-                  <Stat label="Valeur Cardmarket" value={formatEur(summary.market)} />
-                )}
               </div>
+              <Stat label="Valeur estimée" value={formatEur(summary.value)} />
               <Stat
-                label="Plus-value"
+                label="Plus-value estimée"
                 value={
                   summary.gain == null
                     ? "—"
@@ -713,6 +712,18 @@ export function CollectionClient({
                       : "down"
                 }
               />
+              <div className="hidden sm:contents">
+                {summary.market != null && (
+                  <Stat label="Valeur Cardmarket" value={formatEur(summary.market)} />
+                )}
+                {summary.marketGain != null && (
+                  <Stat
+                    label="Plus-value Cardmarket"
+                    value={`${summary.marketGain > 0 ? "+" : ""}${formatEur(summary.marketGain)}`}
+                    tone={summary.marketGain >= 0 ? "up" : "down"}
+                  />
+                )}
+              </div>
             </>
           )}
         </div>
