@@ -172,6 +172,30 @@ async function loadCardmarket() {
   return { global, expIndex };
 }
 
+/**
+ * Appariements forcés (id TCGplayer → idProduct Cardmarket) quand les noms
+ * ne se correspondent pas : Cardmarket nomme les tins et mini tins par leur
+ * duo de Pokémon, TCGplayer par un seul, avec des variantes International/Retail.
+ */
+const CM_ID_OVERRIDES = {
+  704148: 895556, // 30th Celebration 2-Pack Blister → Eevee 2-Pack Blister
+  704192: 895603, // Classic Collection Pack → Classic Collection Booster
+  704150: 895745, // ex Tin [Greninja ex] (International) → Greninja ex Tin
+  718673: 895745, // ex Tin [Greninja ex] (Retail) → Greninja ex Tin
+  704149: 895746, // ex Tin [Sylveon ex] (International) → Sylveon ex Tin
+  718674: 895746, // ex Tin [Sylveon ex] (Retail) → Sylveon ex Tin
+  704176: 895565, // Mini Tin [Espeon] → Espeon & Meowth
+  704185: 895566, // Mini Tin [Greninja] → Greninja & Volbeat
+  704179: 895567, // Mini Tin [Lapras] → Lapras & Drifloon
+  704178: 895564, // Mini Tin [Mew] → Mew & Alolan Exeggutor
+  704183: 895568, // Mini Tin [Mewtwo] → Mewtwo & Scraggy
+  704180: 895569, // Mini Tin [Moltres] → Moltres & Articuno
+  704182: 895571, // Mini Tin [Umbreon] → Umbreon & Alolan Meowth
+  704181: 895573, // Mini Tin [Zapdos] → Zapdos & Hisuian Zorua
+  704190: 895577, // Ultra-Premium Collection [Day] → Espeon ex UPC
+  704191: 895578, // Ultra-Premium Collection [Night] → Umbreon ex UPC
+};
+
 function matchCardmarket(cm, productName, setNorm) {
   const variants = cmVariants(productName, setNorm);
   for (const v of variants) {
@@ -421,7 +445,7 @@ for (const { group, products, priceById } of groups) {
   const groupLogo = td ? null : await unmatchedLogo(group, setClean);
   const released = group.publishedOn ? String(group.publishedOn).slice(0, 10) : null;
   for (const p of products) {
-    const cmId = matchCardmarket(cm, p.name, td ? norm(td.set_name_fr) : setNorm) ?? matchCardmarket(cm, p.name, setNorm);
+    const cmId = CM_ID_OVERRIDES[p.productId] ?? matchCardmarket(cm, p.name, td ? norm(td.set_name_fr) : setNorm) ?? matchCardmarket(cm, p.name, setNorm);
     if (td) withSet++;
     if (cmId) withCm++;
     rows.push({
