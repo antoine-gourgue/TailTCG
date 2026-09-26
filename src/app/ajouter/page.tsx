@@ -9,8 +9,7 @@ import { catalogCard } from "@/lib/catalog";
 import { ITEM_LANGUAGE, isScanLang } from "@/lib/scan/url";
 import { resolveCardmarketPrice } from "@/lib/cardmarket";
 import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
-import { CardImage } from "@/components/card-image";
-import { formatEur } from "@/lib/domain";
+import { CardSpotlight } from "@/components/card-spotlight";
 import { AppShell } from "@/components/app-shell";
 import { ItemForm, type CardMeta } from "@/components/item-form";
 import { WishlistButton } from "@/components/wishlist-button";
@@ -60,7 +59,8 @@ export default async function AjouterPage({
 
   let meta: CardMeta;
   let previewImage: string | null = null;
-  let subtitle = "";
+  let total: number | null = null;
+  let kicker: string | null = null;
   let rarity: string | null = null;
   let defaultType: string | null = null;
   let defaultLanguage: string = ITEM_LANGUAGE[lang];
@@ -90,8 +90,7 @@ export default async function AjouterPage({
       localId: cc.local_id,
       imageBase: `storage:${cc.image_path}`,
     };
-    subtitle = `${cc.set_name} · ${cc.local_id}`;
-    rarity = "Hors catalogue";
+    kicker = "Carte hors catalogue";
     defaultLanguage = "JP";
   } else {
     const card = await catalogCard(cardId, lang);
@@ -106,9 +105,7 @@ export default async function AjouterPage({
       imageBase: card.image ?? "",
     };
     previewImage = card.image ? `${card.image}/low.webp` : null;
-    subtitle = `${card.set.name} · ${card.localId}${
-      card.set.cardCount?.official ? ` / ${card.set.cardCount.official}` : ""
-    }`;
+    total = card.set.cardCount?.official ?? null;
     rarity = card.rarity ?? null;
     cmId = overrideCardmarketId(card.id, card.pricing?.cardmarket?.idProduct);
     price = await resolveCardmarketPrice(cmId, card.pricing?.cardmarket);
@@ -157,42 +154,23 @@ export default async function AjouterPage({
         <div className="flex flex-col gap-8 md:flex-row">
           {/* La carte choisie */}
           <aside className="w-full max-w-60 shrink-0 md:sticky md:top-20 md:self-start">
-            <div className="card-tile aspect-[63/88]">
-              <CardImage base={previewImage} alt={meta.name} direct />
-            </div>
-            <div className="mt-4">
-              <p className="display text-lg font-semibold leading-tight">
-                {meta.name}
-              </p>
-              <p className="mt-1 text-sm text-muted">{subtitle}</p>
-              {rarity && (
-                <p className="mt-2 inline-block rounded-md bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong">
-                  {rarity}
-                </p>
-              )}
-              {price != null && (
-                <a
-                  href={cardmarketUrl({ idProduct: cmId, name: meta.name, localId: meta.localId })}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-edge px-3 py-2 transition hover:border-edge-strong"
-                  title="Voir cette carte sur Cardmarket"
-                >
-                  <span className="min-w-0">
-                    <span className="block text-[11px] uppercase tracking-wide text-faint">
-                      Cardmarket
-                    </span>
-                    <span className="num text-base font-semibold">{formatEur(price)}</span>
-                  </span>
-                  <span className="shrink-0 text-xs text-accent-strong">
-                    Cardmarket ↗
-                  </span>
-                </a>
-              )}
-              <div className="mt-4">
-                <WishlistButton card={meta} initialWished={Boolean(wish)} />
-              </div>
-            </div>
+            <CardSpotlight
+              layout="stack"
+              kicker={kicker}
+              card={{
+                name: meta.name,
+                image: previewImage,
+                direct: true,
+                setName: meta.setName,
+                localId: meta.localId,
+                total,
+                rarity: cardId.startsWith("custom:") ? undefined : rarity,
+                lang: defaultLanguage !== "FR" ? defaultLanguage : null,
+              }}
+              price={cardId.startsWith("custom:") ? undefined : price}
+              cmUrl={cardId.startsWith("custom:") ? null : cardmarketUrl({ idProduct: cmId, name: meta.name, localId: meta.localId })}
+              actions={<WishlistButton card={meta} initialWished={Boolean(wish)} />}
+            />
           </aside>
 
           <div className="min-w-0 flex-1">

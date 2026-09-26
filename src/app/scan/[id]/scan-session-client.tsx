@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
-import { Check, ExternalLink, ListPlus, Loader2, Plus, RotateCcw, ScanLine, SkipForward, Smartphone, Trash2, X, Zap } from "lucide-react";
+import { Check, ListPlus, Loader2, Plus, RotateCcw, ScanLine, SkipForward, Smartphone, Trash2, X, Zap } from "lucide-react";
 import { SELECTED_RING, TileCaption } from "@/components/card-grid-kit";
 import { CardImage } from "@/components/card-image";
+import { CardSpotlight } from "@/components/card-spotlight";
 import { Sheet } from "@/components/sheet";
 import { formatEur } from "@/lib/domain";
 import { addCardUrl, isScanLang, ITEM_LANGUAGE } from "@/lib/scan/url";
@@ -190,16 +191,13 @@ export function ScanSessionClient({
 
   const detail = selected ? details[scanKey(selected)] : undefined;
 
-  /** Détail de la carte choisie : visuel, cote, actions */
+  /** Détail de la carte choisie : fiche express + actions selon son statut */
   const detailPanel = selected && (
-    <div className="flex flex-col">
-      <div className="mx-auto w-full max-w-[220px]">
-        <div className="card-tile aspect-[63/88]">
-          <CardImage key={selected.id} base={selected.image || null} alt={selected.name} />
-        </div>
-      </div>
-      <div className="mt-4 min-w-0">
-        <p className="label-xs flex items-center gap-1.5 text-muted">
+    <CardSpotlight
+      layout={wide ? "stack" : "auto"}
+      inDialog={!wide}
+      kicker={
+        <>
           {selected.status === "added" ? (
             <Check size={12} className="text-gain" aria-hidden />
           ) : selected.status === "skipped" ? (
@@ -208,55 +206,20 @@ export function ScanSessionClient({
             <Smartphone size={12} aria-hidden />
           )}
           {STATUS_LABEL[selected.status]}
-        </p>
-        <p className="display mt-1 flex items-center gap-2 text-lg font-semibold leading-tight">
-          <span className="truncate">{selected.name}</span>
-          <LangBadge lang={selected.lang} className="shrink-0" />
-        </p>
-        <p className="mt-0.5 text-sm text-muted">
-          {selected.set_name} <span className="num text-faint">· n° {selected.local_id}</span>
-        </p>
-        {detail?.rarity && (
-          <p className="mt-1.5 inline-block rounded-md bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong">
-            {detail.rarity}
-          </p>
-        )}
-      </div>
-
-      {detail === undefined ? (
-        <p className="mt-4 flex items-center gap-2 rounded-lg border border-dashed border-edge px-3 py-2 text-xs text-faint">
-          <Loader2 size={12} className="animate-spin" aria-hidden />
-          Cote Cardmarket…
-        </p>
-      ) : detail.price == null ? (
-        <a
-          href={detail.cmUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-4 flex items-center justify-between gap-2 rounded-lg border border-dashed border-edge px-3 py-2 text-xs text-faint transition hover:border-edge-strong"
-        >
-          Cote Cardmarket indisponible
-          <span className="inline-flex items-center gap-1 text-accent-strong">
-            Chercher <ExternalLink size={11} aria-hidden />
-          </span>
-        </a>
-      ) : (
-        <a
-          href={detail.cmUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-4 flex items-center justify-between gap-2 rounded-lg border border-edge px-3 py-2 transition hover:border-edge-strong"
-          title="Voir cette carte sur Cardmarket"
-        >
-          <span className="min-w-0">
-            <span className="block text-[11px] uppercase tracking-wide text-faint">Cardmarket</span>
-            <span className="num text-base font-semibold">{formatEur(detail.price)}</span>
-          </span>
-          <span className="shrink-0 text-xs text-accent-strong">Cardmarket ↗</span>
-        </a>
-      )}
-
-      <div className="mt-4 flex flex-col gap-2">
+        </>
+      }
+      card={{
+        name: selected.name,
+        image: selected.image || null,
+        setName: selected.set_name,
+        localId: selected.local_id,
+        rarity: detail === undefined ? undefined : (detail.rarity ?? null),
+        lang: isScanLang(selected.lang) && selected.lang !== "fr" ? ITEM_LANGUAGE[selected.lang] : null,
+      }}
+      price={detail === undefined ? "loading" : detail.price}
+      cmUrl={detail?.cmUrl ?? null}
+      actions={
+        <>
         {selected.status === "pending" && (
           <>
             <button type="button" onClick={() => addOne(selected.id)} disabled={busy} className="btn btn-primary w-full justify-center">
@@ -303,8 +266,9 @@ export function ScanSessionClient({
             <p className="text-center text-xs text-muted">Ajoutée à ta collection.</p>
           )
         )}
-      </div>
-    </div>
+        </>
+      }
+    />
   );
 
   return (
@@ -526,7 +490,7 @@ export function ScanSessionClient({
             </div>
           </aside>
         ) : (
-          <Sheet open={selected !== null} onClose={() => setSelectedId(null)} label="Détail de la carte" size="sm">
+          <Sheet open={selected !== null} onClose={() => setSelectedId(null)} label="Détail de la carte" size="xl">
             {detailPanel}
           </Sheet>
         )}

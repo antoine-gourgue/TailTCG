@@ -9,6 +9,7 @@ import { resolveCardmarketRef } from "@/lib/cardmarket";
 import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
 import { signStorageImages } from "@/lib/images";
 import { formatEur, CONDITIONS } from "@/lib/domain";
+import { rarityLabel, raritySymbol } from "@/lib/rarity";
 import { AppShell } from "@/components/app-shell";
 import { ItemForm } from "@/components/item-form";
 import { DeleteItemButton } from "@/components/delete-item-button";
@@ -262,11 +263,6 @@ export default async function CartePage({
                   <h1 className="display text-3xl font-bold tracking-tight">
                     {item.card_name}
                   </h1>
-                  {tcgdexCard?.rarity && (
-                    <span className="rounded-md bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent-strong">
-                      {tcgdexCard.rarity}
-                    </span>
-                  )}
                 </div>
                 <p className="mt-1 text-muted">
                   <Link
@@ -277,6 +273,18 @@ export default async function CartePage({
                     {item.set_name}
                   </Link>{" "}
                   <span className="num text-faint">· {item.local_id}</span>
+                  {tcgdexCard?.rarity && (
+                    <span className="text-faint">
+                      {" "}
+                      ·{" "}
+                      {raritySymbol(tcgdexCard.rarity) && (
+                        <span className="text-accent-strong" aria-hidden>
+                          {raritySymbol(tcgdexCard.rarity)}{" "}
+                        </span>
+                      )}
+                      {rarityLabel(tcgdexCard.rarity)}
+                    </span>
+                  )}
                 </p>
                 {!editing && (
                   <BinderPicker

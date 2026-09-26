@@ -4,6 +4,7 @@ import type { Database } from "@/lib/database.types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchSetsIndex } from "@/lib/tcgdex";
 import { daysAgoISO, CONDITIONS, LANGUAGES } from "@/lib/domain";
+import { rarityLabel, UNKNOWN_RARITY } from "@/lib/rarity";
 import { signStorageImages } from "@/lib/images";
 import { KIND_ORDER, kindLabel, sealedSetName } from "@/lib/sealed";
 import { sealedCotes, sealedVariations, type SealedCote } from "@/lib/sealed-prices";
@@ -27,7 +28,7 @@ type Row = {
   set_name: string;
   local_id: string;
   image_url: string;
-  card_type: string | null;
+  rarity: string | null;
   language: string;
   condition: string;
   quantity: number | null;
@@ -44,6 +45,7 @@ type Row = {
 };
 
 const SOURCES_SHOWN = 6;
+const RARITIES_SHOWN = 6;
 
 /** Les 12 derniers mois, du plus ancien au mois courant */
 function monthWindow(): MonthPoint[] {
@@ -77,7 +79,7 @@ export async function loadCardStats(supabase: DB, ownerId: string): Promise<Stat
     supabase
       .from("collection_value")
       .select(
-        "id, tcgdex_id, card_name, set_id, set_name, local_id, image_url, card_type, language, condition, quantity, purchase_price, purchase_date, created_at, source_id, current_price, gain, sold_price, sold_at, graded, needs_review",
+        "id, tcgdex_id, card_name, set_id, set_name, local_id, image_url, rarity, language, condition, quantity, purchase_price, purchase_date, created_at, source_id, current_price, gain, sold_price, sold_at, graded, needs_review",
       )
       .eq("owner_id", ownerId),
     supabase.from("sources").select("id, name"),
@@ -212,12 +214,18 @@ export async function loadCardStats(supabase: DB, ownerId: string): Promise<Stat
   };
   const byCondition = countBy((r) => r.condition ?? "?");
   const byLanguage = countBy((r) => r.language ?? "?");
-  const byType = countBy((r) => r.card_type || "Non renseigné");
+  const byRarity = countBy((r) => rarityLabel(r.rarity));
   const conditionSlices: Slice[] = CONDITIONS.map((c) => ({ code: c.code, label: `${c.code} · ${c.label}`, count: byCondition.get(c.code) ?? 0 }));
   const languageSlices: Slice[] = [...byLanguage.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([code, n]) => ({ code, label: (LANGUAGES as readonly string[]).includes(code) ? code : `Autre (${code})`, count: n }));
-  const typeSlices: Slice[] = [...byType.entries()].sort((a, b) => b[1] - a[1]).map(([code, n]) => ({ code, label: code, count: n }));
+  // Rareté : les plus représentées d'abord, « Non renseignée » en dernier ; au-delà de 6, le reste est regroupé
+  const rarityRows = [...byRarity.entries()].sort((a, b) => (a[0] === UNKNOWN_RARITY ? 1 : 0) - (b[0] === UNKNOWN_RARITY ? 1 : 0) || b[1] - a[1]);
+  const raritySlices: Slice[] = rarityRows.slice(0, RARITIES_SHOWN).map(([code, n]) => ({ code, label: code, count: n }));
+  if (rarityRows.length > RARITIES_SHOWN) {
+    const rest = rarityRows.slice(RARITIES_SHOWN);
+    raritySlices.push({ code: "__rest__", label: `Autres (${rest.length})`, count: rest.reduce((a, [, n]) => a + n, 0) });
+  }
 
   /* ——— Dépenses par source ——— */
   const sourceName = new Map((sources ?? []).map((s) => [s.id as string, s.name as string]));
@@ -300,7 +308,7 @@ export async function loadCardStats(supabase: DB, ownerId: string): Promise<Stat
     sourcesCount: sourceRows.length,
     conditionSlices,
     languageSlices,
-    typeSlices,
+    raritySlices,
     hasGain: withGain.length > 0,
     top,
     flop,

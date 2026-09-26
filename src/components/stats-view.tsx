@@ -6,6 +6,7 @@ import {
   CalendarDays,
   ClipboardList,
   Coins,
+  Gem,
   Heart,
   Languages,
   Layers,
@@ -68,7 +69,7 @@ export type StatsData = {
   sourcesCount: number;
   conditionSlices: Slice[];
   languageSlices: Slice[];
-  typeSlices: Slice[];
+  raritySlices: Slice[];
   hasGain: boolean;
   top: RankItem[];
   flop: RankItem[];
@@ -298,8 +299,8 @@ export function StatsView({ d, s }: { d: StatsData; s?: SealedStats }) {
         <Panel icon={Languages} title="Par langue">
           <Donut slices={d.languageSlices} label="Répartition par langue" />
         </Panel>
-        <Panel icon={Tag} title="Par type">
-          <Donut slices={d.typeSlices} label="Répartition par type" />
+        <Panel icon={Gem} title="Par rareté">
+          <Donut slices={d.raritySlices} label="Répartition par rareté" />
         </Panel>
       </div>
 

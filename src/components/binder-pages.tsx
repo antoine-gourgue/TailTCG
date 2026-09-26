@@ -15,6 +15,7 @@ import { Book, Check, ChevronLeft, ChevronRight, Minus, Pencil, Plus, Search, X 
 import { useCleanView } from "@/components/binder-clean-view";
 import { Sheet } from "@/components/sheet";
 import { CardImage } from "@/components/card-image";
+import { CardSpotlight } from "@/components/card-spotlight";
 import { BinderCover, type CoverItem } from "@/components/binder-cover";
 import type { CoverRender } from "@/lib/binder-cover";
 import { Toast } from "@/components/toast";
@@ -1705,56 +1706,33 @@ export function BinderPages({
       <Sheet
         open={detail != null}
         onClose={() => setDetail(null)}
-        size="sm"
+        size="xl"
         label={item?.card_name ?? "Carte"}
       >
         {item && (
-          <div>
-            <div className="mx-auto w-full max-w-[300px]">
-              <div className="card-tile aspect-[63/88]">
-                {item.kind === "pokemon" && item.pokemon ? (
-                  <PokemonCard
-                    p={{ id: item.pokemon.id, name: item.card_name, types: item.pokemon.types }}
-                    priority
-                  />
-                ) : (
-                  <CardImage
-                    base={item.image_url || null}
-                    alt={item.card_name}
-                    quality="high"
-                    fallback={item.photo_fallback ?? null}
-                  />
-                )}
-              </div>
-            </div>
-            <div className="mt-4">
-              <p className="display text-xl font-semibold leading-tight">
-                {item.card_name}
-              </p>
-              <p className="mt-1 text-sm text-muted">
-                {item.set_name}
-                {item.local_id && (
-                  <span className="num text-faint">
-                    {" "}
-                    · {item.kind === "pokemon" ? "N° " : ""}
-                    {item.local_id}
-                    {setTotal ? ` / ${setTotal}` : ""}
-                  </span>
-                )}
-                {item.kind === "pokemon" && item.pokemon && item.pokemon.types.length > 0 && (
-                  <span className="text-faint">
-                    {" "}
-                    · {item.pokemon.types.map((t) => TYPE_FR[t] ?? t).join(" / ")}
-                  </span>
-                )}
-              </p>
-              {item.kind === "wanted" && (
-                <p className="mt-2 inline-block rounded-md bg-raised px-2 py-0.5 text-xs text-muted">
-                  Hors collection
-                </p>
-              )}
-            </div>
-            <div className="mt-4 flex flex-col gap-2">
+          <CardSpotlight
+            inDialog
+            kicker={item.kind === "wanted" ? "Hors collection" : item.kind === "pokemon" ? "Pokédex" : undefined}
+            card={{
+              name: item.card_name,
+              image: item.image_url || null,
+              fallback: item.photo_fallback ?? null,
+              setName: item.set_name ?? "",
+              localId: item.local_id ? (item.kind === "pokemon" ? `N° ${item.local_id}` : item.local_id) : null,
+              total: item.kind === "pokemon" ? null : (setTotal ?? null),
+            }}
+            imageSlot={
+              item.kind === "pokemon" && item.pokemon ? (
+                <PokemonCard p={{ id: item.pokemon.id, name: item.card_name, types: item.pokemon.types }} priority />
+              ) : undefined
+            }
+            facts={
+              item.kind === "pokemon" && item.pokemon && item.pokemon.types.length > 0
+                ? [{ label: "Type", value: item.pokemon.types.map((t) => TYPE_FR[t] ?? t).join(" / ") }]
+                : []
+            }
+            actions={
+              <>
               {item.kind === "owned" && hrefBase ? (
                 <Link href={`${hrefBase}${refIdOf(item.id)}`} className="btn btn-primary w-full">
                   Voir dans ma collection
@@ -1783,8 +1761,9 @@ export function BinderPages({
                   Changer la carte de cette pochette
                 </button>
               )}
-            </div>
-          </div>
+              </>
+            }
+          />
         )}
       </Sheet>
     );

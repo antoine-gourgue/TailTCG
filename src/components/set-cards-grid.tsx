@@ -12,6 +12,9 @@ import { formatEur } from "@/lib/domain";
 import { Toast } from "@/components/toast";
 import { Sheet } from "@/components/sheet";
 import { FloatingBar } from "@/components/floating-bar";
+import { CardSpotlight } from "@/components/card-spotlight";
+import { rarityRank, raritySymbol } from "@/lib/rarity";
+import { ITEM_LANGUAGE, isScanLang } from "@/lib/scan/url";
 
 export type SetCard = {
   id: string;
@@ -27,54 +30,7 @@ export type SetCard = {
   lang?: string;
 };
 
-/** Ordre d'affichage des raretés (inconnues à la fin) */
-const RARITY_ORDER = [
-  "Commune",
-  "Peu Commune",
-  "Rare",
-  "Rare Holo",
-  "Rare Holo EX",
-  "Rare Holo LV.X",
-  "Rare Prime",
-  "LÉGENDE",
-  "Ultra Rare",
-  "Magnifique rare",
-  "Double rare",
-  "Illustration rare",
-  "Illustration spéciale rare",
-  "Hyper rare",
-  "Chromatique rare",
-  "Chromatique ultra rare",
-  "Rare Secrète",
-  "Secrète",
-  "Promo",
-];
-
-const RARITY_SYMBOLS: Record<string, string> = {
-  Commune: "●",
-  "Peu Commune": "◆",
-  Rare: "★",
-  "Rare Holo": "✦",
-  "Rare Holo EX": "✦",
-  "Rare Holo LV.X": "✦",
-  "Rare Prime": "✹",
-  LÉGENDE: "▞",
-  "Ultra Rare": "✸",
-  "Double rare": "★★",
-  "Illustration rare": "✧",
-  "Illustration spéciale rare": "✧✧",
-  "Hyper rare": "🟊",
-  "Rare Secrète": "✪",
-  Secrète: "✪",
-  Promo: "◈",
-};
-
 const UNKNOWN = "Autre";
-
-function rarityRank(r: string): number {
-  const i = RARITY_ORDER.indexOf(r);
-  return i === -1 ? 999 : i;
-}
 
 export function SetCardsGrid({
   cards,
@@ -294,7 +250,7 @@ export function SetCardsGrid({
                   active ? "text-accent-strong" : "text-faint opacity-50"
                 }`}
               >
-                <span aria-hidden>{RARITY_SYMBOLS[rarity] ?? "✶"}</span>
+                <span aria-hidden>{raritySymbol(rarity) ?? "✶"}</span>
               </button>
             );
           })}
@@ -371,96 +327,39 @@ export function SetCardsGrid({
         </ul>
       )}
 
-      {/* Aperçu de la carte */}
-      <Sheet
-        open={selected != null}
-        onClose={() => setSelected(null)}
-        label={selected?.name ?? "Carte"}
-        size="xs"
-      >
+      {/* Fiche express de la carte */}
+      <Sheet open={selected != null} onClose={() => setSelected(null)} label={selected?.name ?? "Carte"} size="xl">
         {selected && (
-          <div className="mx-auto w-full max-w-[260px] sm:max-w-none">
-            <div className="card-tile relative aspect-[63/88]">
-              <CardImage base={selected.image} alt={selected.name} quality="high" />
-              <button
-                type="button"
-                onClick={() => toggleWish(selected)}
-                disabled={pendingWish}
-                title={
-                  wished.has(selected.id)
-                    ? "Retirer des recherchées"
-                    : "Ajouter aux recherchées"
-                }
-                aria-label={
-                  wished.has(selected.id)
-                    ? "Retirer des recherchées"
-                    : "Ajouter aux recherchées"
-                }
-                className={`absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-sm transition ${
-                  wished.has(selected.id)
-                    ? "bg-accent text-accent-ink"
-                    : "bg-black/60 text-white hover:bg-black/80"
-                } ${pendingWish ? "opacity-60" : ""}`}
+          <CardSpotlight
+            inDialog
+            card={{
+              name: selected.name,
+              image: selected.image,
+              setName,
+              localId: selected.localId,
+              total: officialCount,
+              rarity: selected.rarity,
+              lang:
+                selected.lang && isScanLang(selected.lang) && selected.lang !== "fr"
+                  ? ITEM_LANGUAGE[selected.lang]
+                  : lang === "JP"
+                    ? "JP"
+                    : null,
+            }}
+            price={selected.price}
+            cmUrl={cardmarketUrl({ idProduct: selected.cmId, name: selected.name, localId: selected.localId })}
+            wish={{ on: wished.has(selected.id), pending: pendingWish, toggle: () => toggleWish(selected) }}
+            facts={(ownedQty[selected.id] ?? 0) > 0 ? [{ label: "Ma collection", value: `× ${ownedQty[selected.id]}` }] : []}
+            actions={
+              <Link
+                href={`/ajouter?card=${encodeURIComponent(selected.id)}${selected.lang ? `&lang=${selected.lang}` : langSuffix}`}
+                className="btn btn-primary w-full !py-3"
               >
-                <Star
-                  size={16}
-                  fill={wished.has(selected.id) ? "currentColor" : "none"}
-                  aria-hidden
-                />
-              </button>
-            </div>
-
-            <div className="mt-4 min-w-0">
-              <p className="display truncate text-lg font-semibold leading-tight">
-                {selected.name}
-              </p>
-              <p className="mt-0.5 text-sm text-muted">
-                {setName}{" "}
-                <span className="num text-faint">
-                  · {selected.localId}
-                  {officialCount && !selected.localId.includes("/") ? ` / ${officialCount}` : ""}
-                </span>
-              </p>
-              {selected.rarity && (
-                <p className="mt-1.5 inline-block rounded-md bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong">
-                  {selected.rarity}
-                </p>
-              )}
-            </div>
-
-            {selected.price == null && (
-              <p className="mt-4 rounded-lg border border-dashed border-edge px-3 py-2 text-xs text-faint">
-                Cote Cardmarket indisponible pour cette carte
-              </p>
-            )}
-            {selected.price != null && (
-              <a
-                href={cardmarketUrl({ idProduct: selected.cmId, name: selected.name, localId: selected.localId })}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 flex items-center justify-between gap-2 rounded-lg border border-edge px-3 py-2 transition hover:border-edge-strong"
-                title="Voir cette carte sur Cardmarket"
-              >
-                <span className="min-w-0">
-                  <span className="block text-[11px] uppercase tracking-wide text-faint">
-                    Cardmarket
-                  </span>
-                  <span className="num text-base font-semibold">
-                    {formatEur(selected.price)}
-                  </span>
-                </span>
-                <span className="shrink-0 text-xs text-accent-strong">Cardmarket ↗</span>
-              </a>
-            )}
-
-            <Link
-              href={`/ajouter?card=${encodeURIComponent(selected.id)}${selected.lang ? `&lang=${selected.lang}` : langSuffix}`}
-              className="btn btn-primary mt-4 w-full"
-            >
-              <Plus size={15} aria-hidden />
-              Ajouter à ma collection
-            </Link>
-          </div>
+                <Plus size={16} aria-hidden />
+                Ajouter à ma collection
+              </Link>
+            }
+          />
         )}
       </Sheet>
 
