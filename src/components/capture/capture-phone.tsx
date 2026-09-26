@@ -92,7 +92,6 @@ export function CapturePhone({
         <CardScanner
           token={token}
           onConfirm={sendDetect}
-          confirmLabel="Envoyer sur l'ordinateur"
           title="Scanner pour l'ordinateur"
           noun="envoyée"
           onFinish={finishDetect}

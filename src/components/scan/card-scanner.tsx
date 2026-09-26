@@ -6,34 +6,52 @@ import { Check, ExternalLink, Loader2, RefreshCw, Sparkles, X } from "lucide-rea
 import { CardImage } from "@/components/card-image";
 import { formatEur } from "@/lib/domain";
 import type { Pt } from "@/lib/scan/detect.mjs";
-import { ScanEngine, type Quad } from "@/lib/scan/engine";
+import { CornerEngine } from "@/lib/scan/corners-engine";
 import { NeuralScanner } from "@/lib/scan/embed-engine";
 import { NeuralIndex, type NeuralHit } from "@/lib/scan/embed-match";
 import type { ScanCandidate, ScanResult } from "@/lib/scan/index";
 import { ITEM_LANGUAGE } from "@/lib/scan/url";
+import { play } from "@/lib/sfx";
 
-/** Candidats de détection départagés par la reconnaissance quand le premier ne donne rien */
-const MAX_QUADS = 3;
-/** Détections consécutives de la même carte avant de l'envoyer à la reconnaissance (1 = dès qu'on la voit : le matcher refuse les images incertaines) */
-const STABLE_HITS = 2;
-/** Délai minimal entre deux reconnaissances (retente vite quand la 1re n'aboutit pas) */
-const RECOG_EVERY_MS = 140;
-/** Reconnaissance neurale locale : verrou immédiat, sans serveur, quand c'est très sûr et stable */
+/** Cadence maximale des cartes redressées envoyées à la reconnaissance */
+const RECOG_EVERY_MS = 300;
+/** Cadence maximale des appels au serveur (pHash), quand le neural local n'a pas tranché */
+const SERVER_EVERY_MS = 500;
+/** Reconnaissance neurale locale : commit IMMÉDIAT quand une seule image domine très nettement */
 const NEURAL_MATCH = 0.78;
 const NEURAL_MARGIN = 0.04;
-const NEURAL_STABLE = 2;
-/** Sous ce cosinus, ce n'est pas une carte (visage, fenêtre, décor) : on
- *  n'appelle même pas le repli pHash serveur, qui verrouillerait à tort */
+/** Sous ce cosinus, ce n'est pas une carte (visage, fenêtre, décor) : on n'appelle pas le serveur */
 const NEURAL_FLOOR = 0.6;
-/** Le cadre reste affiché ce temps après la dernière carte vue par le neural :
- *  sans carte récente, on n'affiche aucun cadre (il ne saute plus partout) */
+/**
+ * AGRÉGATION TEMPORELLE (reprise du scanner GoupixDex) : une carte holo sombre
+ * en mouvement donne un embedding qui saute d'une image à l'autre — la vraie
+ * carte revient en tête par intermittence, les faux sont tous différents. On
+ * crédite le meilleur pari de chaque image nette : la vraie carte accumule un
+ * score cohérent, les faux ne s'additionnent pas. Commit quand un candidat
+ * dépasse un score ET domine le suivant.
+ */
+const AGG_MIN_SIM = 0.66;
+const AGG_SCORE_BASE = 0.58;
+const AGG_DECAY = 0.82;
+const AGG_COMMIT_SCORE = 0.3;
+const AGG_DOMINATION = 1.6;
+/** Anti-doublon : la même carte revue dans ce délai ne s'ajoute pas deux fois */
+const COMMIT_DEBOUNCE_MS = 3000;
+/** Après un ajout : images vides consécutives et délai minimal avant d'accepter la carte suivante */
+const CLEAR_TICKS_TO_REARM = 10;
+const MIN_REARM_MS = 900;
+/** Durée maximale du cooldown (un cadre resté collé au décor ne bloquerait jamais) */
+const COOLDOWN_MAX_MS = 2500;
+/** Images vides avant que le cadre disparaisse (≈ 150 ms) */
+const MISS_LINGER_TICKS = 4;
+/** Le cadre détecté est masqué ce temps après un verdict « pas une carte » */
 const FRAME_HOLD_MS = 900;
 /** Cadre orange tant que la carte n'est pas reconnue, vert dès qu'elle l'est */
 const SEEK = { stroke: "#f97316", fill: "rgba(249,115,22,.10)" };
 const LOCK = { stroke: "#34d399", fill: "rgba(16,185,129,.14)" };
 /** Cadre-guide (format carte) affiché quand aucune carte n'est accrochée : fraction de la hauteur d'écran */
 const GUIDE_H_FRAC = 0.5;
-/** Cadrages essayés (part rognée sur chaque bord) : un seul = plus réactif */
+/** Cadrages essayés par le neural (part rognée sur chaque bord) : un seul = plus réactif */
 const NEURAL_INSETS = [0];
 /** Modèle + index hébergés sur Supabase Storage (bucket public scan-assets) */
 const SCAN_ASSETS = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/scan-assets`;
@@ -45,14 +63,20 @@ const HOLD_MS = 450;
 /**
  * Lissage ADAPTATIF du cadre (coins en pixels vidéo) : sous le deadband, la
  * carte est immobile et ce que renvoie le détecteur n'est que du bruit → on
- * FIGE le cadre (fini le rectangle qui tremble/change de taille sans raison) ;
- * au-delà, le poids du lerp monte avec le déplacement réel (suit la main sans
- * traîner ni jitter) ; au-delà d'un gros saut, on colle direct (nouvelle scène).
+ * FIGE le cadre ; au-delà, le poids du lerp monte avec le déplacement réel ;
+ * au-delà d'un gros saut, on colle direct (nouvelle scène).
  */
 const SMOOTH_DEADBAND_FRAC = 0.008;
 const SMOOTH_LERP_MIN = 0.22;
 const SMOOTH_LERP_MAX = 0.85;
 const SCENE_CHANGE_FRAC = 0.22;
+/** Détection indisponible : la zone-guide part à la reconnaissance à cette cadence */
+const FALLBACK_EVERY_MS = 1200;
+/** Durées d'affichage : confirmation, erreur, bandeau de la carte ajoutée, flash vert */
+const TOAST_MS = 1600;
+const ERROR_MS = 2600;
+const BANNER_MS = 8000;
+const FLASH_MS = 420;
 
 /** Déplacement moyen des coins entre deux quadrilatères (px) */
 function cornerDrift(a: Pt[], b: Pt[]): number {
@@ -74,25 +98,12 @@ function smoothCorners(prev: Pt[] | null, next: Pt[], longEdge: number): Pt[] {
     (i) => [prev[i][0] + (next[i][0] - prev[i][0]) * w, prev[i][1] + (next[i][1] - prev[i][1]) * w] as Pt,
   );
 }
-/** Sans carte détectée depuis ce temps, on envoie le centre de l'image (carte plein écran), à cette cadence */
-const FALLBACK_AFTER_MS = 2500;
-const FALLBACK_EVERY_MS = 1200;
-/** Durée d'affichage de la confirmation d'ajout */
-const TOAST_MS = 1600;
 
-type Phase = "scanning" | "found" | "choose";
-type Track = { corners: Pt[]; hits: number };
+/** scanning : on cherche ; cooldown : carte ajoutée, on attend qu'elle sorte du champ ; choose : versions à départager */
+type Phase = "scanning" | "cooldown" | "choose";
 
 /** Résultat de l'action principale : enchaîner sur la carte suivante, quitter, ou erreur à afficher */
 export type ConfirmResult = { status: "continue" | "leave" } | { status: "error"; error: string };
-
-/** Deux quadrilatères désignent-ils le même objet (coins à moins d'un quart de la diagonale) ? */
-function overlaps(a: Pt[], b: Pt[]): boolean {
-  const diag = Math.hypot(a[2][0] - a[0][0], a[2][1] - a[0][1]);
-  let e = 0;
-  for (let i = 0; i < 4; i++) e += Math.hypot(a[i][0] - b[i][0], a[i][1] - b[i][1]);
-  return e / 4 < 0.25 * diag;
-}
 
 /**
  * Prochaine image de la vidéo (ou prochain rafraîchissement d'écran), au
@@ -121,23 +132,22 @@ function LangBadge({ lang }: { lang: ScanCandidate["lang"] }) {
   );
 }
 
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** Horloge isolée (lint react-compiler : pas de Date.now() dans un composant) */
+const nowMs = () => Date.now();
+
 /**
- * Scanner de carte plein écran, en continu et sans cadre à viser : la caméra
- * filme, un worker OpenCV cherche la carte au premier plan à chaque image
- * (d'abord autour de sa dernière position, pour la suivre), et le cadre
- * dessiné par-dessus la vidéo la suit en douceur. Dès que la carte est
- * stable, elle est redressée en perspective et envoyée à la reconnaissance,
- * en parallèle de la détection qui continue. Quand un cadre ou un écran
- * derrière la carte se fait passer pour elle, les candidats suivants sont
- * essayés : c'est la reconnaissance qui tranche. Dès qu'elle est sûre, la
- * carte est proposée ; s'il existe plusieurs versions (réimpressions), on
- * laisse choisir. Après l'action principale, on enchaîne sur la carte
- * suivante.
+ * Scanner de carte plein écran, mains libres (façon GoupixDex) : la caméra
+ * filme, un réseau de coins (worker ONNX) cadre la carte à chaque image, le
+ * cadre orange la suit. Dès qu'une image est nette, la carte redressée part
+ * à la reconnaissance (neural local, sinon pHash serveur) ; quand elle est
+ * sûre, la carte est AJOUTÉE aussitôt — bip, vibration, flash vert, bandeau —
+ * puis le scanner attend qu'elle sorte du champ avant d'accepter la suivante.
+ * S'il existe plusieurs versions (réimpressions), on laisse choisir.
  */
 export function CardScanner({
   token,
   onConfirm,
-  confirmLabel = "Ajouter à ma collection",
   detailsHref,
   onClose,
   title = "Scanner",
@@ -147,7 +157,6 @@ export function CardScanner({
   /** Relais QR : jeton de la session (sinon l'utilisateur connecté fait foi) */
   token?: string;
   onConfirm: (card: ScanCandidate) => Promise<ConfirmResult>;
-  confirmLabel?: string;
   /** Lien « Modifier les détails » vers la fiche d'ajout complète */
   detailsHref?: (card: ScanCandidate) => string;
   onClose?: () => void;
@@ -160,25 +169,17 @@ export function CardScanner({
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const engineRef = useRef<ScanEngine | null>(null);
+  const engineRef = useRef<CornerEngine | null>(null);
   /** Reconnaissance neurale locale (worker ONNX + index d'embeddings) */
   const neuralRef = useRef<NeuralScanner | null>(null);
   const neuralIndexRef = useRef<NeuralIndex | null>(null);
   const neuralReady = useRef(false);
-  /** Verrou neural : mêmes id consécutifs avant de valider */
-  const neuralStreak = useRef(0);
-  const neuralLastId = useRef<string | null>(null);
-  /** Dernier instant où le neural a vu une carte (cos ≥ NEURAL_FLOOR) : gère l'affichage du cadre */
+  /** Dernier instant où le neural a vu une carte (cos ≥ NEURAL_FLOOR) et dernier verdict « pas une carte » */
   const cardSeenAt = useRef(0);
-  /** Dernier verdict neural « ce n'est pas une carte » : seul cas où le cadre détecté est masqué */
   const notCardAt = useRef(0);
   /** Débogage neural (dev, ?scandebug) : affiche le cosinus/marge en direct pour régler les seuils */
   const scanDebug = useRef(false);
-  const [neuralDebug, setNeuralDebug] = useState<{ name: string; cos: number; margin: number; streak: number } | null>(null);
-  /** Carte suivie (coins dans le repère vidéo) et nombre de détections consécutives */
-  const track = useRef<Track | null>(null);
-  /** Candidat à essayer quand la reconnaissance ne donne rien (on tourne parmi les candidats) */
-  const altIndex = useRef(0);
+  const [neuralDebug, setNeuralDebug] = useState<{ name: string; cos: number; margin: number; lead: number } | null>(null);
   /** Dernière détection : cadre à afficher et instant */
   const target = useRef<{ corners: Pt[]; at: number } | null>(null);
   /** Cadre lissé effectivement dessiné */
@@ -186,13 +187,23 @@ export function CardScanner({
   const lastHitAt = useRef(0);
   const recogInflight = useRef(false);
   const lastRecogAt = useRef(0);
+  const lastServerAt = useRef(0);
   const lastFallbackAt = useRef(0);
   const failures = useRef(0);
+  /** Machine d'état mains libres : armé = prêt à ajouter ; après un ajout, on attend que la carte parte */
+  const armed = useRef(true);
+  const clearTicks = useRef(0);
+  const missTicks = useRef(0);
+  const lastCommitAt = useRef(0);
+  const lastCommit = useRef<{ id: string; lang: string; at: number } | null>(null);
+  /** Scores d'agrégation glissants par carte */
+  const scores = useRef<Map<string, { card: ScanCandidate; score: number }>>(new Map());
   const phaseRef = useRef<Phase>("scanning");
   const [phase, setPhase] = useState<Phase>("scanning");
   const [camera, setCamera] = useState<"starting" | "ready" | "error">("starting");
   const [engine, setEngine] = useState<"loading" | "ready" | "error">("loading");
   const [seen, setSeen] = useState(false);
+  /** Dernière carte reconnue (bandeau, cote) */
   const [found, setFound] = useState<ScanCandidate | null>(null);
   /** Cote Cardmarket de la dernière carte reconnue (`id` ≠ carte affichée = en cours de chargement) */
   const [priceOf, setPriceOf] = useState<{ id: string; value: number | null; url: string | null } | null>(null);
@@ -203,21 +214,22 @@ export function CardScanner({
   const [apiDown, setApiDown] = useState(false);
   const [added, setAdded] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [banner, setBanner] = useState<ScanCandidate | null>(null);
+  const [flash, setFlash] = useState(false);
 
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
 
-  // Débogage neural : ?scandebug affiche le cosinus/marge en direct (opt-in,
-  // par le paramètre d'URL ; invisible pour qui ne l'ajoute pas). Utile pour
-  // régler les seuils sur de vraies cartes, y compris sur le site déployé.
+  // Débogage neural : ?scandebug affiche le cosinus/marge en direct (opt-in)
   useEffect(() => {
     scanDebug.current = new URLSearchParams(window.location.search).has("scandebug");
   }, []);
 
-  // Moteur de détection (worker OpenCV)
+  // Détecteur de coins (worker ONNX)
   useEffect(() => {
-    const eng = new ScanEngine();
+    const eng = new CornerEngine();
     engineRef.current = eng;
     let alive = true;
     eng
@@ -233,8 +245,7 @@ export function CardScanner({
 
   // Reconnaissance neurale locale : index d'embeddings + modèle ONNX, chargés
   // en tâche de fond. Tant qu'ils ne sont pas prêts, la reconnaissance passe
-  // par le serveur (pHash) ; une fois prêts, une carte très sûre se verrouille
-  // instantanément côté client, sans aller-retour réseau.
+  // par le serveur (pHash).
   useEffect(() => {
     if (!NeuralScanner.supported()) return;
     let alive = true;
@@ -328,14 +339,29 @@ export function CardScanner({
     };
   }, [found, token]);
 
-  // Confirmation d'ajout éphémère
+  // Messages éphémères : confirmation, erreur, bandeau, flash
   useEffect(() => {
     if (!toast) return;
     const id = window.setTimeout(() => setToast(null), TOAST_MS);
     return () => window.clearTimeout(id);
   }, [toast]);
+  useEffect(() => {
+    if (!errorMsg) return;
+    const id = window.setTimeout(() => setErrorMsg(null), ERROR_MS);
+    return () => window.clearTimeout(id);
+  }, [errorMsg]);
+  useEffect(() => {
+    if (!banner) return;
+    const id = window.setTimeout(() => setBanner(null), BANNER_MS);
+    return () => window.clearTimeout(id);
+  }, [banner]);
+  useEffect(() => {
+    if (!flash) return;
+    const id = window.setTimeout(() => setFlash(false), FLASH_MS);
+    return () => window.clearTimeout(id);
+  }, [flash]);
 
-  /** Dessine (ou efface) le contour de la carte par-dessus la vidéo : coins marqués, liseré fin */
+  /** Dessine (ou efface) le contour de la carte par-dessus la vidéo : voile, liseré et coins de la couleur d'état */
   function drawOverlay(corners: Pt[] | null, tone: "seek" | "lock", alpha = 1) {
     const video = videoRef.current;
     const canvas = overlayRef.current;
@@ -361,7 +387,6 @@ export function CardScanner({
     ctx.globalAlpha = alpha;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    // voile + liseré de la couleur d'état
     ctx.beginPath();
     pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
     ctx.closePath();
@@ -390,7 +415,7 @@ export function CardScanner({
     ctx.globalAlpha = 1;
   }
 
-  /** Cadre-guide au format carte, pointillé, quand aucune carte n'est accrochée (la zone que lit aussi le repli) */
+  /** Cadre-guide au format carte, pointillé, quand aucune carte n'est accrochée */
   function drawGuide(tone: "seek" | "lock") {
     const video = videoRef.current;
     const canvas = overlayRef.current;
@@ -424,43 +449,44 @@ export function CardScanner({
   }
 
   // Rendu du cadre à chaque rafraîchissement d'écran : il glisse vers la
-  // dernière détection (lissage exponentiel) et s'efface en fondu quand la
-  // carte a disparu depuis un moment.
+  // dernière détection (lissage) et s'efface en fondu quand la carte a disparu.
   useEffect(() => {
     if (camera !== "ready") return;
     let raf = 0;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
+      const video = videoRef.current;
+      const longEdge = video ? Math.max(video.videoWidth, video.videoHeight) || 1080 : 1080;
       const t = target.current;
-      // Carte reconnue (ou versions à départager) : le cadre reste, en vert, sous la fiche
-      if (phaseRef.current === "found" || phaseRef.current === "choose") {
+      const fresh = !!t && now - t.at <= HOLD_MS + 250;
+      const ph = phaseRef.current;
+      // Versions à départager : la détection est en pause, le dernier cadre reste figé en vert
+      if (ph === "choose") {
         if (shown.current) drawOverlay(shown.current, "lock");
         else drawGuide("lock");
         return;
       }
-      if (phaseRef.current !== "scanning") {
-        shown.current = null;
-        drawOverlay(null, "seek");
+      // Carte ajoutée : cadre vert, qui suit encore la carte tant qu'elle est là
+      if (ph === "cooldown") {
+        if (fresh && t) {
+          shown.current = smoothCorners(shown.current, t.corners, longEdge);
+          drawOverlay(shown.current, "lock");
+        } else {
+          shown.current = null;
+          drawGuide("lock");
+        }
         return;
       }
       // Le cadre s'affiche dès la détection (orange) ; il ne se masque que si
-      // la reconnaissance vient de dire « ce n'est pas une carte » (visage,
-      // fenêtre, écran) — pas avant qu'elle ait pu se prononcer.
+      // la reconnaissance vient de dire « ce n'est pas une carte »
       const notCard = neuralReady.current && notCardAt.current > cardSeenAt.current && now - notCardAt.current < FRAME_HOLD_MS;
-      if (!t || notCard) {
+      if (!fresh || !t || notCard) {
+        if (t && !fresh) target.current = null;
         shown.current = null;
         drawGuide("seek");
         return;
       }
       const age = now - t.at;
-      if (age > HOLD_MS + 250) {
-        target.current = null;
-        shown.current = null;
-        drawGuide("seek");
-        return;
-      }
-      const video = videoRef.current;
-      const longEdge = video ? Math.max(video.videoWidth, video.videoHeight) || 1080 : 1080;
       shown.current = smoothCorners(shown.current, t.corners, longEdge);
       const alpha = age <= HOLD_MS ? 1 : 1 - (age - HOLD_MS) / 250;
       drawOverlay(shown.current, "seek", alpha);
@@ -483,21 +509,75 @@ export function CardScanner({
     };
   }
 
+  /** Prêt à ajouter la carte suivante */
+  function rearm() {
+    armed.current = true;
+    clearTicks.current = 0;
+    scores.current.clear();
+    if (phaseRef.current === "cooldown") setPhase("scanning");
+  }
+
+  /** Carte ajoutée : on attend qu'elle quitte le champ avant la suivante */
+  function enterCooldown() {
+    armed.current = false;
+    clearTicks.current = 0;
+    lastCommitAt.current = performance.now();
+    setChoices([]);
+    setPhase("cooldown");
+  }
+
+  /** Retour signalé à l'écran : bip, vibration, flash vert, bandeau */
+  function celebrate(card: ScanCandidate) {
+    play("pop");
+    navigator.vibrate?.(60);
+    setFlash(true);
+    setFound(card);
+    setBanner(card);
+    setConfirmError(null);
+  }
+
+  /**
+   * Carte sûre : ajoutée aussitôt (mains libres), sans confirmation. La même
+   * carte revue dans les 3 s ne s'ajoute pas deux fois.
+   */
+  function commit(card: ScanCandidate) {
+    const now = nowMs();
+    const last = lastCommit.current;
+    if (last && last.id === card.id && last.lang === card.lang && now - last.at < COMMIT_DEBOUNCE_MS) {
+      last.at = now;
+      enterCooldown();
+      return;
+    }
+    lastCommit.current = { id: card.id, lang: card.lang, at: now };
+    scores.current.clear();
+    enterCooldown();
+    celebrate(card);
+    void onConfirm(card)
+      .then((r) => {
+        if (r.status === "error") {
+          setErrorMsg(r.error);
+          setBanner(null);
+        } else if (r.status === "continue") {
+          setAdded((n) => n + 1);
+          setToast(card.name);
+        }
+      })
+      .catch(() => setErrorMsg("Impossible pour le moment, réessaie."));
+  }
+
   /**
    * Reconnaissance neurale locale de la carte redressée. Renvoie :
-   * - "lock"     : carte sûre et stable → verrouillée en local, sans réseau ;
-   * - "skip"     : le neural gère (verrou en cours) OU ce n'est pas une carte
-   *                (cosinus sous NEURAL_FLOOR : visage, fenêtre) → ne PAS
-   *                appeler le pHash serveur, qui verrouillerait à tort ;
-   * - "fallback" : neural pas prêt, ou carte incertaine → laisser le pHash.
+   * - "commit"   : carte sûre (image dominante, ou agrégation) → ajoutée ;
+   * - "skip"     : pas armé, ou pas une carte (cosinus sous NEURAL_FLOOR) → pas de pHash ;
+   * - "fallback" : neural pas prêt, ou carte incertaine → laisser le pHash serveur.
    */
-  async function recognizeNeural(blob: Blob): Promise<"lock" | "skip" | "fallback"> {
+  async function recognizeNeural(blob: Blob): Promise<"commit" | "skip" | "fallback"> {
     const ns = neuralRef.current;
     const idx = neuralIndexRef.current;
     if (!neuralReady.current || !ns || !idx) return "fallback";
     const vecs = await ns.embedBlobVariants(blob, NEURAL_INSETS);
-    if (!vecs.length || phaseRef.current !== "scanning") return "fallback";
-    // Meilleur candidat parmi les cadrages essayés
+    if (!vecs.length) return "fallback";
+    if (!armed.current || phaseRef.current !== "scanning") return "skip";
     let top: NeuralHit | null = null;
     let margin = 0;
     for (const v of vecs) {
@@ -508,48 +588,58 @@ export function CardScanner({
       }
     }
     if (!top) return "fallback";
-    if (scanDebug.current)
-      setNeuralDebug({ name: top.name, cos: Number(top.cos.toFixed(3)), margin: Number(margin.toFixed(3)), streak: neuralStreak.current });
-    // Une carte est plausiblement là : autorise l'affichage du cadre
     if (top.cos >= NEURAL_FLOOR) cardSeenAt.current = performance.now();
     else notCardAt.current = performance.now();
-    // Candidat sûr : on construit la stabilité, puis on verrouille en local
+    // Chemin rapide : une image très sûre et dominante commit sans attendre
     if (top.cos >= NEURAL_MATCH && margin >= NEURAL_MARGIN) {
-      neuralStreak.current = neuralLastId.current === top.id ? neuralStreak.current + 1 : 1;
-      neuralLastId.current = top.id;
-      if (neuralStreak.current < NEURAL_STABLE) return "skip";
-      neuralStreak.current = 0;
-      altIndex.current = 0;
-      navigator.vibrate?.(30);
-      setFound(neuralToCandidate(top));
-      setTicks((t) => t + 1);
-      setPhase("found");
-      return "lock";
+      commit(neuralToCandidate(top));
+      return "commit";
     }
-    neuralStreak.current = 0;
-    neuralLastId.current = null;
-    // Cosinus très bas = pas une carte : on coupe le pHash. Sinon carte
-    // incertaine (mauvais angle, reflet…) → le pHash serveur peut rattraper.
+    // Agrégation : décroître tous les scores, puis créditer le meilleur pari
+    for (const [k, v] of scores.current) {
+      v.score *= AGG_DECAY;
+      if (v.score < 0.05) scores.current.delete(k);
+    }
+    if (top.cos >= AGG_MIN_SIM) {
+      const key = `${top.lang}/${top.id}`;
+      const e = scores.current.get(key) ?? { card: neuralToCandidate(top), score: 0 };
+      e.card = neuralToCandidate(top);
+      e.score += top.cos - AGG_SCORE_BASE;
+      scores.current.set(key, e);
+    }
+    let leader: { card: ScanCandidate; score: number } | null = null;
+    let runnerUp = 0;
+    for (const v of scores.current.values()) {
+      if (!leader || v.score > leader.score) {
+        runnerUp = leader ? leader.score : runnerUp;
+        leader = v;
+      } else if (v.score > runnerUp) runnerUp = v.score;
+    }
+    if (scanDebug.current)
+      setNeuralDebug({ name: top.name, cos: Number(top.cos.toFixed(3)), margin: Number(margin.toFixed(3)), lead: Number((leader?.score ?? 0).toFixed(2)) });
+    if (leader && leader.score >= AGG_COMMIT_SCORE && leader.score >= runnerUp * AGG_DOMINATION) {
+      commit(leader.card);
+      return "commit";
+    }
     return top.cos < NEURAL_FLOOR ? "skip" : "fallback";
   }
 
-  /** Envoie une carte redressée à la reconnaissance et applique le verdict */
+  /** Envoie une carte redressée à la reconnaissance : neural local d'abord, serveur (pHash) s'il n'a pas tranché */
   async function recognize(blob: Blob) {
     recogInflight.current = true;
     lastRecogAt.current = performance.now();
-    // Voie rapide locale : le neural verrouille lui-même s'il est sûr, et
-    // coupe le pHash quand ce n'est pas une carte. On n'appelle le serveur que
-    // s'il n'a pas tranché (neural pas prêt, ou carte incertaine).
-    let verdict: "lock" | "skip" | "fallback" = "fallback";
+    let verdict: "commit" | "skip" | "fallback" = "fallback";
     try {
       verdict = await recognizeNeural(blob);
     } catch {
       verdict = "fallback";
     }
-    if (verdict !== "fallback") {
+    const now = performance.now();
+    if (verdict !== "fallback" || !armed.current || now - lastServerAt.current < SERVER_EVERY_MS) {
       recogInflight.current = false;
       return;
     }
+    lastServerAt.current = now;
     try {
       const res = await fetch(`/api/scan/match${token ? `?token=${encodeURIComponent(token)}` : ""}`, {
         method: "POST",
@@ -565,25 +655,16 @@ export function CardScanner({
       setApiDown(false);
       const data: ScanResult = await res.json();
       setTicks((t) => t + 1);
-      if (phaseRef.current !== "scanning") return;
+      if (!armed.current || phaseRef.current !== "scanning") return;
       if (data.status === "match") {
-        // Une réponse sûre (score et marge sur le suivant vérifiés par l'API) suffit : on verrouille
-        altIndex.current = 0;
-        navigator.vibrate?.(30);
-        setFound(data.candidates[0]);
-        setPhase("found");
+        commit(data.candidates[0]);
       } else if (data.status === "ambiguous") {
-        altIndex.current = 0;
         navigator.vibrate?.(20);
         setChoices(data.candidates);
         setPhase("choose");
-      } else {
-        // Rien : ce candidat n'est pas une carte connue, au suivant
-        track.current = null;
-        altIndex.current += 1;
       }
     } catch {
-      // réseau : on réessaie à la prochaine carte stable
+      // réseau : on réessaie à la prochaine image nette
     } finally {
       recogInflight.current = false;
     }
@@ -591,7 +672,8 @@ export function CardScanner({
 
   // Boucle de détection : une analyse par image de la caméra, dans le
   // worker ; le cadre suit la carte, la reconnaissance part en parallèle dès
-  // que la carte est stable.
+  // qu'une image est nette. Après un ajout, on attend que la carte sorte du
+  // champ (images vides consécutives) avant d'accepter la suivante.
   useEffect(() => {
     if (camera !== "ready" || engine === "loading") return;
     let alive = true;
@@ -599,27 +681,26 @@ export function CardScanner({
       while (alive) {
         const video = videoRef.current;
         const eng = engineRef.current;
-        if (!video || phaseRef.current !== "scanning") {
+        if (!video || phaseRef.current === "choose") {
           await nextFrame(video);
           continue;
         }
         const now = performance.now();
         if (engine === "error" || !eng) {
-          // Détection indisponible : le centre de l'image, à cadence lente
-          if (!recogInflight.current && now - lastFallbackAt.current > FALLBACK_EVERY_MS && eng) {
+          // Détection indisponible : la zone-guide, à cadence lente
+          if (eng && armed.current && !recogInflight.current && now - lastFallbackAt.current > FALLBACK_EVERY_MS) {
             lastFallbackAt.current = now;
-            const blob = await eng.centerCrop(video);
+            const blob = await eng.guideCrop(video);
             if (blob) void recognize(blob);
           }
           await nextFrame(video);
           continue;
         }
-        const prev = track.current;
         const wantCrop =
-          !!prev && prev.hits >= STABLE_HITS - 1 && !recogInflight.current && now - lastRecogAt.current > RECOG_EVERY_MS;
-        let res: Awaited<ReturnType<ScanEngine["detect"]>>;
+          armed.current && phaseRef.current === "scanning" && !recogInflight.current && now - lastRecogAt.current > RECOG_EVERY_MS;
+        let res: Awaited<ReturnType<CornerEngine["detect"]>>;
         try {
-          res = await eng.detect(video, { prev: prev?.corners ?? null, k: MAX_QUADS, crop: wantCrop });
+          res = await eng.detect(video, { crop: wantCrop });
         } catch {
           await nextFrame(video);
           continue;
@@ -627,48 +708,35 @@ export function CardScanner({
         if (!alive) break;
         const at = performance.now();
         if (process.env.NODE_ENV !== "production") {
-          // Compteurs de mise au point (window.__scan) : images analysées, temps cumulé dans le worker, suivis, détections
-          const w = window as unknown as { __scan?: { frames?: number; ms?: number; tracked?: number; hits?: number; last?: unknown } };
+          // Compteurs de mise au point (window.__scan)
+          const w = window as unknown as { __scan?: { frames?: number; ms?: number; hits?: number; last?: unknown } };
           const st = (w.__scan ??= {});
           st.frames = (st.frames ?? 0) + 1;
           st.ms = (st.ms ?? 0) + res.ms;
-          st.tracked = (st.tracked ?? 0) + (res.tracked ? 1 : 0);
-          st.hits = (st.hits ?? 0) + (res.quads.length ? 1 : 0);
-          st.last = { quads: res.quads.length, tracked: res.tracked, ms: Math.round(res.ms), crop: !!res.card, at: Math.round(at) };
+          st.hits = (st.hits ?? 0) + (res.corners ? 1 : 0);
+          st.last = { presence: Number(res.presence.toFixed(2)), ms: Math.round(res.ms), crop: !!res.card, guide: res.guide, at: Math.round(at) };
         }
-        let next: Track | null = null;
-        let chosen: Quad | undefined;
-        if (res.quads.length) {
-          const same = prev ? res.quads.find((q) => overlaps(q.corners, prev.corners)) : undefined;
-          if (same) {
-            chosen = same;
-            next = { corners: same.corners, hits: prev!.hits + 1 };
-          } else {
-            chosen = res.quads[altIndex.current % res.quads.length];
-            next = { corners: chosen.corners, hits: 1 };
-            notCardAt.current = 0;
-          }
-        }
-        track.current = next;
-        if (next) {
-          // Le cadre n'apparaît qu'à la deuxième image d'affilée : un
-          // rectangle vu une seule fois (reflet, bord de table) ne clignote pas
-          if (next.hits >= 2 || target.current) target.current = { corners: next.corners, at };
+        if (res.corners) {
+          missTicks.current = 0;
+          clearTicks.current = 0;
+          target.current = { corners: res.corners, at };
           lastHitAt.current = at;
           setSeen(true);
-        } else if (at - lastHitAt.current > HOLD_MS) {
-          setSeen(false);
+        } else {
+          missTicks.current += 1;
+          // Réarmement : absence soutenue de carte après un délai minimal
+          if (!armed.current && at - lastCommitAt.current >= MIN_REARM_MS) {
+            clearTicks.current += 1;
+            if (clearTicks.current >= CLEAR_TICKS_TO_REARM) rearm();
+          }
+          if (missTicks.current >= MISS_LINGER_TICKS && target.current) {
+            target.current = null;
+            setSeen(false);
+          }
         }
-        // Carte stable et redressée : reconnaissance en parallèle
-        if (res.card && chosen === res.quads[0] && next && next.hits >= STABLE_HITS && !recogInflight.current) {
-          void recognize(res.card);
-        }
-        // Rien depuis un moment : la carte remplit peut-être déjà l'écran
-        if (!next && at - lastHitAt.current > FALLBACK_AFTER_MS && !recogInflight.current && at - lastFallbackAt.current > FALLBACK_EVERY_MS) {
-          lastFallbackAt.current = at;
-          const blob = await eng.centerCrop(video);
-          if (blob) void recognize(blob);
-        }
+        // Réarmement garanti : un cadre resté collé au décor ne bloque jamais
+        if (!armed.current && at - lastCommitAt.current >= COOLDOWN_MAX_MS) rearm();
+        if (res.card && armed.current && !recogInflight.current) void recognize(res.card);
         await nextFrame(video);
       }
     })();
@@ -680,18 +748,19 @@ export function CardScanner({
 
   function rescan() {
     failures.current = 0;
-    track.current = null;
     target.current = null;
     shown.current = null;
-    altIndex.current = 0;
+    scores.current.clear();
+    armed.current = true;
+    clearTicks.current = 0;
     lastHitAt.current = performance.now();
     setApiDown(false);
-    setFound(null);
     setChoices([]);
     setConfirmError(null);
     setPhase("scanning");
   }
 
+  /** Version choisie à la main (réimpressions) */
   async function confirm(card: ScanCandidate) {
     setConfirming(true);
     setConfirmError(null);
@@ -701,10 +770,13 @@ export function CardScanner({
         setConfirmError(r.error);
         return;
       }
+      lastCommit.current = { id: card.id, lang: card.lang, at: nowMs() };
+      scores.current.clear();
+      enterCooldown();
+      celebrate(card);
       if (r.status === "continue") {
         setAdded((n) => n + 1);
         setToast(card.name);
-        rescan();
       }
     } catch {
       setConfirmError("Impossible pour le moment, réessaie.");
@@ -734,6 +806,11 @@ export function CardScanner({
         <RefreshCw size={14} className="text-loss" aria-hidden />
         Reconnaissance indisponible, réessaie dans un instant
       </>
+    ) : phase === "cooldown" ? (
+      <>
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-400" aria-hidden />
+        {capitalize(noun)} · retire la carte pour la suivante
+      </>
     ) : seen ? (
       <>
         <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-orange-400" aria-hidden />
@@ -748,13 +825,13 @@ export function CardScanner({
 
   const hint =
     engine === "error"
-      ? "Détection indisponible : remplis l'écran avec la carte."
-      : ticks > 8
+      ? "Détection indisponible : remplis le cadre avec la carte."
+      : ticks > 8 && phase === "scanning"
         ? "Rapproche-toi, évite les reflets, montre les quatre coins."
         : null;
 
-  /** Cote de la carte affichée (null tant qu'elle charge) */
-  const price = found && priceOf?.id === found.id ? priceOf : null;
+  /** Cote de la carte du bandeau (null tant qu'elle charge) */
+  const price = banner && priceOf?.id === banner.id ? priceOf : null;
 
   const sheetStyle = { animation: "sheet-in 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both" };
   const sheetClass =
@@ -764,6 +841,7 @@ export function CardScanner({
     <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-black text-white">
       <video ref={videoRef} playsInline muted className="absolute inset-0 h-full w-full object-cover" />
       <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden />
+      {flash && <div className="fade-out pointer-events-none absolute inset-0 z-10 bg-emerald-500/30" aria-hidden />}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-black/70 to-transparent" />
 
@@ -805,7 +883,7 @@ export function CardScanner({
         </span>
       </header>
 
-      {/* Confirmation d'ajout */}
+      {/* Confirmation d'ajout / erreur */}
       {toast && (
         <div className="rise-in pointer-events-none relative z-10 mt-4 flex justify-center px-6">
           <span className="inline-flex items-center gap-2 rounded-full bg-gain px-4 py-2 text-sm font-semibold text-black shadow-lg">
@@ -814,9 +892,53 @@ export function CardScanner({
           </span>
         </div>
       )}
+      {errorMsg && (
+        <div className="rise-in pointer-events-none relative z-10 mt-4 flex justify-center px-6">
+          <span className="inline-flex items-center gap-2 rounded-full bg-loss px-4 py-2 text-sm font-semibold text-white shadow-lg">
+            <X size={15} aria-hidden />
+            {errorMsg}
+          </span>
+        </div>
+      )}
+
+      {/* Bandeau de la carte ajoutée : visuel, nom, cote, fiche complète */}
+      {banner && phase !== "choose" && (
+        <div className="rise-in absolute inset-x-3 bottom-[max(5rem,calc(env(safe-area-inset-bottom)+4rem))] z-20 flex items-center gap-3 rounded-2xl border border-white/15 bg-black/70 p-3 shadow-2xl backdrop-blur-md">
+          <div className="card-tile w-14 shrink-0 aspect-[63/88]">
+            <CardImage key={`${banner.id}-${banner.lang}`} base={banner.image} alt={banner.name} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="label-xs flex items-center gap-1.5 text-emerald-300">
+              <Check size={12} aria-hidden />
+              {capitalize(noun)}
+            </p>
+            <p className="display mt-0.5 truncate text-base font-bold leading-tight">
+              {banner.name}
+              <LangBadge lang={banner.lang} />
+            </p>
+            <p className="truncate text-xs text-white/70">
+              {banner.setName} <span className="num">· n° {banner.localId}</span>
+              {price?.value != null && <span className="num ml-2 font-semibold text-emerald-300">{formatEur(price.value)}</span>}
+            </p>
+            {detailsHref && (
+              <Link href={detailsHref(banner)} className="mt-1 inline-flex items-center gap-1 text-xs text-white/85 underline-offset-4 hover:underline">
+                Modifier les détails <ExternalLink size={11} aria-hidden />
+              </Link>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setBanner(null)}
+            aria-label="Masquer"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/80 transition hover:bg-white/20"
+          >
+            <X size={15} aria-hidden />
+          </button>
+        </div>
+      )}
 
       {/* État, en bas de la vidéo */}
-      {phase === "scanning" && (
+      {phase !== "choose" && (
         <div className="relative z-10 mt-auto mb-[max(1.75rem,env(safe-area-inset-bottom))] flex flex-col items-center gap-2 px-6 text-center">
           <span className="inline-flex max-w-full items-center gap-2 rounded-full bg-black/55 px-4 py-2 text-sm backdrop-blur [&>svg]:shrink-0">
             {status}
@@ -826,7 +948,7 @@ export function CardScanner({
       )}
 
       {/* Un tap hors de la feuille la referme et relance le scan */}
-      {phase !== "scanning" && (
+      {phase === "choose" && (
         <button
           type="button"
           onClick={rescan}
@@ -834,81 +956,6 @@ export function CardScanner({
           aria-label="Fermer et rescanner"
           className="absolute inset-0 z-10 cursor-default bg-transparent"
         />
-      )}
-
-      {/* Carte reconnue */}
-      {phase === "found" && found && (
-        <section className={sheetClass} style={sheetStyle}>
-          <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-edge-strong" />
-          <div className="flex gap-4">
-            <div className="card-tile w-24 shrink-0 aspect-[63/88]">
-              <CardImage key={`${found.id}-${found.lang}`} base={found.image} alt={found.name} />
-            </div>
-            <div className="min-w-0 flex-1 py-1">
-              <p className="label-xs flex items-center gap-1.5 text-gain">
-                <Check size={13} aria-hidden />
-                Carte reconnue
-              </p>
-              <p className="display mt-1 text-xl font-bold leading-tight">
-                {found.name}
-                <LangBadge lang={found.lang} />
-              </p>
-              <p className="mt-1 text-sm text-muted">
-                {found.setName} <span className="num text-faint">· n° {found.localId}</span>
-              </p>
-              <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                {!price ? (
-                  <span className="inline-flex items-center gap-1.5 text-faint">
-                    <Loader2 size={12} className="animate-spin" aria-hidden />
-                    Cote Cardmarket…
-                  </span>
-                ) : price.value != null ? (
-                  <>
-                    <span className="text-muted">Cote Cardmarket</span>
-                    <span className="num font-semibold">{formatEur(price.value)}</span>
-                  </>
-                ) : (
-                  <span className="text-faint">Cote Cardmarket indisponible</span>
-                )}
-                {price?.url && (
-                  <a
-                    href={price.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-accent-strong underline-offset-4 hover:underline"
-                  >
-                    Voir <ExternalLink size={11} aria-hidden />
-                  </a>
-                )}
-              </p>
-            </div>
-          </div>
-          {confirmError && <p className="mt-3 text-sm text-loss">{confirmError}</p>}
-          <div className="mt-5 flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => confirm(found)}
-              disabled={confirming}
-              className="btn btn-primary w-full justify-center !py-3 text-base"
-            >
-              {confirming ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Check size={16} aria-hidden />}
-              {confirmLabel}
-            </button>
-            {detailsHref && (
-              <Link href={detailsHref(found)} className="btn btn-ghost w-full justify-center">
-                Modifier les détails
-              </Link>
-            )}
-            <button
-              type="button"
-              onClick={rescan}
-              disabled={confirming}
-              className="mx-auto mt-1 py-1 text-sm text-muted underline-offset-4 hover:underline"
-            >
-              Ce n&apos;est pas cette carte
-            </button>
-          </div>
-        </section>
       )}
 
       {/* Versions à départager */}
@@ -952,15 +999,15 @@ export function CardScanner({
         </section>
       )}
 
-      {/* Débogage neural (dev, ?scandebug) : régler NEURAL_MATCH / NEURAL_MARGIN */}
+      {/* Débogage neural (dev, ?scandebug) : régler NEURAL_MATCH / NEURAL_MARGIN / agrégation */}
       {neuralDebug && (
         <div className="pointer-events-none fixed left-2 top-2 z-[60] rounded bg-black/75 px-2 py-1.5 font-mono text-[11px] leading-tight text-green-400">
           <div className="font-bold">{neuralDebug.name}</div>
           <div>
-            cos {neuralDebug.cos} · marge {neuralDebug.margin}
+            cos {neuralDebug.cos} · marge {neuralDebug.margin} · agrég. {neuralDebug.lead}
           </div>
           <div className="text-green-300/70">
-            seuil {NEURAL_MATCH}/{NEURAL_MARGIN} · série {neuralDebug.streak}/{NEURAL_STABLE}
+            seuils {NEURAL_MATCH}/{NEURAL_MARGIN} · commit agrég. {AGG_COMMIT_SCORE}
           </div>
         </div>
       )}
