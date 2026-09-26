@@ -124,7 +124,7 @@ export default async function CartePage({
     user.id
   );
 
-  const [{ data: valueHistory }, { data: lastGrading }, { data: marketSnaps }] = await Promise.all([
+  const [{ data: valueHistory }, { data: marketSnaps }, { data: lastGrading }] = await Promise.all([
     supabase
       .from("item_value_history")
       .select("id, recorded_at, value")
