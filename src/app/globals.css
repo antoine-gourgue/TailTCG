@@ -388,6 +388,19 @@ select.field {
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
 }
 
+/* Fond de carte OpenStreetMap : adouci en clair, inversé en sombre (un plan
+   clair sur une interface sombre éblouit). Seules les tuiles sont filtrées,
+   pas les marqueurs ni les infobulles. */
+.leaflet-container {
+  background: var(--raised);
+}
+.map-tiles {
+  filter: saturate(0.6) contrast(0.95);
+}
+:root[data-theme="dark"] .map-tiles {
+  filter: invert(1) hue-rotate(180deg) saturate(0.4) brightness(0.92) contrast(0.85);
+}
+
 /* ————— Logo TailTCG ————— */
 
 :root,
