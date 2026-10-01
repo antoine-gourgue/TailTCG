@@ -110,7 +110,7 @@ function Stat({
   tone?: "up" | "down";
 }) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex min-w-0 flex-col gap-0.5">
       <span className="label-xs">{label}</span>
       <span
         className={`display num text-xl font-bold leading-none ${
@@ -688,8 +688,10 @@ export function CollectionClient({
     // En mode sélection, la barre flottante couvre le bas : place pour la dernière rangée
     <div className={selecting ? "pb-10 md:pb-20" : undefined}>
       {/* Résumé : la valeur du classeur, toujours visible */}
-      <div className="panel rise-in mb-5 flex flex-col gap-4 px-5 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-10 sm:px-6">
-        <div className="grid grid-cols-2 gap-4 sm:contents">
+      {/* Chiffres sur 2, 3 puis 6 colonnes — rangées pleines et colonnes alignées (en flex-wrap,
+          chaque rangée se calait différemment, ex. iPad) ; commandes de vue dessous */}
+      <div className="panel rise-in mb-5 flex flex-col gap-4 px-5 py-4 sm:px-6">
+        <div className="grid grid-cols-2 items-start gap-x-6 gap-y-4 sm:grid-cols-3 xl:grid-cols-6">
           <Stat label="Cartes" value={summary.count} />
           {!hideValues && (
             <>
@@ -728,7 +730,7 @@ export function CollectionClient({
             </>
           )}
         </div>
-        <div className="flex items-center gap-2 sm:ml-auto">
+        <div className="flex shrink-0 items-center gap-2 sm:justify-end">
           {canSelect && (
             <button
               type="button"
@@ -782,9 +784,12 @@ export function CollectionClient({
           className="field !w-52 text-[13px]"
         />
         {filterSelects(selectCls)}
-        <span className="mx-1 h-5 w-px bg-edge" />
-        {sortSelect(selectCls)}
-        {sortToggle}
+        {/* Tri et sens restent ensemble quand la rangée passe à la ligne (tablette) */}
+        <div className="flex items-center gap-2">
+          <span className="mx-1 h-5 w-px bg-edge" />
+          {sortSelect(selectCls)}
+          {sortToggle}
+        </div>
       </div>
 
       {/* Mobile : recherche pleine largeur, filtres dans une sheet */}

@@ -116,8 +116,8 @@ export default async function ScellesPage() {
           </div>
         ) : (
           <>
-            {/* Valeurs clés : deux colonnes alignées sur mobile, en ligne au-delà */}
-            <div className="panel mb-6 grid grid-cols-2 items-start gap-x-6 gap-y-4 px-5 py-4 sm:flex sm:flex-wrap sm:gap-x-10 sm:px-6">
+            {/* Valeurs clés : 2, 3 puis 6 colonnes — rangées pleines et colonnes alignées (en flex-wrap, chaque rangée se calait différemment, ex. iPad) */}
+            <div className="panel mb-6 grid grid-cols-2 items-start gap-x-6 gap-y-4 sm:grid-cols-3 xl:grid-cols-6 px-5 py-4 sm:px-6">
               <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="label-xs">Produits</span>
                 <span className="display num text-xl font-bold leading-none">{count}</span>
@@ -167,7 +167,7 @@ export default async function ScellesPage() {
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <span className="label-xs">Meilleure plus-value</span>
                   <span className="display num text-xl font-bold leading-none text-gain">+{formatEur(best.gain!)}</span>
-                  <span className="truncate text-xs text-muted sm:max-w-56">{best.product.name}</span>
+                  <span className="truncate text-xs text-muted">{best.product.name}</span>
                 </div>
               )}
             </div>
