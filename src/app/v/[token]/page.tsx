@@ -92,7 +92,7 @@ export default async function SharedCollectionPage({
             Ma collection
           </Link>
         ) : (
-          <Link href="/login" className="btn btn-primary mt-8">
+          <Link href="/inscription" className="btn btn-primary mt-8">
             Créer ma collection
           </Link>
         )}
@@ -308,7 +308,7 @@ export default async function SharedCollectionPage({
             Ma collection →
           </Link>
         ) : (
-          <Link href="/login" className="btn btn-ghost">
+          <Link href="/inscription" className="btn btn-ghost">
             Créer ma collection →
           </Link>
         )}

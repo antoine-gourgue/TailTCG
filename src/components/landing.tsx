@@ -400,7 +400,7 @@ export function Landing() {
             <Link href="/login" className="btn btn-ghost">
               Se connecter
             </Link>
-            <Link href="/login" className="btn btn-primary">
+            <Link href="/inscription" className="btn btn-primary">
               <span className="hidden sm:inline">Créer ma collection</span>
               <span className="sm:hidden">Commencer</span>
             </Link>
@@ -427,7 +427,7 @@ export function Landing() {
               français et japonais.
             </p>
             <div className="rise-in mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: "0.4s" }}>
-              <Link href="/login" className="btn btn-primary !px-7 !py-3.5 text-base shadow-xl">
+              <Link href="/inscription" className="btn btn-primary !px-7 !py-3.5 text-base shadow-xl">
                 Créer ma collection
                 <ArrowRight size={16} aria-hidden />
               </Link>
@@ -593,7 +593,7 @@ export function Landing() {
               <p className="mx-auto mt-5 max-w-lg text-base leading-relaxed text-muted">
                 Scan, cote, classeurs, pré-gradation, scellés, vitrine : tout au même endroit, gratuit, sans pub.
               </p>
-              <Link href="/login" className="btn btn-primary mt-8 !px-8 !py-3.5 text-base shadow-xl">
+              <Link href="/inscription" className="btn btn-primary mt-8 !px-8 !py-3.5 text-base shadow-xl">
                 Commencer maintenant
                 <ArrowRight size={16} aria-hidden />
               </Link>

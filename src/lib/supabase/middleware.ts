@@ -6,6 +6,7 @@ import { getJwks } from "@/lib/supabase/jwks";
 // publique (jeton secret vérifié dans la page)
 const PUBLIC_PATHS = [
   "/login",
+  "/inscription",
   "/auth",
   // Réinitialisation par lien admin : accessible sans session
   "/reinitialiser",
