@@ -39,7 +39,7 @@ type Tab = { href: string; label: string; Icon: LucideIcon };
 
 const TABS: Tab[] = [
   { href: "/collection", label: "Collection", Icon: BarChart3 },
-  { href: "/", label: "Cartes", Icon: LayoutGrid },
+  { href: "/cartes", label: "Cartes", Icon: LayoutGrid },
   { href: "/scelles", label: "Scellés", Icon: Boxes },
 ];
 
@@ -65,7 +65,8 @@ const MORE: Tab[] = [
 const CLOSE_DY = 90;
 
 export function isTabActive(href: string, pathname: string): boolean {
-  if (href === "/") return pathname === "/" || pathname.startsWith("/carte");
+  if (href === "/cartes") return pathname.startsWith("/carte");
+  if (href === "/collection") return pathname.startsWith("/collection") || pathname.startsWith("/stats");
   if (href === "/recherche")
     return (
       pathname.startsWith("/recherche") ||
@@ -164,7 +165,7 @@ export function MobileNav({
       {/* ——— Barre haute : logo + recherche ——— */}
       <header className="sticky top-0 z-40 border-b border-edge bg-surface/90 backdrop-blur-md md:hidden">
         <div className="flex h-13 items-center justify-between px-4">
-          <Link href="/" className="flex items-center" aria-label="Accueil">
+          <Link href="/collection" className="flex items-center" aria-label="Accueil">
             <Logo variant="lockup" size={26} />
           </Link>
           <button

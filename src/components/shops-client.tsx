@@ -184,7 +184,7 @@ function SourceRow({ source }: { source: SourceWithStats }) {
               <>
                 {" · "}
                 <Link
-                  href={`/?source=${source.id}`}
+                  href={`/cartes?source=${source.id}`}
                   className="underline hover:text-foreground"
                 >
                   voir

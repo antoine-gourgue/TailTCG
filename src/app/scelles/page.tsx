@@ -116,19 +116,19 @@ export default async function ScellesPage() {
           </div>
         ) : (
           <>
-            {/* Valeurs clés */}
-            <div className="panel mb-6 flex flex-wrap items-start gap-x-10 gap-y-4 px-6 py-4">
-              <div className="flex flex-col gap-0.5">
+            {/* Valeurs clés : deux colonnes alignées sur mobile, en ligne au-delà */}
+            <div className="panel mb-6 grid grid-cols-2 items-start gap-x-6 gap-y-4 px-5 py-4 sm:flex sm:flex-wrap sm:gap-x-10 sm:px-6">
+              <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="label-xs">Produits</span>
                 <span className="display num text-xl font-bold leading-none">{count}</span>
                 <span className="text-xs text-muted">{lines.length} référence{lines.length > 1 ? "s" : ""}</span>
               </div>
-              <div className="flex flex-col gap-0.5">
+              <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="label-xs">Payé</span>
                 <span className="display num text-xl font-bold leading-none">{formatEur(totalPaid)}</span>
                 <span className="text-xs text-muted">{pricedCount === count ? "prix connu partout" : `prix connu pour ${pricedCount} sur ${count}`}</span>
               </div>
-              <div className="flex flex-col gap-0.5">
+              <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="label-xs">Valeur estimée</span>
                 <span className="display num text-xl font-bold leading-none">{formatEur(totalEst)}</span>
                 <span className="text-xs text-muted">
@@ -142,7 +142,7 @@ export default async function ScellesPage() {
                 </span>
               </div>
               {totalPaid > 0 && (
-                <div className="flex flex-col gap-0.5">
+                <div className="flex min-w-0 flex-col gap-0.5">
                   <span className="label-xs">Plus-value</span>
                   <span className={`display num text-xl font-bold leading-none ${gain > 0 ? "text-gain" : gain < 0 ? "text-loss" : ""}`}>
                     {gain > 0 ? "+" : ""}
@@ -152,7 +152,7 @@ export default async function ScellesPage() {
                 </div>
               )}
               {v7All != null && (
-                <div className="flex flex-col gap-0.5">
+                <div className="flex min-w-0 flex-col gap-0.5">
                   <span className="label-xs">7 jours</span>
                   <span className={`display num text-xl font-bold leading-none ${v7All > 0 ? "text-gain" : v7All < 0 ? "text-loss" : ""}`}>
                     {v7All > 0 ? "+" : ""}
@@ -167,7 +167,7 @@ export default async function ScellesPage() {
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <span className="label-xs">Meilleure plus-value</span>
                   <span className="display num text-xl font-bold leading-none text-gain">+{formatEur(best.gain!)}</span>
-                  <span className="max-w-56 truncate text-xs text-muted">{best.product.name}</span>
+                  <span className="truncate text-xs text-muted sm:max-w-56">{best.product.name}</span>
                 </div>
               )}
             </div>
@@ -205,10 +205,10 @@ export default async function ScellesPage() {
                         {kindLabel(l.product.kind)} · {sealedSetName(l.product)}
                       </p>
                       {l.since && <p className="text-[11px] text-faint">Acheté le {fmtShort(l.since)}</p>}
-                      <div className="mt-auto flex items-baseline justify-between gap-2 pt-2">
-                        <span className="num text-xs text-muted">{l.paid > 0 ? `payé ${formatEur(l.paid)}` : "prix non renseigné"}</span>
+                      {/* Valeur, payé et plus-value empilés : tient dans une carte étroite (2 colonnes sur mobile) */}
+                      <div className="mt-auto flex flex-col gap-0.5 pt-2">
                         <span
-                          className={`num text-sm font-bold ${l.estimated == null ? "text-faint" : ""}`}
+                          className={`num text-[15px] font-bold leading-tight ${l.estimated == null ? "text-faint" : ""}`}
                           title={
                             l.manual != null
                               ? "Estimation saisie à la main"
@@ -223,17 +223,20 @@ export default async function ScellesPage() {
                           {l.estimated != null ? formatEur(l.estimated) : "—"}
                           {l.cote?.source === "tcgplayer" && l.manual == null && <span className="ml-1 text-[10px] font-normal text-faint">≈ US</span>}
                         </span>
-                      </div>
-                      {l.gain != null && (
-                        <p className={`num flex items-baseline justify-between text-xs font-semibold ${l.gain > 0 ? "text-gain" : l.gain < 0 ? "text-loss" : "text-muted"}`}>
-                          <span className="font-normal text-faint">plus-value</span>
-                          <span>
-                            {l.gain > 0 ? "+" : ""}
-                            {formatEur(l.gain)}
-                            {l.gainPct != null && <span className="ml-1 font-normal text-muted">{pct(l.gainPct)}</span>}
+                        <span className="num text-xs text-muted">{l.paid > 0 ? `payé ${formatEur(l.paid)}` : "prix non renseigné"}</span>
+                        {l.gain != null && (
+                          <span
+                            className={`num flex flex-wrap items-baseline gap-x-1 text-xs font-semibold ${l.gain > 0 ? "text-gain" : l.gain < 0 ? "text-loss" : "text-muted"}`}
+                            title="Plus-value"
+                          >
+                            <span>
+                              {l.gain > 0 ? "+" : ""}
+                              {formatEur(l.gain)}
+                            </span>
+                            {l.gainPct != null && <span className="font-normal text-muted">{pct(l.gainPct)}</span>}
                           </span>
-                        </p>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </Link>
                 </li>

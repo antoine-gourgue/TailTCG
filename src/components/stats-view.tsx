@@ -163,7 +163,7 @@ export function StatsView({ d, s }: { d: StatsData; s?: SealedStats }) {
       {c && sealed && (
         <Panel icon={Layers} title="Cartes et scellés" hint="Chaque ligne se partage entre les deux : les barres se rejoignent au centre, à proportion.">
           <div className="grid grid-cols-[1fr_4.5rem_1fr] items-end gap-2 pb-3 sm:grid-cols-[1fr_6rem_1fr]">
-            <SideHead tone="accent" label="Cartes" sub={`${plural(d.count, "carte")} · ${plural(d.sets.length, "set")}`} href="/" align="right" />
+            <SideHead tone="accent" label="Cartes" sub={`${plural(d.count, "carte")} · ${plural(d.sets.length, "set")}`} href="/cartes" align="right" />
             <span />
             <SideHead tone="sealed" label="Scellés" sub={`${plural(sealed.count, "produit")} · ${plural(sealed.unique, "référence")}`} href="/scelles" align="left" />
           </div>

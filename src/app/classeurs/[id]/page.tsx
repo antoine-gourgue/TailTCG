@@ -289,7 +289,7 @@ export default async function ClasseurPage({
               Ouvre ta collection en mode sélection, coche les cartes à ranger
               ici, puis « Ajouter à un classeur ».
             </p>
-            <Link href="/?select" className="btn btn-primary mt-2">
+            <Link href="/cartes?select" className="btn btn-primary mt-2">
               Choisir des cartes
             </Link>
           </div>

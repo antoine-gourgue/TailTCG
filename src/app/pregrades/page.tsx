@@ -118,7 +118,7 @@ export default async function PregradesPage() {
             <p className="max-w-md text-sm text-muted">
               Lance « Pré-grader au scan » : la caméra prend le recto puis le verso, la carte est reconnue
               et retrouvée dans ta collection, le centrage, les coins et les tranches sont analysés — tu vérifies, tu enregistres.
-              Tu peux aussi ouvrir une carte depuis <Link href="/" className="text-accent-strong underline-offset-2 hover:underline">Cartes</Link>.
+              Tu peux aussi ouvrir une carte depuis <Link href="/cartes" className="text-accent-strong underline-offset-2 hover:underline">Cartes</Link>.
             </p>
           </div>
         ) : (

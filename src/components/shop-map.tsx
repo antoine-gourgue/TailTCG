@@ -75,7 +75,7 @@ export default function ShopMap({ shops }: { shops: SourceWithStats[] }) {
                 {shop.cards} carte{shop.cards > 1 ? "s" : ""} achetée
                 {shop.cards > 1 ? "s" : ""} · {formatEur(shop.spent)}
               </p>
-              <a href={`/?source=${shop.id}`} className="underline">
+              <a href={`/cartes?source=${shop.id}`} className="underline">
                 Voir ces cartes
               </a>
             </div>

@@ -53,7 +53,7 @@ const GROUPS: NavGroup[] = [
     label: "Ma collection",
     items: [
       { href: "/collection", label: "Collection", Icon: LayoutDashboard },
-      { href: "/", label: "Cartes", Icon: LayoutGrid },
+      { href: "/cartes", label: "Cartes", Icon: LayoutGrid },
       { href: "/scelles", label: "Scellés", Icon: Boxes },
       { href: "/classeurs", label: "Classeurs", Icon: NotebookTabs },
       { href: "/wishlist", label: "Recherchées", Icon: Star },
@@ -73,7 +73,7 @@ const GROUPS: NavGroup[] = [
 const ADMIN: NavItem = { href: "/admin", label: "Admin", Icon: ShieldCheck };
 
 function isActive(href: string, pathname: string) {
-  if (href === "/") return pathname === "/" || pathname.startsWith("/carte");
+  if (href === "/cartes") return pathname.startsWith("/carte");
   if (href === "/recherche") return pathname.startsWith("/recherche") || pathname.startsWith("/ajouter") || pathname.startsWith("/extensions");
   if (href === "/collection") return pathname.startsWith("/collection") || pathname.startsWith("/stats");
   return pathname.startsWith(href);

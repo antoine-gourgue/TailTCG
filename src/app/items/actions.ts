@@ -141,7 +141,7 @@ export async function createItem(
   // Cote Cardmarket tout de suite (sinon la carte n'a de valeur qu'au cron du lendemain)
   await snapshotPrices([tcgdex_id]);
 
-  revalidatePath("/");
+  revalidatePath("/cartes");
   revalidatePath("/wishlist");
 
   // Carte scannée depuis le téléphone : on la marque ajoutée et on enchaîne
@@ -167,7 +167,7 @@ export async function createItem(
       redirect(next ? addCardUrl({ id: next.tcgdex_id, lang: next.lang, scan: next.id }) : `/scan/${scan.session_id}`);
     }
   }
-  redirect("/");
+  redirect("/cartes");
 }
 
 /** Classeurs dont une pochette « hors collection » vient d'être remplacée */
@@ -230,7 +230,7 @@ export async function updateItem(
     await recordValue(supabase, id, fields.manual_price);
   }
 
-  revalidatePath("/");
+  revalidatePath("/cartes");
   revalidatePath(`/carte/${id}`);
   redirect(`/carte/${id}`);
 }
@@ -331,7 +331,7 @@ export async function bulkAddToCollection(cards: BulkCard[], language: string) {
   // Cote Cardmarket tout de suite pour les cartes ajoutées
   await snapshotPrices((created ?? []).map((c) => c.tcgdex_id));
 
-  revalidatePath("/");
+  revalidatePath("/cartes");
   revalidatePath("/wishlist");
   return { error: null, added: clean.length, items: created ?? [] };
 }
@@ -350,7 +350,7 @@ export async function bulkDeleteItems(ids: string[]) {
     console.error("bulkDeleteItems:", error.message);
     return { error: "Suppression impossible, réessaie.", count: 0 };
   }
-  revalidatePath("/");
+  revalidatePath("/cartes");
   return { error: null, count: clean.length };
 }
 
@@ -382,7 +382,7 @@ export async function updateItemValue(
 
   await recordValue(supabase, id, value);
 
-  revalidatePath("/");
+  revalidatePath("/cartes");
   revalidatePath(`/carte/${id}`);
   return { ok: true };
 }
@@ -415,7 +415,7 @@ export async function markItemSold(
     return { ok: false, message: "Impossible, réessaie." };
   }
 
-  revalidatePath("/");
+  revalidatePath("/cartes");
   revalidatePath(`/carte/${id}`);
   return { ok: true };
 }
@@ -429,7 +429,7 @@ export async function cancelSale(formData: FormData): Promise<void> {
     .from("items")
     .update({ sold_price: null, sold_at: null })
     .eq("id", id);
-  revalidatePath("/");
+  revalidatePath("/cartes");
   revalidatePath(`/carte/${id}`);
 }
 
@@ -463,7 +463,7 @@ export async function deleteValuePoint(formData: FormData): Promise<void> {
     .update({ manual_price: latest?.value ?? null })
     .eq("id", point.item_id);
 
-  revalidatePath("/");
+  revalidatePath("/cartes");
   revalidatePath(`/carte/${point.item_id}`);
 }
 
@@ -479,8 +479,8 @@ export async function deleteItem(formData: FormData): Promise<void> {
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
 
-  revalidatePath("/");
-  redirect(`/?deleted=${id}`);
+  revalidatePath("/cartes");
+  redirect(`/cartes?deleted=${id}`);
 }
 
 export async function restoreItem(formData: FormData): Promise<void> {
@@ -490,7 +490,7 @@ export async function restoreItem(formData: FormData): Promise<void> {
   const supabase = await createClient();
   await supabase.from("items").update({ deleted_at: null }).eq("id", id);
 
-  revalidatePath("/");
+  revalidatePath("/cartes");
   revalidatePath("/parametres");
 }
 

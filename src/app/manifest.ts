@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "TailTCG",
     short_name: "TailTCG",
     description: "Ta collection de cartes Pokémon, organisée et valorisée.",
-    start_url: "/",
+    start_url: "/collection",
     display: "standalone",
     background_color: "#131215",
     theme_color: "#131215",

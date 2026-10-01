@@ -147,7 +147,7 @@ export function ScanClient() {
       {/* En-tête collant, verre dépoli */}
       <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-edge/70 bg-background/80 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur">
         <Link
-          href="/"
+          href="/collection"
           onClick={clearStored}
           aria-label="Fermer"
           className="flex h-9 w-9 items-center justify-center rounded-full bg-raised text-muted transition active:scale-95"
@@ -258,8 +258,8 @@ export function ScanClient() {
             {empty ? "Ouvrir la caméra" : "Scanner une autre carte"}
           </button>
           {!empty && (
-            <Link href="/" onClick={clearStored} className="flex items-center justify-center gap-1.5 py-1 text-sm font-medium text-muted">
-              Terminer · voir ma collection
+            <Link href="/cartes" onClick={clearStored} className="flex items-center justify-center gap-1.5 py-1 text-sm font-medium text-muted">
+              Terminer · voir mes cartes
             </Link>
           )}
         </div>

@@ -229,6 +229,22 @@ body {
   }
 }
 
+/* iOS Safari : un champ date garde sa largeur native et déborde d'une
+   colonne étroite ; vide, il n'a ni texte ni la hauteur des autres champs.
+   Rendu « texte » : la largeur imposée s'applique, valeur alignée à gauche.
+   (-webkit-touch-callout : iOS uniquement, le bureau garde son sélecteur.) */
+@supports (-webkit-touch-callout: none) {
+  input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+  }
+  input[type="date"]::-webkit-date-and-time-value {
+    min-height: 1.2em;
+    text-align: left;
+  }
+}
+
 select.field {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");

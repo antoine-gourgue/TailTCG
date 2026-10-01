@@ -9,7 +9,7 @@ export function AddedToast({ count }: { count: number }) {
   return (
     <Toast
       message={`${count} carte${count > 1 ? "s" : ""} ajoutée${count > 1 ? "s" : ""} — à compléter`}
-      onDone={() => router.replace("/", { scroll: false })}
+      onDone={() => router.replace("/cartes", { scroll: false })}
     />
   );
 }

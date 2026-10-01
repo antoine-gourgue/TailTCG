@@ -20,7 +20,7 @@ export async function addRecognizedCard(c: ScanCandidate): Promise<{ item: Added
   );
   const it = res.items[0] as { id: string } | undefined;
   if (res.error || !it) return { item: null, error: res.error ?? "Ajout impossible" };
-  revalidatePath("/");
+  revalidatePath("/cartes");
   revalidatePath("/pregrades");
   return { item: { id: it.id, tcgdex_id: c.id, card_name: c.name, set_name: c.setName, local_id: c.localId, image_url: c.image }, error: null };
 }

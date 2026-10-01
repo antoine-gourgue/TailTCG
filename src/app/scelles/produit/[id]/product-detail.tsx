@@ -38,13 +38,31 @@ const signed = (v: number) => `${v > 0 ? "+" : ""}${formatEur(v)}`;
 
 function Stat({ label, value, tone, sub }: { label: string; value: string; tone?: "gain" | "loss" | "faint"; sub?: string }) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex min-w-0 flex-col gap-0.5">
       <span className="label-xs">{label}</span>
       <span className={`display num text-xl font-bold leading-none ${tone === "gain" ? "text-gain" : tone === "loss" ? "text-loss" : tone === "faint" ? "text-faint" : ""}`}>
         {value}
       </span>
       {sub && <span className="text-xs text-muted">{sub}</span>}
     </div>
+  );
+}
+
+const gainTone = (v: number | null) => (v == null ? "text-faint" : v > 0 ? "text-gain" : v < 0 ? "text-loss" : "");
+
+function RemoveLotButton({ id }: { id: string }) {
+  return (
+    <form action={removeSealedItem}>
+      <input type="hidden" name="id" value={id} />
+      <button
+        type="submit"
+        title="Retirer ce lot"
+        aria-label="Retirer ce lot"
+        className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition hover:bg-raised hover:text-loss sm:h-8 sm:w-8"
+      >
+        <Trash2 size={14} aria-hidden />
+      </button>
+    </form>
   );
 }
 
@@ -76,6 +94,13 @@ export function ProductDetail({
   const gain = owned > 0 && cote ? estimated - paid : null;
   const usdEur = product.price_usd != null && product.price_usd > 0 ? Math.round(product.price_usd * USD_TO_EUR * 100) / 100 : null;
   const varTone = (v: number | null) => (v == null ? "faint" : v > 0 ? "gain" : v < 0 ? "loss" : undefined);
+  const lotRows = lots.map((lot) => {
+    const unit = lot.manual_price ?? cote?.value ?? null;
+    const value = unit != null ? unit * lot.quantity : null;
+    const lotPaid = lot.purchase_price != null ? lot.purchase_price * lot.quantity : null;
+    const lotGain = value != null && lotPaid != null ? value - lotPaid : null;
+    return { lot, value, lotPaid, lotGain };
+  });
 
   return (
     <main className="page py-8">
@@ -118,8 +143,8 @@ export function ProductDetail({
             {product.released_on && <span>Sortie le {fmtDate(product.released_on)}</span>}
           </p>
 
-          {/* Cote et variations */}
-          <div className="panel mt-6 flex flex-wrap items-center gap-x-10 gap-y-4 px-6 py-4">
+          {/* Cote et variations : deux colonnes alignées sur mobile, en ligne au-delà */}
+          <div className="panel mt-6 grid grid-cols-2 items-start gap-x-6 gap-y-4 px-5 py-4 sm:flex sm:flex-wrap sm:items-center sm:gap-x-10 sm:px-6">
             <Stat
               label={cote?.source === "tcgplayer" ? "Estimation" : cote?.source === "cardmarket-low" ? "À partir de" : "Cote Cardmarket"}
               value={cote ? formatEur(cote.value) : "—"}
@@ -143,7 +168,7 @@ export function ProductDetail({
                 target="_blank"
                 rel="noopener noreferrer"
                 title="Voir ce produit sur Cardmarket"
-                className="group ml-auto flex items-center gap-3 rounded-xl border border-edge bg-raised/60 px-4 py-2 transition hover:border-accent/50 hover:bg-raised"
+                className="group col-span-2 flex items-center justify-between gap-3 rounded-xl border border-edge bg-raised/60 px-4 py-2.5 transition hover:border-accent/50 hover:bg-raised sm:ml-auto sm:justify-start sm:py-2"
               >
                 <span className="flex flex-col gap-0.5">
                   <span className="label-xs">Cardmarket</span>
@@ -156,7 +181,7 @@ export function ProductDetail({
 
           {/* Ma collection */}
           {owned > 0 && (
-            <div className="panel mt-4 flex flex-wrap items-center gap-x-10 gap-y-4 px-6 py-4">
+            <div className="panel mt-4 grid grid-cols-2 items-start gap-x-6 gap-y-4 px-5 py-4 sm:flex sm:flex-wrap sm:items-center sm:gap-x-10 sm:px-6">
               <Stat label="Possédés" value={String(owned)} />
               <Stat label="Payé" value={formatEur(paid)} />
               <Stat label="Valeur estimée" value={formatEur(estimated)} />
@@ -194,7 +219,7 @@ export function ProductDetail({
                   </p>
                 </div>
                 {last != null && (
-                  <div className="text-right">
+                  <div className="sm:text-right">
                     <p className="num text-lg font-bold leading-none">{formatEur(last)}</p>
                     {delta != null && history.length > 1 && (
                       <p className={`num mt-1 text-xs ${delta > 0 ? "text-gain" : delta < 0 ? "text-loss" : "text-muted"}`}>
@@ -214,7 +239,7 @@ export function ProductDetail({
                 <p className="text-sm text-muted">Pas encore de relevé : la cote est enregistrée chaque nuit à partir de maintenant.</p>
               )}
               {prices.length >= 2 && min != null && max != null && avg != null && (
-                <div className="mt-4 flex flex-wrap gap-x-10 gap-y-3 border-t border-edge pt-4">
+                <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-edge pt-4 sm:flex sm:flex-wrap sm:gap-x-10">
                   <Stat label="Plus bas" value={formatEur(min)} />
                   <Stat label="Plus haut" value={formatEur(max)} />
                   <Stat label="Moyenne" value={formatEur(avg)} />
@@ -237,7 +262,31 @@ export function ProductDetail({
               {cote ? ` · valeur ${formatEur(estimated)}` : ""}
             </p>
           </div>
-          <div className="overflow-x-auto">
+
+          {/* Mobile : une ligne compacte par lot, bouton de retrait toujours visible */}
+          <ul className="divide-y divide-edge sm:hidden">
+            {lotRows.map(({ lot: l, value, lotGain }) => (
+              <li key={l.id} className="flex items-center gap-3 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="num text-sm font-semibold">
+                    {l.quantity} ×{" "}
+                    {l.purchase_price != null ? formatEur(l.purchase_price) : <span className="font-normal text-faint">prix non renseigné</span>}
+                  </p>
+                  <p className="truncate text-xs text-muted">{l.purchase_date ? fmtDate(l.purchase_date) : "date non renseignée"}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="num text-sm">
+                    {value != null ? formatEur(value) : <span className="text-faint">—</span>}
+                    {l.manual_price != null && <span className="ml-1 text-[10px] text-muted">saisie</span>}
+                  </p>
+                  <p className={`num text-xs font-semibold ${gainTone(lotGain)}`}>{lotGain != null ? signed(lotGain) : "—"}</p>
+                </div>
+                <RemoveLotButton id={l.id} />
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full min-w-[520px] text-sm">
               <thead>
                 <tr className="text-left">
@@ -250,48 +299,30 @@ export function ProductDetail({
                 </tr>
               </thead>
               <tbody className="divide-y divide-edge">
-                {lots.map((l) => {
-                  const unit = l.manual_price ?? cote?.value ?? null;
-                  const value = unit != null ? unit * l.quantity : null;
-                  const lotPaid = l.purchase_price != null ? l.purchase_price * l.quantity : null;
-                  const lotGain = value != null && lotPaid != null ? value - lotPaid : null;
-                  return (
-                    <tr key={l.id}>
-                      <td className="num py-2.5 font-semibold">{l.quantity} ×</td>
-                      <td className="num py-2.5">
-                        {l.purchase_price != null ? (
-                          <>
-                            {formatEur(l.purchase_price)}
-                            {l.quantity > 1 && <span className="text-xs text-muted"> · {formatEur(lotPaid!)}</span>}
-                          </>
-                        ) : (
-                          <span className="text-faint">non renseigné</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 text-muted">{l.purchase_date ? fmtDate(l.purchase_date) : "—"}</td>
-                      <td className="num py-2.5 text-right">
-                        {value != null ? formatEur(value) : <span className="text-faint">—</span>}
-                        {l.manual_price != null && <span className="block text-[11px] text-muted">estimation saisie</span>}
-                      </td>
-                      <td className={`num py-2.5 text-right font-semibold ${lotGain == null ? "text-faint" : lotGain > 0 ? "text-gain" : lotGain < 0 ? "text-loss" : ""}`}>
-                        {lotGain != null ? signed(lotGain) : "—"}
-                      </td>
-                      <td className="py-2.5 pl-3 text-right">
-                        <form action={removeSealedItem}>
-                          <input type="hidden" name="id" value={l.id} />
-                          <button
-                            type="submit"
-                            title="Retirer ce lot"
-                            aria-label="Retirer ce lot"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-faint transition hover:bg-raised hover:text-loss"
-                          >
-                            <Trash2 size={14} aria-hidden />
-                          </button>
-                        </form>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {lotRows.map(({ lot: l, value, lotPaid, lotGain }) => (
+                  <tr key={l.id}>
+                    <td className="num py-2.5 font-semibold">{l.quantity} ×</td>
+                    <td className="num py-2.5">
+                      {l.purchase_price != null ? (
+                        <>
+                          {formatEur(l.purchase_price)}
+                          {l.quantity > 1 && <span className="text-xs text-muted"> · {formatEur(lotPaid!)}</span>}
+                        </>
+                      ) : (
+                        <span className="text-faint">non renseigné</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 text-muted">{l.purchase_date ? fmtDate(l.purchase_date) : "—"}</td>
+                    <td className="num py-2.5 text-right">
+                      {value != null ? formatEur(value) : <span className="text-faint">—</span>}
+                      {l.manual_price != null && <span className="block text-[11px] text-muted">estimation saisie</span>}
+                    </td>
+                    <td className={`num py-2.5 text-right font-semibold ${gainTone(lotGain)}`}>{lotGain != null ? signed(lotGain) : "—"}</td>
+                    <td className="py-2.5 pl-3 text-right">
+                      <RemoveLotButton id={l.id} />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

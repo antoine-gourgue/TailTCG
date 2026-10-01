@@ -62,7 +62,7 @@ export default async function CartePage({
   const [{ id }, { edit, from }] = await Promise.all([params, searchParams]);
   const editing = edit != null;
   // Ouverte depuis le scan mobile : le retour ramène à la liste des cartes scannées
-  const back = from === "scan" ? { href: "/scan", label: "← Scan" } : { href: "/", label: "← Collection" };
+  const back = from === "scan" ? { href: "/scan", label: "← Scan" } : { href: "/cartes", label: "← Cartes" };
 
   const supabase = await createClient();
   const {
@@ -266,7 +266,7 @@ export default async function CartePage({
                 </div>
                 <p className="mt-1 text-muted">
                   <Link
-                    href={`/?set=${encodeURIComponent(item.set_id ?? "")}`}
+                    href={`/cartes?set=${encodeURIComponent(item.set_id ?? "")}`}
                     className="underline-offset-2 transition hover:text-foreground hover:underline"
                     title={`Voir toutes mes cartes ${item.set_name}`}
                   >

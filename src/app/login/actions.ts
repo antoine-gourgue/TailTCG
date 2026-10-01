@@ -28,7 +28,7 @@ export async function signInWithPassword(
     return { ok: false, message: "Email ou mot de passe incorrect." };
   }
 
-  redirect("/");
+  redirect("/collection");
 }
 
 // Inscription ouverte : le compte est actif immédiatement (emails
@@ -70,7 +70,7 @@ export async function signUp(
     };
   }
 
-  redirect("/");
+  redirect("/collection");
 }
 
 // Réinitialisation par lien admin : le jeton (token_hash) n'est vérifié qu'ici,
@@ -109,5 +109,5 @@ export async function resetPasswordWithToken(
     return { ok: false, message: `Impossible : ${error.message}` };
   }
 
-  redirect("/");
+  redirect("/collection");
 }

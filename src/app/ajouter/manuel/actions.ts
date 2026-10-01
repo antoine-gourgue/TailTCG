@@ -152,9 +152,9 @@ export async function createCustomCards(
     }
   }
 
-  revalidatePath("/");
+  revalidatePath("/cartes");
   revalidatePath("/recherche");
-  redirect(`/?added=${rows.length}`);
+  redirect(`/cartes?added=${rows.length}`);
 }
 
 // Supprime une carte hors catalogue ET tout ce qui s'y rattache :
@@ -199,5 +199,5 @@ export async function deleteCustomCard(formData: FormData): Promise<void> {
   await supabase.from("custom_cards").delete().eq("id", card.id);
 
   revalidatePath("/recherche");
-  revalidatePath("/");
+  revalidatePath("/cartes");
 }

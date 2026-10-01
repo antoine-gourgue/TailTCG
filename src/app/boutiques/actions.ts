@@ -111,5 +111,5 @@ export async function deleteSource(formData: FormData): Promise<void> {
   // Les items pointant dessus passent à source_id = null (on delete set null)
   await supabase.from("sources").delete().eq("id", id);
   revalidatePath("/boutiques");
-  revalidatePath("/");
+  revalidatePath("/cartes");
 }

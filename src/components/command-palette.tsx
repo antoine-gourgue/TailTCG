@@ -26,7 +26,7 @@ function normalize(s: string): string {
 
 const PAGES = [
   { href: "/collection", label: "Collection", Icon: BarChart3 },
-  { href: "/", label: "Cartes", Icon: LayoutGrid },
+  { href: "/cartes", label: "Cartes", Icon: LayoutGrid },
   { href: "/scelles", label: "Scellés", Icon: LayoutGrid },
   { href: "/classeurs", label: "Classeurs", Icon: NotebookTabs },
   { href: "/recherche", label: "Ajouter une carte", Icon: SearchIcon },

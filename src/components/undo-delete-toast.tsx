@@ -17,7 +17,7 @@ export function UndoDeleteToast({ itemId }: { itemId: string }) {
   useEffect(() => {
     const t = setTimeout(() => {
       setVisible(false);
-      router.replace("/", { scroll: false });
+      router.replace("/cartes", { scroll: false });
     }, 10000);
     return () => clearTimeout(t);
   }, [router]);
@@ -30,7 +30,7 @@ export function UndoDeleteToast({ itemId }: { itemId: string }) {
     fd.set("item_id", itemId);
     await restoreItem(fd);
     setVisible(false);
-    router.replace("/", { scroll: false });
+    router.replace("/cartes", { scroll: false });
     router.refresh();
   }
 

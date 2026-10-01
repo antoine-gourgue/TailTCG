@@ -11,17 +11,18 @@ export function AddForm({ productId }: { productId: number }) {
   return (
     <form action={action} className="space-y-3">
       <input type="hidden" name="product_id" value={productId} />
-      <div className="grid grid-cols-3 gap-3">
-        <label className="text-sm">
+      {/* Mobile : quantité et prix côte à côte, la date sur toute la largeur */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <label className="min-w-0 text-sm">
           <span className="label-xs mb-1.5 block">Quantité</span>
           <input name="quantity" type="number" min={1} defaultValue={1} className="field" required />
         </label>
-        <label className="text-sm">
+        <label className="min-w-0 text-sm">
           <span className="label-xs mb-1.5 block">Prix d&apos;achat (€)</span>
           <input name="purchase_price" type="text" inputMode="decimal" placeholder="—" className="field" />
         </label>
-        <label className="text-sm">
-          <span className="label-xs mb-1.5 block">Date</span>
+        <label className="col-span-2 min-w-0 text-sm sm:col-span-1">
+          <span className="label-xs mb-1.5 block">Date d&apos;achat</span>
           <input name="purchase_date" type="date" className="field" />
         </label>
       </div>
@@ -32,7 +33,7 @@ export function AddForm({ productId }: { productId: number }) {
           Ajouté à tes scellés.
         </p>
       )}
-      <button type="submit" disabled={pending} className="btn btn-primary">
+      <button type="submit" disabled={pending} className="btn btn-primary w-full sm:w-auto">
         <Plus size={16} aria-hidden />
         {pending ? "Ajout…" : "Ajouter à mes scellés"}
       </button>
