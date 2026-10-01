@@ -155,7 +155,7 @@ export default async function CartesPage({
       <main className="relative z-10 page py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="display text-3xl font-bold tracking-tight">Cartes</h1>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2">
             <ShareButton
               initialToken={settings?.share_token ?? null}
               initialShowValues={settings?.share_show_values ?? false}
@@ -167,25 +167,28 @@ export default async function CartesPage({
         </div>
 
         {staleItems.length > 0 && (
-          <div className="panel mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 border-accent/40 bg-accent-soft/60 px-5 py-3.5 text-sm">
-            <BellRing size={16} className="shrink-0 text-accent-strong" aria-hidden />
-            <span className="font-medium">
-              {staleItems.length} carte{staleItems.length > 1 ? "s" : ""} à
-              réévaluer :
-            </span>
-            {staleItems.slice(0, 5).map((i, idx) => (
-              <Link
-                key={i.id}
-                href={`/carte/${i.id}?edit`}
-                className="text-accent-strong underline-offset-2 hover:underline"
-              >
-                {i.card_name}
-                {idx < Math.min(staleItems.length, 5) - 1 ? "," : ""}
-              </Link>
-            ))}
-            {staleItems.length > 5 && (
-              <span className="text-muted">et {staleItems.length - 5} autres…</span>
-            )}
+          <div className="panel mb-5 flex items-start gap-3 border-accent/40 bg-accent-soft/60 px-5 py-3.5 text-sm">
+            <BellRing size={16} className="mt-0.5 shrink-0 text-accent-strong" aria-hidden />
+            <p className="min-w-0 leading-relaxed">
+              <span className="font-medium">
+                {staleItems.length} carte{staleItems.length > 1 ? "s" : ""} à
+                réévaluer :
+              </span>{" "}
+              {staleItems.slice(0, 5).map((i, idx) => (
+                <span key={i.id}>
+                  <Link
+                    href={`/carte/${i.id}?edit`}
+                    className="text-accent-strong underline-offset-2 hover:underline"
+                  >
+                    {i.card_name}
+                  </Link>
+                  {idx < Math.min(staleItems.length, 5) - 1 ? ", " : ""}
+                </span>
+              ))}
+              {staleItems.length > 5 && (
+                <span className="text-muted"> et {staleItems.length - 5} autres…</span>
+              )}
+            </p>
           </div>
         )}
         <CollectionClient

@@ -288,9 +288,14 @@ select.field {
   box-shadow: var(--shadow-panel);
 }
 
-.btn-primary:hover {
-  background: var(--accent-strong);
-  transform: translateY(-1px);
+/* Survols réservés aux pointeurs qui survolent : au doigt, iOS garde l'état
+   :hover après un tap (bouton resté soulevé, vignette restée agrandie au
+   retour sur la liste) — comme les variantes hover: de Tailwind v4 */
+@media (hover: hover) {
+  .btn-primary:hover {
+    background: var(--accent-strong);
+    transform: translateY(-1px);
+  }
 }
 
 .btn-primary:active {
@@ -303,10 +308,12 @@ select.field {
   color: var(--muted);
 }
 
-.btn-ghost:hover {
-  border-color: var(--border-strong);
-  color: var(--foreground);
-  background: var(--surface);
+@media (hover: hover) {
+  .btn-ghost:hover {
+    border-color: var(--border-strong);
+    color: var(--foreground);
+    background: var(--surface);
+  }
 }
 
 .btn-danger {
@@ -350,10 +357,12 @@ select.field {
   transition: transform 0.22s cubic-bezier(0.3, 0.7, 0.3, 1), box-shadow 0.22s ease;
 }
 
-a:hover .card-tile,
-.card-tile:hover {
-  transform: translateY(-4px) scale(1.015);
-  box-shadow: var(--shadow-card-hover);
+@media (hover: hover) {
+  a:hover .card-tile,
+  .card-tile:hover {
+    transform: translateY(-4px) scale(1.015);
+    box-shadow: var(--shadow-card-hover);
+  }
 }
 
 /* Badge posé sur une vignette */
@@ -816,6 +825,25 @@ a:hover .card-tile,
 }
 @media (prefers-reduced-motion: reduce) {
   .modal-in, .modal-out, .backdrop-in { animation-duration: 0.01s; }
+}
+
+/* Actions de la fiche carte, sur mobile : tuiles d'une grille 3 colonnes,
+   icône au-dessus d'un libellé court sur deux lignes au plus (en pilules,
+   les sept boutons s'empilaient en quatre rangées décalées). Les boutons
+   viennent de plusieurs composants : le style se pose depuis le conteneur. */
+@media (max-width: 639px) {
+  .card-actions > .btn-ghost {
+    flex-direction: column;
+    gap: 0.3rem;
+    border-radius: 0.875rem;
+    padding: 0.625rem 0.375rem;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    text-align: center;
+  }
+  .card-actions > .btn-primary {
+    padding-block: 0.7rem;
+  }
 }
 
 /* Actions d'un dialogue : alignées à droite, pleine largeur côte à côte

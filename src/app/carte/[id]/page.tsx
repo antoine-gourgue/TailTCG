@@ -217,12 +217,12 @@ export default async function CartePage({
                 href={`/carte/${prevId}`}
                 title="Carte précédente"
                 aria-label="Carte précédente"
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-edge text-muted transition hover:border-edge-strong hover:text-foreground"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-edge sm:h-8 sm:w-8 text-muted transition hover:border-edge-strong hover:text-foreground"
               >
                 <ChevronLeft size={16} aria-hidden />
               </Link>
             ) : (
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-edge text-faint opacity-40">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-edge sm:h-8 sm:w-8 text-faint opacity-40">
                 <ChevronLeft size={16} aria-hidden />
               </span>
             )}
@@ -231,12 +231,12 @@ export default async function CartePage({
                 href={`/carte/${nextId}`}
                 title="Carte suivante"
                 aria-label="Carte suivante"
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-edge text-muted transition hover:border-edge-strong hover:text-foreground"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-edge sm:h-8 sm:w-8 text-muted transition hover:border-edge-strong hover:text-foreground"
               >
                 <ChevronRight size={16} aria-hidden />
               </Link>
             ) : (
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-edge text-faint opacity-40">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-edge sm:h-8 sm:w-8 text-faint opacity-40">
                 <ChevronRight size={16} aria-hidden />
               </span>
             )}
@@ -316,7 +316,8 @@ export default async function CartePage({
                   </Link>
                 </div>
               ) : (
-                <div className="flex flex-wrap gap-2">
+                /* Mobile : « Modifier » en pleine largeur, les autres actions en tuiles sur 3 colonnes */
+                <div className="card-actions grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto sm:flex-wrap">
                   {lastGrading && (
                     <GradingReportButton
                       data={{
@@ -355,7 +356,7 @@ export default async function CartePage({
                     itemId={item.id ?? id}
                     purchasePrice={item.purchase_price}
                   />
-                  <Link href={`/carte/${id}?edit`} className="btn btn-primary">
+                  <Link href={`/carte/${id}?edit`} className="btn btn-primary order-first col-span-3 sm:order-none">
                     <Pencil size={15} aria-hidden />
                     Modifier
                   </Link>
@@ -363,9 +364,9 @@ export default async function CartePage({
               )}
             </div>
 
-            {/* Valeurs clés */}
-            <div className="panel mb-6 mt-5 flex flex-wrap items-center gap-x-10 gap-y-4 px-6 py-4">
-              <div className="flex flex-col gap-0.5">
+            {/* Valeurs clés : deux colonnes alignées sur mobile, en ligne au-delà */}
+            <div className="panel mb-6 mt-5 grid grid-cols-2 items-start gap-x-6 gap-y-4 px-5 py-4 sm:flex sm:flex-wrap sm:items-center sm:gap-x-10 sm:px-6">
+              <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="label-xs">Payé</span>
                 <span className="display num text-xl font-bold leading-none">
                   {formatEur(item.purchase_price)}
@@ -373,7 +374,7 @@ export default async function CartePage({
               </div>
               {item.sold_at != null ? (
                 <>
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex min-w-0 flex-col gap-0.5">
                     <span className="label-xs">Vendue</span>
                     <span className="display num text-xl font-bold leading-none">
                       {formatEur(item.sold_price)}
@@ -388,7 +389,7 @@ export default async function CartePage({
                     </span>
                   </div>
                   {item.sold_price != null && item.purchase_price != null && (
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex min-w-0 flex-col gap-0.5">
                       <span className="label-xs">Plus-value réalisée</span>
                       <span
                         className={`display num text-xl font-bold leading-none ${
@@ -410,7 +411,7 @@ export default async function CartePage({
                 </>
               ) : (
                 <>
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex min-w-0 flex-col gap-0.5">
                     <span className="label-xs">Valeur estimée</span>
                     <span
                       className={`display num text-xl font-bold leading-none ${
@@ -423,7 +424,7 @@ export default async function CartePage({
                     </span>
                   </div>
                   {item.gain != null && (
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex min-w-0 flex-col gap-0.5">
                       <span className="label-xs">Plus-value</span>
                       <span
                         className={`display num text-xl font-bold leading-none ${
@@ -452,7 +453,7 @@ export default async function CartePage({
                   target="_blank"
                   rel="noopener noreferrer"
                   title="Voir cette carte sur Cardmarket"
-                  className="group ml-auto flex items-center gap-3 rounded-xl border border-edge bg-raised/60 px-4 py-2 transition hover:border-accent/50 hover:bg-raised"
+                  className="group col-span-2 flex items-center justify-between gap-3 rounded-xl border border-edge bg-raised/60 px-4 py-2.5 transition hover:border-accent/50 hover:bg-raised sm:ml-auto sm:justify-start sm:py-2"
                 >
                   <span className="flex flex-col gap-0.5">
                     <span className="label-xs">{marketRef?.field === "low" ? "À partir de · Cardmarket" : "Cote Cardmarket"}</span>
@@ -473,7 +474,7 @@ export default async function CartePage({
                     href={item.cardmarket_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="btn btn-ghost ml-auto !py-1.5 text-[13px]"
+                    className="btn btn-ghost col-span-2 !py-1.5 text-[13px] sm:ml-auto"
                   >
                     Cardmarket
                     <ExternalLink size={13} aria-hidden />

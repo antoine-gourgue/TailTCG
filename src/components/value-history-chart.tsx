@@ -219,12 +219,13 @@ export function ValueHistoryChart({
           ))}
         </svg>
 
-        {/* Infobulle maison, gardée dans le cadre près des bords */}
+        {/* Infobulle maison, gardée dans le cadre près des bords : centre borné à
+            une demi-largeur d'infobulle du bord (le détail empilé est plus large) */}
         {hovered && hover != null && (
           <div
             className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-xl border border-edge bg-raised px-3 py-2 shadow-lg"
             style={{
-              left: `${Math.min(Math.max((xs[hover] / W) * 100, 14), 86)}%`,
+              left: `clamp(${stacked ? "6.5rem" : "4rem"}, ${(xs[hover] / W) * 100}%, calc(100% - ${stacked ? "6.5rem" : "4rem"}))`,
               top: `calc(${(y(hovered.value) / H) * 100}% - 12px)`,
             }}
           >

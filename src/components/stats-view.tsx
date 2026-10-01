@@ -162,9 +162,9 @@ export function StatsView({ d, s }: { d: StatsData; s?: SealedStats }) {
       {/* ——— Cartes vs scellés : chaque ligne se partage entre les deux, barres dos à dos ——— */}
       {c && sealed && (
         <Panel icon={Layers} title="Cartes et scellés" hint="Chaque ligne se partage entre les deux : les barres se rejoignent au centre, à proportion.">
-          <div className="grid grid-cols-[1fr_4.5rem_1fr] items-end gap-2 pb-3 sm:grid-cols-[1fr_6rem_1fr]">
+          <div className="grid grid-cols-2 items-end gap-2 pb-3 sm:grid-cols-[1fr_6rem_1fr]">
             <SideHead tone="accent" label="Cartes" sub={`${plural(d.count, "carte")} · ${plural(d.sets.length, "set")}`} href="/cartes" align="right" />
-            <span />
+            <span className="hidden sm:block" />
             <SideHead tone="sealed" label="Scellés" sub={`${plural(sealed.count, "produit")} · ${plural(sealed.unique, "référence")}`} href="/scelles" align="left" />
           </div>
           <Butterfly label="Valeur" a={d.value} b={sealed.value} />
@@ -385,7 +385,7 @@ export function StatsView({ d, s }: { d: StatsData; s?: SealedStats }) {
               ) : (
                 <ul className="-mx-2.5 flex flex-col">
                   {sealed.gains.map((r) => (
-                    <SealedRow key={r.id} r={r} right={<Gain v={r.gain} p={r.gainPct} />} />
+                    <SealedRow key={r.id} r={r} right={<Gain v={r.gain} p={r.gainPct} stack />} />
                   ))}
                 </ul>
               )}
@@ -397,23 +397,32 @@ export function StatsView({ d, s }: { d: StatsData; s?: SealedStats }) {
   );
 }
 
-/** En-tête d'un côté du comparatif : pastille, nom cliquable, sous-titre */
+/**
+ * En-tête d'un côté du comparatif : pastille, nom cliquable, sous-titre.
+ * `align` vaut à partir de sm (côté collé au centre) ; sur mobile chaque
+ * en-tête est calé sur son bord, comme les montants en dessous.
+ */
 function SideHead({ tone, label, sub, href, align }: { tone: "accent" | "sealed"; label: string; sub: string; href: string; align: "left" | "right" }) {
   const right = align === "right";
   return (
-    <div className={`min-w-0 ${right ? "text-right" : ""}`}>
-      <Link href={href} className={`inline-flex items-center gap-1.5 font-semibold underline-offset-4 hover:text-accent-strong hover:underline ${right ? "flex-row-reverse" : ""}`}>
+    <div className={`min-w-0 ${right ? "sm:text-right" : "text-right sm:text-left"}`}>
+      <Link
+        href={href}
+        className={`inline-flex items-center gap-1.5 font-semibold underline-offset-4 hover:text-accent-strong hover:underline ${right ? "sm:flex-row-reverse" : "flex-row-reverse sm:flex-row"}`}
+      >
         <span className={`h-2.5 w-2.5 shrink-0 rounded-sm ${tone === "accent" ? "bg-accent" : "bg-sealed"}`} aria-hidden />
         {label}
       </Link>
-      <p className="truncate text-xs text-muted">{sub}</p>
+      <p className="text-xs text-muted sm:truncate">{sub}</p>
     </div>
   );
 }
 
 /**
  * Ligne du comparatif : cartes à gauche, scellés à droite, barres dos à dos
- * qui se partagent la ligne à proportion des deux montants.
+ * qui se partagent la ligne à proportion des deux montants. Sur mobile, le
+ * libellé passe au-dessus et chaque montant au-dessus de sa barre : la
+ * colonne centrale tronquait les libellés et les montants écrasaient les barres.
  */
 function Butterfly({
   label,
@@ -446,31 +455,31 @@ function Butterfly({
       <span className="num text-sm font-semibold">{formatEur(v)}</span>
     );
   return (
-    <div className="grid grid-cols-[1fr_4.5rem_1fr] items-center gap-2 border-t border-edge py-2.5 sm:grid-cols-[1fr_6rem_1fr]">
-      <div className="flex min-w-0 items-center justify-end gap-2.5">
+    <div className="grid grid-cols-2 items-center gap-x-1 gap-y-1.5 border-t border-edge py-2.5 sm:grid-cols-[1fr_6rem_1fr] sm:gap-2">
+      <div className="flex min-w-0 flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-end sm:gap-2.5">
         <span className="shrink-0 whitespace-nowrap">{cell(a, pa, "—")}</span>
-        <div className="flex h-2.5 min-w-0 flex-1 justify-end overflow-hidden rounded-l-full bg-raised/70">
+        <div className="flex h-2.5 w-full min-w-0 justify-end overflow-hidden rounded-l-full bg-raised/70 sm:w-auto sm:flex-1">
           <span className="h-full rounded-l-full bg-accent" style={{ width: `${shareA}%` }} />
         </div>
       </div>
-      <span className="label-xs truncate text-center text-faint">{label}</span>
-      <div className="flex min-w-0 items-center gap-2.5">
-        <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-r-full bg-raised/70">
+      <span className="label-xs order-first col-span-2 text-center text-faint sm:order-none sm:col-span-1 sm:truncate">{label}</span>
+      <div className="flex min-w-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-2.5">
+        <div className="h-2.5 w-full min-w-0 overflow-hidden rounded-r-full bg-raised/70 sm:w-auto sm:flex-1">
           <span className="block h-full rounded-r-full bg-sealed" style={{ width: `${shareB}%` }} />
         </div>
-        <span className="shrink-0 whitespace-nowrap">{cell(b, pb, missingB)}</span>
+        <span className="order-first shrink-0 whitespace-nowrap sm:order-none">{cell(b, pb, missingB)}</span>
       </div>
     </div>
   );
 }
 
-/** Montant signé coloré, pourcentage discret à côté */
-function Gain({ v, p }: { v: number | null; p?: number | null }) {
+/** Montant signé coloré, pourcentage discret à côté (ou dessous avec `stack`) */
+function Gain({ v, p, stack = false }: { v: number | null; p?: number | null; stack?: boolean }) {
   if (v == null) return <span className="text-muted">—</span>;
   return (
-    <span className={`num text-sm font-semibold ${v > 0 ? "text-gain" : v < 0 ? "text-loss" : ""}`}>
+    <span className={`num text-sm font-semibold ${stack ? "block text-right" : ""} ${v > 0 ? "text-gain" : v < 0 ? "text-loss" : ""}`}>
       {signed(v)}
-      {p != null && <span className="ml-1 text-xs font-normal text-muted">{signedPct(p)}</span>}
+      {p != null && <span className={`text-xs font-normal text-muted ${stack ? "block" : "ml-1"}`}>{signedPct(p)}</span>}
     </span>
   );
 }

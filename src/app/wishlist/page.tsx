@@ -96,7 +96,7 @@ export default async function WishlistPage() {
                       <span className="num text-faint">· {wish.local_id}</span>
                     </p>
                     <p className="mt-1 flex items-baseline justify-between gap-2 text-xs">
-                      <span className="text-accent">Je l&apos;ai trouvée →</span>
+                      <span className="min-w-0 truncate text-accent">Je l&apos;ai trouvée →</span>
                       {prices.has(wish.tcgdex_id) && (
                         <span className="num shrink-0 text-muted" title="Cote Cardmarket">
                           {formatEur(prices.get(wish.tcgdex_id)!)}
@@ -107,14 +107,14 @@ export default async function WishlistPage() {
                 </Link>
                 <form
                   action={removeFromWishlist}
-                  className="absolute right-2 top-2 z-20 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100"
+                  className="absolute right-2 top-2 z-20 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
                 >
                   <input type="hidden" name="wish_id" value={wish.id} />
                   <button
                     type="submit"
                     title="Retirer des recherchées"
                     aria-label="Retirer des recherchées"
-                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-black/70 text-white backdrop-blur-sm transition hover:bg-loss"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-black/70 text-white backdrop-blur-sm transition hover:bg-loss pointer-coarse:h-9 pointer-coarse:w-9"
                   >
                     <Trash2 size={13} aria-hidden />
                   </button>

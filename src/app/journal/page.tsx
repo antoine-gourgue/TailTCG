@@ -167,9 +167,9 @@ export default async function JournalPage() {
                         >
                           <meta.Icon size={13} strokeWidth={2} aria-hidden />
                         </span>
-                        <span className="min-w-0 flex-1 truncate text-sm">
-                          <span className="font-medium">{e.title}</span>{" "}
-                          <span className="text-muted">{e.detail}</span>
+                        <span className="min-w-0 flex-1 text-sm sm:truncate">
+                          <span className="block truncate font-medium sm:inline">{e.title}</span>{" "}
+                          <span className="block truncate text-xs text-muted sm:inline sm:text-sm">{e.detail}</span>
                         </span>
                         {e.amount != null && e.amount > 0 && (
                           <span className="num shrink-0 text-sm font-medium">

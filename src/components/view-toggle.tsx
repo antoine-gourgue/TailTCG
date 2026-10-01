@@ -23,7 +23,7 @@ export function ViewToggle({
         className={cls(current === "pages")}
       >
         <BookOpen size={14} aria-hidden />
-        Pages
+        <span className="max-sm:sr-only">Pages</span>
       </Link>
       <Link
         href={`${base}?vue=grille`}
@@ -31,7 +31,7 @@ export function ViewToggle({
         className={cls(current === "grille")}
       >
         <LayoutGrid size={14} aria-hidden />
-        Grille
+        <span className="max-sm:sr-only">Grille</span>
       </Link>
     </div>
   );

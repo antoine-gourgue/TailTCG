@@ -65,7 +65,7 @@ export function StatTile({
         <Icon size={15} className="text-faint" aria-hidden />
       </div>
       <p
-        className={`num display min-w-0 text-xl font-bold leading-none md:text-2xl ${
+        className={`num display min-w-0 text-lg font-bold leading-none sm:text-xl md:text-2xl ${
           tone === "up" ? "text-gain" : tone === "down" ? "text-loss" : ""
         }`}
       >

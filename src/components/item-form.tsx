@@ -333,7 +333,7 @@ export function ItemForm({
               className="field num"
             />
           </div>
-          <div>
+          <div className="col-span-2 sm:col-span-1">
             <label htmlFor="purchase_date" className="label-xs mb-1.5 block">
               Date d&apos;achat
             </label>

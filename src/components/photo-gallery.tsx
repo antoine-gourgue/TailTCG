@@ -210,7 +210,7 @@ export function PhotoGallery({
                 </span>
               )}
             </button>
-            <div className="absolute right-2 top-2 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
+            <div className="absolute right-2 top-2 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
               <ConfirmAction
                 action={deleteItemPhoto}
                 fields={{ photo_id: photo.id }}
@@ -249,7 +249,7 @@ export function PhotoGallery({
             onClick={(e) => e.stopPropagation()}
           />
           <div
-            className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2"
+            className="absolute bottom-[calc(1.25rem+env(safe-area-inset-bottom))] left-1/2 flex -translate-x-1/2 items-center gap-2"
             onClick={(e) => e.stopPropagation()}
           >
             {editingLabel ? (

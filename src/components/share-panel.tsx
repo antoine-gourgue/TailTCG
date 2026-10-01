@@ -55,14 +55,14 @@ export function SharePanel({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2">
         <code className="num min-w-0 flex-1 truncate rounded-xl border border-edge bg-raised px-3 py-2 text-xs">
           {url}
         </code>
         <button
           type="button"
           onClick={copy}
-          className={`btn !py-2 text-sm ${copied ? "border border-gain text-gain" : "btn-ghost"}`}
+          className={`btn shrink-0 !py-2 text-sm ${copied ? "border border-gain text-gain" : "btn-ghost"}`}
         >
           {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
           {copied ? "Copié !" : "Copier"}

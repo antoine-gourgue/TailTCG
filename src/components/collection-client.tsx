@@ -659,7 +659,7 @@ export function CollectionClient({
       type="button"
       onClick={() => setSortAsc((v) => !v)}
       disabled={sortKey === "custom"}
-      className="btn btn-ghost shrink-0 !px-2.5 !py-1.5 disabled:opacity-40"
+      className="btn btn-ghost shrink-0 !px-2.5 !py-1.5 disabled:opacity-40 max-sm:h-11 max-sm:w-11 max-sm:!p-0"
       title={sortAsc ? "Croissant" : "Décroissant"}
       aria-label={sortAsc ? "Tri croissant" : "Tri décroissant"}
     >
@@ -685,7 +685,8 @@ export function CollectionClient({
   }
 
   return (
-    <div>
+    // En mode sélection, la barre flottante couvre le bas : place pour la dernière rangée
+    <div className={selecting ? "pb-10 md:pb-20" : undefined}>
       {/* Résumé : la valeur du classeur, toujours visible */}
       <div className="panel rise-in mb-5 flex flex-col gap-4 px-5 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-10 sm:px-6">
         <div className="grid grid-cols-2 gap-4 sm:contents">
@@ -899,11 +900,11 @@ export function CollectionClient({
                   </p>
                   {!hideValues && (
                     <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-[11px] sm:text-xs">
-                      <span className="num text-faint" title="Prix d'achat">
-                        <span className="hidden sm:inline">payé </span>
-                        {formatEur(item.purchase_price ?? 0)}
+                      {/* Sur mobile, valeur et plus-value seulement : avec le payé, la ligne débordait de la vignette */}
+                      <span className="num hidden text-faint sm:inline" title="Prix d'achat">
+                        payé {formatEur(item.purchase_price ?? 0)}
                       </span>
-                      <span className="text-faint" aria-hidden>→</span>
+                      <span className="hidden text-faint sm:inline" aria-hidden>→</span>
                       <span className="num font-medium" title={item.current_price != null ? "Valeur estimée" : "Cote Cardmarket (aucune valeur saisie)"}>
                         {formatEur(estimatedOf(item))}
                       </span>

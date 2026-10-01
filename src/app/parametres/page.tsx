@@ -90,7 +90,7 @@ export default async function ParametresPage() {
             <dl className="mb-5 grid grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
               <div>
                 <dt className="label-xs mb-1">Email</dt>
-                <dd>{user.email}</dd>
+                <dd className="break-all">{user.email}</dd>
               </div>
               {memberSince && (
                 <div>
@@ -218,24 +218,29 @@ export default async function ParametresPage() {
               l&apos;écran d&apos;accueil — pratique pour photographier tes
               cartes.
             </p>
+            {/* Une phrase par étape (icônes en ligne) : en flex, chaque bout de texte devenait une colonne */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-xl border border-edge p-4">
                 <p className="label-xs mb-2.5">iPhone / iPad (Safari)</p>
                 <ol className="flex flex-col gap-2 text-sm text-muted">
-                  <li className="flex items-center gap-2">
+                  <li className="flex items-start gap-2">
                     <span className="num shrink-0 font-semibold text-foreground">1.</span>
-                    Ouvre tailtcg.vercel.app dans Safari
+                    <span>Ouvre tailtcg.vercel.app dans Safari</span>
                   </li>
-                  <li className="flex items-center gap-2">
+                  <li className="flex items-start gap-2">
                     <span className="num shrink-0 font-semibold text-foreground">2.</span>
-                    Touche <Share size={14} className="inline shrink-0" aria-label="Partager" />{" "}
-                    (Partager) en bas de l&apos;écran
+                    <span>
+                      Touche <Share size={14} className="inline align-[-2px]" aria-label="Partager" /> (Partager) en bas
+                      de l&apos;écran
+                    </span>
                   </li>
-                  <li className="flex items-center gap-2">
+                  <li className="flex items-start gap-2">
                     <span className="num shrink-0 font-semibold text-foreground">3.</span>
-                    Choisis{" "}
-                    <span className="inline-flex items-center gap-1 text-foreground">
-                      <SquarePlus size={14} aria-hidden /> « Sur l&apos;écran d&apos;accueil »
+                    <span>
+                      Choisis{" "}
+                      <span className="text-foreground">
+                        <SquarePlus size={14} className="inline align-[-2px]" aria-hidden /> « Sur l&apos;écran d&apos;accueil »
+                      </span>
                     </span>
                   </li>
                 </ol>
@@ -243,19 +248,20 @@ export default async function ParametresPage() {
               <div className="rounded-xl border border-edge p-4">
                 <p className="label-xs mb-2.5">Android (Chrome)</p>
                 <ol className="flex flex-col gap-2 text-sm text-muted">
-                  <li className="flex items-center gap-2">
+                  <li className="flex items-start gap-2">
                     <span className="num shrink-0 font-semibold text-foreground">1.</span>
-                    Ouvre tailtcg.vercel.app dans Chrome
+                    <span>Ouvre tailtcg.vercel.app dans Chrome</span>
                   </li>
-                  <li className="flex items-center gap-2">
+                  <li className="flex items-start gap-2">
                     <span className="num shrink-0 font-semibold text-foreground">2.</span>
-                    Touche le menu{" "}
-                    <EllipsisVertical size={14} className="inline shrink-0" aria-label="Menu" /> en
-                    haut à droite
+                    <span>
+                      Touche le menu <EllipsisVertical size={14} className="inline align-[-2px]" aria-label="Menu" /> en haut à
+                      droite
+                    </span>
                   </li>
-                  <li className="flex items-center gap-2">
+                  <li className="flex items-start gap-2">
                     <span className="num shrink-0 font-semibold text-foreground">3.</span>
-                    Choisis « Ajouter à l&apos;écran d&apos;accueil »
+                    <span>Choisis « Ajouter à l&apos;écran d&apos;accueil »</span>
                   </li>
                 </ol>
               </div>

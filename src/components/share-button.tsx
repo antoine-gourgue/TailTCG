@@ -17,9 +17,9 @@ export function ShareButton({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="btn btn-ghost">
+      <button type="button" onClick={() => setOpen(true)} aria-label="Partager" className="btn btn-ghost max-sm:!px-3">
         <Share2 size={15} aria-hidden />
-        Partager
+        <span className="hidden sm:inline">Partager</span>
       </button>
 
       <Sheet
