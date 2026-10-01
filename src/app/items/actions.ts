@@ -139,7 +139,7 @@ export async function createItem(
   revalidateBinders(binders);
 
   // Cote Cardmarket tout de suite (sinon la carte n'a de valeur qu'au cron du lendemain)
-  await snapshotPrices([tcgdex_id]);
+  await snapshotPrices([tcgdex_id], { japanese: fields.language === "JP" });
 
   revalidatePath("/cartes");
   revalidatePath("/wishlist");
@@ -329,7 +329,10 @@ export async function bulkAddToCollection(cards: BulkCard[], language: string) {
   revalidateBinders(binders);
 
   // Cote Cardmarket tout de suite pour les cartes ajoutées
-  await snapshotPrices((created ?? []).map((c) => c.tcgdex_id));
+  await snapshotPrices(
+    (created ?? []).map((c) => c.tcgdex_id),
+    { japanese: lang === "JP" }
+  );
 
   revalidatePath("/cartes");
   revalidatePath("/wishlist");

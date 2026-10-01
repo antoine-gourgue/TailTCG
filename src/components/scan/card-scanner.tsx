@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Check, ExternalLink, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
+import { Check, ExternalLink, Library, Loader2, Plus, RefreshCw, Sparkles, Undo2, X } from "lucide-react";
 import { CardImage } from "@/components/card-image";
 import { formatEur } from "@/lib/domain";
 import type { Pt } from "@/lib/scan/detect.mjs";
@@ -75,6 +75,10 @@ const TOAST_MS = 1600;
 const ERROR_MS = 2600;
 const BANNER_MS = 8000;
 const FLASH_MS = 420;
+/** Fiche : un tap arrivé juste après le changement de carte visait la précédente, ignoré */
+const SHEET_TAP_GUARD_MS = 400;
+/** Fiche : durée de l'état « ajoutée » du bouton */
+const SHEET_DONE_MS = 1400;
 
 /** Déplacement moyen des coins entre deux quadrilatères (px) */
 function cornerDrift(a: Pt[], b: Pt[]): number {
@@ -100,8 +104,35 @@ function smoothCorners(prev: Pt[] | null, next: Pt[], longEdge: number): Pt[] {
 /** scanning : on cherche ; cooldown : carte ajoutée, on attend qu'elle sorte du champ ; choose : versions à départager */
 type Phase = "scanning" | "cooldown" | "choose";
 
-/** Résultat de l'action principale : enchaîner sur la carte suivante, quitter, ou erreur à afficher */
-export type ConfirmResult = { status: "continue" | "leave" } | { status: "error"; error: string };
+/**
+ * Résultat de l'action principale : enchaîner sur la carte suivante, quitter,
+ * ou erreur à afficher. `key` : de quoi annuler cet ajout (mode fiche).
+ */
+export type ConfirmResult = { status: "continue" | "leave"; key?: string } | { status: "error"; error: string };
+
+/**
+ * Fiche avant l'ajout : la carte reconnue s'affiche avec sa cote et les
+ * exemplaires déjà possédés, et n'est ajoutée qu'au tap (un tap par
+ * exemplaire) ; chaque ajout fait depuis la fiche s'annule depuis elle.
+ */
+export type ScanReview = {
+  owned: (card: ScanCandidate) => Promise<number | null>;
+  /** Annule l'ajout identifié par la `key` rendue par `onConfirm` ; true si c'est fait */
+  undo: (key: string) => Promise<boolean>;
+};
+
+/** Fiche de la carte reconnue (mode `review`) */
+type Sheet = {
+  card: ScanCandidate;
+  /** Exemplaires déjà possédés : null = en cours ou inconnu */
+  owned: number | null;
+  /** Ajouts faits depuis cette fiche, du plus ancien au plus récent */
+  keys: string[];
+  busy: "add" | "undo" | null;
+  done: boolean;
+  error: string | null;
+  shownAt: number;
+};
 
 /**
  * Prochaine image de la vidéo (ou prochain rafraîchissement d'écran), au
@@ -166,6 +197,7 @@ export function CardScanner({
   title = "Scanner",
   noun = "ajoutée",
   onFinish,
+  review,
 }: {
   /** Relais QR : jeton de la session (sinon l'utilisateur connecté fait foi) */
   token?: string;
@@ -178,6 +210,8 @@ export function CardScanner({
   noun?: string;
   /** Bouton « Terminer » en haut à droite (fin d'une série envoyée à l'ordinateur) */
   onFinish?: () => void | Promise<void>;
+  /** Fiche avant l'ajout (scan direct) ; sans elle, une carte sûre est ajoutée aussitôt (relais QR) */
+  review?: ScanReview;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -213,8 +247,9 @@ export function CardScanner({
   const [seen, setSeen] = useState(false);
   /** Dernière carte reconnue (bandeau, cote) */
   const [found, setFound] = useState<ScanCandidate | null>(null);
-  /** Cote Cardmarket de la dernière carte reconnue (`id` ≠ carte affichée = en cours de chargement) */
-  const [priceOf, setPriceOf] = useState<{ id: string; value: number | null; url: string | null } | null>(null);
+  /** Cote de la dernière carte reconnue (`id` ≠ carte affichée = en cours de chargement) */
+  const [priceOf, setPriceOf] = useState<{ id: string; value: number | null; url: string | null; source: "cardmarket" | "tcgplayer" } | null>(null);
+  const [sheet, setSheet] = useState<Sheet | null>(null);
   const [choices, setChoices] = useState<ScanCandidate[]>([]);
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
@@ -316,7 +351,7 @@ export function CardScanner({
     };
   }, []);
 
-  // Cote Cardmarket de la carte reconnue
+  // Cote de la carte reconnue (Cardmarket, ou TCGplayer pour une japonaise sans cote Cardmarket)
   useEffect(() => {
     if (!found) return;
     let alive = true;
@@ -324,10 +359,10 @@ export function CardScanner({
     if (token) q.set("token", token);
     fetch(`/api/scan/price?${q}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((data: { price: number | null; url: string | null } | null) => {
-        if (alive) setPriceOf({ id: found.id, value: data?.price ?? null, url: data?.url ?? null });
+      .then((data: { price: number | null; url: string | null; source?: "cardmarket" | "tcgplayer" } | null) => {
+        if (alive) setPriceOf({ id: found.id, value: data?.price ?? null, url: data?.url ?? null, source: data?.source ?? "cardmarket" });
       })
-      .catch(() => alive && setPriceOf({ id: found.id, value: null, url: null }));
+      .catch(() => alive && setPriceOf({ id: found.id, value: null, url: null, source: "cardmarket" }));
     return () => {
       alive = false;
     };
@@ -499,6 +534,66 @@ export function CardScanner({
     setConfirmError(null);
   }
 
+  /** Mode fiche : la carte reconnue s'affiche (cote, exemplaires possédés) sans être ajoutée */
+  function present(card: ScanCandidate) {
+    if (!review) return;
+    play("pop");
+    navigator.vibrate?.(60);
+    setFlash(true);
+    setFound(card);
+    setBanner(null);
+    setConfirmError(null);
+    setSheet({ card, owned: null, keys: [], busy: null, done: false, error: null, shownAt: nowMs() });
+    const same = (s: Sheet | null) => !!s && s.card.id === card.id && s.card.lang === card.lang;
+    void resolveCard(card).then((full) => setSheet((s) => (same(s) ? { ...s!, card: full } : s)));
+    void review
+      .owned(card)
+      .catch(() => null)
+      .then((n) => setSheet((s) => (same(s) && s!.owned == null ? { ...s!, owned: n } : s)));
+  }
+
+  /** Fiche : ajoute un exemplaire de la carte affichée (un tap = un exemplaire) */
+  async function addFromSheet() {
+    const s = sheet;
+    if (!s || s.busy || nowMs() - s.shownAt < SHEET_TAP_GUARD_MS) return;
+    const same = (x: Sheet | null) => !!x && x.card.id === s.card.id && x.card.lang === s.card.lang;
+    setSheet((x) => (same(x) ? { ...x!, busy: "add", error: null } : x));
+    try {
+      const full = await resolveCard(s.card);
+      const r = await onConfirm(full);
+      if (r.status === "error") {
+        setSheet((x) => (same(x) ? { ...x!, busy: null, error: r.error } : x));
+        return;
+      }
+      setAdded((n) => n + 1);
+      setToast(full.name);
+      setSheet((x) =>
+        same(x) ? { ...x!, card: full, busy: null, done: true, keys: r.key ? [...x!.keys, r.key] : x!.keys, owned: x!.owned != null ? x!.owned + 1 : x!.owned } : x,
+      );
+      window.setTimeout(() => setSheet((x) => (same(x) && x!.done ? { ...x!, done: false } : x)), SHEET_DONE_MS);
+    } catch {
+      setSheet((x) => (same(x) ? { ...x!, busy: null, error: "Impossible pour le moment, réessaie." } : x));
+    }
+  }
+
+  /** Fiche : annule le dernier ajout fait depuis elle */
+  async function undoFromSheet() {
+    const s = sheet;
+    const key = s?.keys[s.keys.length - 1];
+    if (!s || !key || s.busy || !review) return;
+    const same = (x: Sheet | null) => !!x && x.card.id === s.card.id && x.card.lang === s.card.lang;
+    setSheet((x) => (same(x) ? { ...x!, busy: "undo", error: null } : x));
+    const ok = await review.undo(key).catch(() => false);
+    if (ok) setAdded((n) => Math.max(0, n - 1));
+    setSheet((x) =>
+      same(x)
+        ? ok
+          ? { ...x!, busy: null, done: false, keys: x!.keys.slice(0, -1), owned: x!.owned != null ? Math.max(0, x!.owned - 1) : x!.owned }
+          : { ...x!, busy: null, error: "Annulation impossible, réessaie." }
+        : x,
+    );
+  }
+
   /** Nom du set et visuel de référence de la carte reconnue (l'ajout n'attend que ça) */
   async function resolveCard(c: ScanCandidate): Promise<ScanCandidate> {
     try {
@@ -547,6 +642,10 @@ export function CardScanner({
     lastCommit.current = { cardId: d.tcgdexCardId, at: now };
     enterCooldown();
     const card = candidateOf(d);
+    if (review) {
+      present(card);
+      return;
+    }
     celebrate(card);
     addCard(card);
   }
@@ -708,6 +807,13 @@ export function CardScanner({
 
   /** Version choisie à la main (réimpressions) */
   async function confirm(card: ScanCandidate) {
+    if (review) {
+      lastCommit.current = { cardId: card.id, at: nowMs() };
+      scores.current.clear();
+      enterCooldown();
+      present(card);
+      return;
+    }
     setConfirming(true);
     setConfirmError(null);
     try {
@@ -756,7 +862,7 @@ export function CardScanner({
     ) : phase === "cooldown" ? (
       <>
         <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-400" aria-hidden />
-        {capitalize(noun)} · retire la carte pour la suivante
+        {review ? "Reconnue" : capitalize(noun)} · retire la carte pour la suivante
       </>
     ) : seen ? (
       <>
@@ -774,6 +880,9 @@ export function CardScanner({
 
   /** Cote de la carte du bandeau (null tant qu'elle charge) */
   const price = banner && priceOf?.id === banner.id ? priceOf : null;
+  /** Cote de la carte de la fiche (null tant qu'elle charge) */
+  const sheetPrice = sheet && priceOf?.id === sheet.card.id ? priceOf : null;
+  const showSheet = !!review && !!sheet && phase !== "choose";
 
   const sheetStyle = { animation: "sheet-in 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both" };
   const sheetClass =
@@ -858,7 +967,12 @@ export function CardScanner({
             </p>
             <p className="truncate text-xs text-white/70">
               {banner.setName} <span className="num">· n° {banner.localId}</span>
-              {price?.value != null && <span className="num ml-2 font-semibold text-emerald-300">{formatEur(price.value)}</span>}
+              {price?.value != null && (
+                <span className="num ml-2 font-semibold text-emerald-300">
+                  {price.source === "tcgplayer" && "≈ "}
+                  {formatEur(price.value)}
+                </span>
+              )}
             </p>
             {detailsHref && (
               <Link href={detailsHref(banner)} className="mt-1 inline-flex items-center gap-1 text-xs text-white/85 underline-offset-4 hover:underline">
@@ -877,8 +991,104 @@ export function CardScanner({
         </div>
       )}
 
+      {/* Fiche de la carte reconnue (mode fiche) : cote, exemplaires possédés, ajout au tap, annulation */}
+      {showSheet && sheet && (
+        <section className={sheetClass} style={sheetStyle} aria-label="Carte reconnue">
+          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-edge-strong" />
+          <div className="flex gap-4">
+            <div className="card-tile aspect-[63/88] w-20 shrink-0">
+              <CardImage key={`${sheet.card.id}-${sheet.card.lang}-${sheet.card.image}`} base={sheet.card.image} alt={sheet.card.name} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start gap-2">
+                <p className="display min-w-0 flex-1 truncate pt-0.5 text-lg font-bold leading-tight">
+                  {sheet.card.name}
+                  <LangBadge lang={sheet.card.lang} />
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSheet(null)}
+                  disabled={!!sheet.busy}
+                  aria-label="Fermer la fiche"
+                  className="-mr-1.5 -mt-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-raised hover:text-foreground"
+                >
+                  <X size={18} aria-hidden />
+                </button>
+              </div>
+              <p className="truncate text-sm text-muted">
+                {sheet.card.setName} <span className="num">· n° {sheet.card.localId}</span>
+              </p>
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                {!sheetPrice ? (
+                  <span className="h-7 w-20 animate-pulse rounded-lg bg-raised" aria-label="Cote en cours" />
+                ) : sheetPrice.value != null ? (
+                  <a
+                    href={sheetPrice.url ?? undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={sheetPrice.source === "tcgplayer" ? "Pas de cote Cardmarket : marché japonais, converti" : "Cote Cardmarket"}
+                    className="inline-flex items-baseline gap-1.5 rounded-lg bg-gain/15 px-2.5 py-1 text-gain"
+                  >
+                    <span className="num text-base font-bold leading-none">
+                      {sheetPrice.source === "tcgplayer" && "≈ "}
+                      {formatEur(sheetPrice.value)}
+                    </span>
+                    <span className="text-[10px] font-medium text-muted">{sheetPrice.source === "tcgplayer" ? "TCGplayer" : "Cardmarket"}</span>
+                  </a>
+                ) : (
+                  <span className="rounded-lg bg-raised px-2.5 py-1.5 text-xs text-faint">Pas de cote</span>
+                )}
+                {sheet.owned != null &&
+                  (sheet.owned > 0 ? (
+                    <span className="inline-flex items-center gap-1 rounded-lg bg-accent-soft px-2 py-1.5 text-xs font-semibold leading-none text-accent-strong">
+                      <Library size={13} aria-hidden />
+                      Déjà ×{sheet.owned} dans ta collection
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-lg bg-gain/15 px-2 py-1.5 text-xs font-semibold leading-none text-gain">
+                      Nouvelle
+                    </span>
+                  ))}
+              </div>
+            </div>
+          </div>
+          {sheet.error && <p className="mt-3 text-sm text-loss">{sheet.error}</p>}
+          <div className="mt-4 flex gap-2">
+            {sheet.keys.length > 0 && (
+              <button type="button" onClick={() => void undoFromSheet()} disabled={!!sheet.busy} className="btn btn-ghost shrink-0 !py-3">
+                {sheet.busy === "undo" ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Undo2 size={16} aria-hidden />}
+                Annuler
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => void addFromSheet()}
+              disabled={!!sheet.busy}
+              className="btn btn-primary flex-1 justify-center !py-3 text-base"
+            >
+              {sheet.busy === "add" ? (
+                <Loader2 size={18} className="animate-spin" aria-hidden />
+              ) : sheet.done ? (
+                <Check size={18} aria-hidden />
+              ) : (
+                <Plus size={18} aria-hidden />
+              )}
+              {sheet.done ? "Ajoutée" : sheet.keys.length > 0 ? "Ajouter encore" : "Ajouter à ma collection"}
+            </button>
+          </div>
+          {detailsHref && sheet.keys.length === 0 && (
+            <Link
+              href={detailsHref(sheet.card)}
+              className="mt-3 flex items-center justify-center gap-1 text-xs text-muted underline-offset-4 hover:underline"
+            >
+              Ajouter avec l&apos;état, le prix d&apos;achat… <ExternalLink size={11} aria-hidden />
+            </Link>
+          )}
+        </section>
+      )}
+
       {/* État, en bas de la vidéo */}
-      {phase !== "choose" && (
+      {phase !== "choose" && !showSheet && (
         <div className="relative z-10 mt-auto mb-[max(1.75rem,env(safe-area-inset-bottom))] flex flex-col items-center gap-2 px-6 text-center">
           <span className="inline-flex max-w-full items-center gap-2 rounded-full bg-black/55 px-4 py-2 text-sm backdrop-blur [&>svg]:shrink-0">
             {status}

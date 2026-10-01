@@ -34,6 +34,7 @@ type Cell = { key: string; label: string; value: ReactNode; href?: string };
 export function CardSpotlight({
   card,
   price,
+  priceSource = "cardmarket",
   cmUrl,
   kicker,
   facts = [],
@@ -46,6 +47,9 @@ export function CardSpotlight({
   card: SpotlightCard;
   /** Cote Cardmarket : montant, null = indisponible, "loading" ; absente = pas de ligne */
   price?: number | null | "loading";
+  /** Origine de la cote : Cardmarket, ou TCGplayer japonais converti (carte japonaise sans cote Cardmarket) */
+  priceSource?: "cardmarket" | "tcgplayer";
+  /** Lien de la cote (Cardmarket, ou TCGplayer selon `priceSource`) */
   cmUrl?: string | null;
   /** Ligne de contexte au-dessus du nom (statut, provenance) */
   kicker?: ReactNode;
@@ -88,7 +92,7 @@ export function CardSpotlight({
   if (price !== undefined || cmUrl) {
     cells.push({
       key: "price",
-      label: "Cardmarket",
+      label: priceSource === "tcgplayer" ? "TCGplayer (JP)" : "Cardmarket",
       href: cmUrl ?? undefined,
       value:
         price === "loading" ? (
@@ -96,7 +100,10 @@ export function CardSpotlight({
         ) : price == null ? (
           <span className="font-normal text-faint">Indisponible</span>
         ) : (
-          <span className="num">{formatEur(price)}</span>
+          <span className="num" title={priceSource === "tcgplayer" ? "Pas de cote Cardmarket : marché japonais, converti" : undefined}>
+            {priceSource === "tcgplayer" && "≈ "}
+            {formatEur(price)}
+          </span>
         ),
     });
   }

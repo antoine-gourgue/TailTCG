@@ -5,6 +5,7 @@ import type { Database } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchGuideRefs } from "@/lib/cardmarket";
+import { USD_TO_EUR } from "@/lib/tcgplayer-jp";
 
 /**
  * Cote € des produits scellés : guide Cardmarket par idProduct d'abord (le
@@ -12,7 +13,7 @@ import { fetchGuideRefs } from "@/lib/cardmarket";
  * en repli, converti approximativement. Historique : relevés quotidiens
  * (sealed_price_snapshots) écrits chaque nuit par scripts/sealed-catalog.mjs.
  */
-export const USD_TO_EUR = 0.92;
+export { USD_TO_EUR };
 
 export type SealedPriceInput = { id: number; cardmarket_id: number | null; price_usd: number | null };
 /** `cardmarket-low` : aucune vente encore, c'est l'annonce la moins chère (« à partir de ») */

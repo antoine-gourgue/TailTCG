@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cardmarketUrl } from "@/lib/tcgdex";
 import { catalogCard } from "@/lib/catalog";
-import { resolveCardmarketRef } from "@/lib/cardmarket";
+import { japaneseFallbackPrice, resolveCardmarketRef } from "@/lib/cardmarket";
 import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
 import { signStorageImages } from "@/lib/images";
 import { formatEur, CONDITIONS } from "@/lib/domain";
@@ -106,18 +106,22 @@ export default async function CartePage({
 
   // Fiche officielle TCGdex (cache 24 h) — sauf cartes ajoutées à la main
   const isCustom = item.tcgdex_id?.startsWith("custom:") ?? false;
+  const frCard = item.tcgdex_id && !isCustom ? await catalogCard(item.tcgdex_id, "fr") : null;
   const tcgdexCard =
-    item.tcgdex_id && !isCustom
-      ? (await catalogCard(item.tcgdex_id, "fr")) ??
-        (item.language === "JP" ? await catalogCard(item.tcgdex_id, "ja") : null)
-      : null;
+    frCard ??
+    (item.tcgdex_id && !isCustom && item.language === "JP" ? await catalogCard(item.tcgdex_id, "ja") : null);
   // Prix de référence Cardmarket (indicatif) — pas la valorisation, qui reste manuelle
   const marketId = overrideCardmarketId(
     item.tcgdex_id,
     tcgdexCard?.pricing?.cardmarket?.idProduct
   );
   const marketRef = await resolveCardmarketRef(marketId, tcgdexCard?.pricing?.cardmarket);
-  const marketPrice = marketRef?.value ?? null;
+  // Carte japonaise sans cote Cardmarket : cote TCGplayer japonaise, convertie
+  const jpMarket =
+    !marketRef && item.tcgdex_id && !isCustom && item.language === "JP" && !frCard
+      ? await japaneseFallbackPrice(item.tcgdex_id)
+      : null;
+  const marketPrice = marketRef?.value ?? jpMarket?.eur ?? null;
 
   // Visuel des cartes hors catalogue : photo signée depuis le bucket privé
   const [{ image_url: displayImage }] = await signStorageImages(
@@ -445,22 +449,30 @@ export default async function CartePage({
               {/* Référence marché : distincte des chiffres de valorisation perso */}
               {marketPrice != null ? (
                 <a
-                  href={cardmarketUrl({
-                    idProduct: marketId,
-                    name: item.card_name ?? "",
-                    localId: item.local_id ?? undefined,
-                  })}
+                  href={
+                    jpMarket
+                      ? jpMarket.url
+                      : cardmarketUrl({
+                          idProduct: marketId,
+                          name: item.card_name ?? "",
+                          localId: item.local_id ?? undefined,
+                        })
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
-                  title="Voir cette carte sur Cardmarket"
+                  title={jpMarket ? "Voir cette carte sur TCGplayer" : "Voir cette carte sur Cardmarket"}
                   className="group col-span-2 flex items-center justify-between gap-3 rounded-xl border border-edge bg-raised/60 px-4 py-2.5 transition hover:border-accent/50 hover:bg-raised sm:ml-auto sm:justify-start sm:py-2"
                 >
                   <span className="flex flex-col gap-0.5">
-                    <span className="label-xs">{marketRef?.field === "low" ? "À partir de · Cardmarket" : "Cote Cardmarket"}</span>
+                    <span className="label-xs">
+                      {jpMarket ? "Cote TCGplayer (JP)" : marketRef?.field === "low" ? "À partir de · Cardmarket" : "Cote Cardmarket"}
+                    </span>
                     <span className="num text-lg font-bold leading-none">
+                      {jpMarket && "≈ "}
                       {formatEur(marketPrice)}
                     </span>
                     {marketRef?.field === "low" && <span className="text-[11px] text-muted">annonce la moins chère, pas encore de vente</span>}
+                    {jpMarket && <span className="text-[11px] text-muted">pas de cote Cardmarket : marché japonais, converti</span>}
                   </span>
                   <ExternalLink
                     size={15}
@@ -685,7 +697,7 @@ export default async function CartePage({
                   {showMarket && (
                     <section className="panel p-5">
                       <div className="mb-1 flex flex-wrap items-start justify-between gap-2">
-                        <h2 className="display text-base font-semibold">Évolution de la cote Cardmarket</h2>
+                        <h2 className="display text-base font-semibold">Évolution de la cote {jpMarket ? "TCGplayer (JP)" : "Cardmarket"}</h2>
                         {mLast != null && (
                           <span className="ml-auto text-right">
                             <span className="num block text-base font-bold leading-none">{formatEur(mLast)}</span>
@@ -699,7 +711,7 @@ export default async function CartePage({
                         )}
                       </div>
                       <p className="mb-3 text-xs text-faint">
-                        Relevé chaque nuit d&apos;après le guide Cardmarket · {marketPoints.length} relevé{marketPoints.length > 1 ? "s" : ""}
+                        Relevé chaque nuit d&apos;après {jpMarket ? "TCGplayer, converti en euros" : "le guide Cardmarket"} · {marketPoints.length} relevé{marketPoints.length > 1 ? "s" : ""}
                       </p>
                       {marketPoints.length >= 2 ? (
                         <ValueHistoryChart points={marketPoints} minSpanRatio={0.08} />

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { canScan } from "@/lib/scan/access";
 import { loadCaptureByToken } from "@/lib/capture";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { guideReference } from "@/lib/cardmarket";
+import { guideReference, japaneseFallbackPrice } from "@/lib/cardmarket";
 import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
 import { cardmarketReference, cardmarketUrl } from "@/lib/tcgdex";
 import { catalogCard } from "@/lib/catalog";
@@ -11,8 +11,10 @@ import { isScanLang } from "@/lib/scan/url";
 // Cote Cardmarket d'une carte reconnue par le scan : guide local d'abord
 // (par idProduct, lu en service role : le téléphone en relais QR n'est pas
 // connecté), bloc TCGdex en repli ; sans cote, le lien mène à la recherche
-// Cardmarket par nom. Même accès que la reconnaissance.
-export type ScanPrice = { price: number | null; url: string | null };
+// Cardmarket par nom. Carte japonaise sans cote Cardmarket : cote TCGplayer
+// japonaise (TCGCSV, convertie), lien vers TCGplayer. Même accès que la
+// reconnaissance.
+export type ScanPrice = { price: number | null; url: string | null; source?: "cardmarket" | "tcgplayer" };
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
@@ -41,7 +43,14 @@ export async function GET(request: NextRequest) {
     if (data) price = guideReference(data);
   }
   price ??= cardmarketReference(block);
+  if (price == null && lang === "ja") {
+    const jp = await japaneseFallbackPrice(id);
+    if (jp) {
+      const out: ScanPrice = { price: jp.eur, url: jp.url, source: "tcgplayer" };
+      return NextResponse.json(out, { headers: { "cache-control": "private, max-age=600" } });
+    }
+  }
   const url = card ? cardmarketUrl({ idProduct: cmId, name: card.name, localId: card.localId }) : null;
-  const out: ScanPrice = { price, url };
+  const out: ScanPrice = { price, url, source: "cardmarket" };
   return NextResponse.json(out, { headers: { "cache-control": "private, max-age=600" } });
 }

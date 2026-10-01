@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { cardmarketUrl } from "@/lib/tcgdex";
 import { catalogCard } from "@/lib/catalog";
 import { ITEM_LANGUAGE, isScanLang } from "@/lib/scan/url";
-import { resolveCardmarketPrice } from "@/lib/cardmarket";
+import { japaneseFallbackPrice, resolveCardmarketPrice } from "@/lib/cardmarket";
 import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
 import { CardSpotlight } from "@/components/card-spotlight";
 import { AppShell } from "@/components/app-shell";
@@ -66,6 +66,8 @@ export default async function AjouterPage({
   let defaultLanguage: string = ITEM_LANGUAGE[lang];
   let price: number | null = null;
   let cmId: number | null = null;
+  /** Carte japonaise sans cote Cardmarket : cote TCGplayer japonaise et son lien */
+  let jpMarket: { eur: number; url: string } | null = null;
 
   if (cardId.startsWith("custom:")) {
     // Carte du catalogue perso (hors TCGdex)
@@ -117,6 +119,10 @@ export default async function AjouterPage({
     rarity = card.rarity ?? null;
     cmId = overrideCardmarketId(card.id, card.pricing?.cardmarket?.idProduct);
     price = await resolveCardmarketPrice(cmId, card.pricing?.cardmarket);
+    if (price == null && cardLang === "ja") {
+      jpMarket = await japaneseFallbackPrice(card.id);
+      price = jpMarket?.eur ?? null;
+    }
     // Pré-sélection du type d'après les variantes du set
     defaultType = card.variants?.holo && !card.variants?.normal ? "Holo" : null;
   }
@@ -176,7 +182,14 @@ export default async function AjouterPage({
                 lang: defaultLanguage !== "FR" ? defaultLanguage : null,
               }}
               price={cardId.startsWith("custom:") ? undefined : price}
-              cmUrl={cardId.startsWith("custom:") ? null : cardmarketUrl({ idProduct: cmId, name: meta.name, localId: meta.localId })}
+              priceSource={jpMarket ? "tcgplayer" : "cardmarket"}
+              cmUrl={
+                cardId.startsWith("custom:")
+                  ? null
+                  : jpMarket
+                    ? jpMarket.url
+                    : cardmarketUrl({ idProduct: cmId, name: meta.name, localId: meta.localId })
+              }
               actions={<WishlistButton card={meta} initialWished={Boolean(wish)} />}
             />
           </aside>

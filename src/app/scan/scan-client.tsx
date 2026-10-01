@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Camera, Check, Loader2, ScanLine, X } from "lucide-react";
+import { Camera, Check, Loader2, ScanLine, Undo2, X } from "lucide-react";
 import { CardImage } from "@/components/card-image";
-import { CardScanner, type ConfirmResult } from "@/components/scan/card-scanner";
+import { CardScanner, type ConfirmResult, type ScanReview } from "@/components/scan/card-scanner";
 import { formatEur } from "@/lib/domain";
 import { bulkAddToCollection } from "@/app/items/actions";
+import { ownedCopies, undoScannedAdd } from "@/app/scan/actions";
 import type { ScanCandidate } from "@/lib/scan/index";
 import { addCardUrl, ITEM_LANGUAGE } from "@/lib/scan/url";
 
@@ -23,6 +24,8 @@ type Added = {
   /** undefined = cote en cours, null = indisponible */
   price?: number | null;
   priceUrl?: string | null;
+  /** Cote TCGplayer japonaise (carte japonaise sans cote Cardmarket) */
+  priceSource?: "cardmarket" | "tcgplayer";
 };
 
 /** Petit badge de langue, seulement quand la carte n'est pas française */
@@ -61,9 +64,10 @@ const noopSubscribe = () => () => {};
 /**
  * Scan direct sur mobile, avec une page dédiée : la caméra s'ouvre et se
  * ferme à volonté (croix → retour à cette page, bouton → réouvrir). Chaque
- * carte reconnue s'ajoute d'un geste à la collection (« quasi parfaite »,
- * quantité 1, langue du visuel, à compléter) et s'empile ici avec sa cote ;
- * la fiche complète reste à un tap.
+ * carte reconnue s'affiche dans une fiche (cote, exemplaires déjà possédés) ;
+ * un tap l'ajoute à la collection (« quasi parfaite », quantité 1, langue du
+ * visuel, à compléter) et elle s'empile ici avec sa cote. Un ajout s'annule
+ * depuis la fiche ou depuis la liste ; la fiche complète reste à un tap.
  */
 export function ScanClient() {
   // Session restaurée (aller-retour vers une fiche) : on montre alors la liste,
@@ -93,13 +97,28 @@ export function ScanClient() {
       ITEM_LANGUAGE[card.lang],
     );
     if (res.error) return { status: "error", error: res.error };
-    const key = `${card.id}-${++seq.current}`;
+    const key = `${card.id}-${++seq.current}-${crypto.randomUUID().slice(0, 8)}`;
+    const itemId = res.items[0]?.id ?? null;
     setAdded((prev) => [
-      { key, id: card.id, lang: card.lang, name: card.name, setName: card.setName, localId: card.localId, image: card.image, itemId: res.items[0]?.id ?? null },
+      { key, id: card.id, lang: card.lang, name: card.name, setName: card.setName, localId: card.localId, image: card.image, itemId },
       ...prev,
     ]);
-    return { status: "continue" };
+    return { status: "continue", key: itemId ? key : undefined };
   }
+
+  // Annule un ajout de la session : l'exemplaire part à la corbeille, la carte quitte la liste
+  const [undoing, setUndoing] = useState<string | null>(null);
+  async function undo(key: string): Promise<boolean> {
+    const entry = added.find((a) => a.key === key);
+    if (!entry?.itemId) return false;
+    setUndoing(key);
+    const res = await undoScannedAdd(entry.itemId).catch(() => ({ error: "Annulation impossible." }));
+    setUndoing(null);
+    if (res.error) return false;
+    setAdded((prev) => prev.filter((a) => a.key !== key));
+    return true;
+  }
+  const review: ScanReview = { owned: (card) => ownedCopies(card.id), undo };
 
   // Cote Cardmarket de chaque carte ajoutée, une seule fois par carte
   const requested = useRef<Set<string>>(new Set());
@@ -109,8 +128,10 @@ export function ScanClient() {
       requested.current.add(a.key);
       fetch(`/api/scan/price?id=${encodeURIComponent(a.id)}&lang=${a.lang}`)
         .then((r) => (r.ok ? r.json() : null))
-        .then((d: { price: number | null; url: string | null } | null) => {
-          setAdded((prev) => prev.map((x) => (x.key === a.key ? { ...x, price: d?.price ?? null, priceUrl: d?.url ?? null } : x)));
+        .then((d: { price: number | null; url: string | null; source?: "cardmarket" | "tcgplayer" } | null) => {
+          setAdded((prev) =>
+            prev.map((x) => (x.key === a.key ? { ...x, price: d?.price ?? null, priceUrl: d?.url ?? null, priceSource: d?.source ?? "cardmarket" } : x)),
+          );
         })
         .catch(() => {});
     }
@@ -130,6 +151,7 @@ export function ScanClient() {
     return (
       <CardScanner
         onConfirm={quickAdd}
+        review={review}
         detailsHref={addCardUrl}
         onClose={() => setScanning(false)}
         title="Scanner"
@@ -173,8 +195,8 @@ export function ScanClient() {
             </span>
             <p className="display text-xl font-bold">Scanne tes cartes</p>
             <p className="max-w-[16rem] text-sm leading-relaxed text-muted">
-              Chaque carte reconnue s&apos;ajoute à ta collection. Ferme la caméra quand tu veux, rouvre-la pour
-              continuer.
+              Chaque carte reconnue s&apos;affiche avec sa cote : un tap l&apos;ajoute à ta collection. Ferme la caméra
+              quand tu veux, rouvre-la pour continuer.
             </p>
           </div>
         ) : (
@@ -192,7 +214,7 @@ export function ScanClient() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="label-xs text-muted">Valeur Cardmarket</p>
+                  <p className="label-xs text-muted">{added.some((a) => a.priceSource === "tcgplayer") ? "Valeur à la cote" : "Valeur Cardmarket"}</p>
                   <p className="num mt-1 text-2xl font-bold leading-none">{priced > 0 ? formatEur(total) : "—"}</p>
                   {priced > 0 && priced < added.length && (
                     <p className="mt-1 text-[11px] text-faint">{priced}/{added.length} cotées</p>
@@ -224,19 +246,35 @@ export function ScanClient() {
                       ) : a.price === null ? (
                         <span className="text-faint">n° {a.localId}</span>
                       ) : (
-                        <span className="font-semibold text-accent-strong">{formatEur(a.price)}</span>
+                        <span className="font-semibold text-accent-strong" title={a.priceSource === "tcgplayer" ? "Cote TCGplayer japonaise, convertie" : undefined}>
+                          {a.priceSource === "tcgplayer" && "≈ "}
+                          {formatEur(a.price)}
+                        </span>
                       )}
                     </p>
                   </>
                 );
                 return (
-                  <li key={a.key} className="rise-in">
+                  <li key={a.key} className="rise-in relative">
                     {a.itemId ? (
                       <Link href={`/carte/${a.itemId}?from=scan`} className="block active:opacity-80">
                         {tile}
                       </Link>
                     ) : (
                       <div>{tile}</div>
+                    )}
+                    {/* Annuler l'ajout : hors du lien, posé sur la vignette */}
+                    {a.itemId && (
+                      <button
+                        type="button"
+                        onClick={() => void undo(a.key)}
+                        disabled={undoing != null}
+                        aria-label={`Annuler l'ajout de ${a.name}`}
+                        title="Annuler l'ajout"
+                        className="absolute left-1 top-1 flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white shadow backdrop-blur-sm transition active:scale-95 disabled:opacity-60"
+                      >
+                        {undoing === a.key ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Undo2 size={14} aria-hidden />}
+                      </button>
                     )}
                   </li>
                 );

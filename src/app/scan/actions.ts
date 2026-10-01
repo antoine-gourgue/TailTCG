@@ -211,3 +211,39 @@ export async function finishScanSession(sessionId: string): Promise<{ error: str
     .eq("status", "pending");
   return { error: error ? "Impossible pour le moment." : null };
 }
+
+/** Exemplaires de cette carte déjà dans la collection (hors vendus et corbeille), null si inconnu */
+export async function ownedCopies(tcgdexId: string): Promise<number | null> {
+  if (!tcgdexId) return null;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data, error } = await supabase
+    .from("items")
+    .select("quantity")
+    .eq("tcgdex_id", tcgdexId)
+    .is("deleted_at", null)
+    .is("sold_at", null);
+  if (error) return null;
+  return (data ?? []).reduce((n, r) => n + (r.quantity ?? 1), 0);
+}
+
+/**
+ * Annule l'ajout d'une carte scannée : l'exemplaire part à la corbeille,
+ * comme toute suppression (restaurable 30 jours depuis les paramètres).
+ */
+export async function undoScannedAdd(itemId: string): Promise<{ error: string | null }> {
+  if (!itemId) return { error: "Carte introuvable." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("items")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", itemId)
+    .is("deleted_at", null)
+    .select("id");
+  if (error || !data?.length) return { error: "Annulation impossible, réessaie." };
+  revalidatePath("/cartes");
+  return { error: null };
+}
