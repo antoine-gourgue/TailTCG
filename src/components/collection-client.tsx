@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
   CheckCheck,
   FolderMinus,
+  RefreshCw,
   X,
 } from "lucide-react";
 import { formatEur } from "@/lib/domain";
@@ -1069,6 +1070,18 @@ export function CollectionClient({
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-loss transition hover:bg-loss/10 disabled:opacity-40"
             >
               <FolderMinus size={17} aria-hidden />
+            </button>
+          )}
+          {!readOnly && (
+            <button
+              type="button"
+              disabled={selected.size === 0 || busy}
+              onClick={() => router.push(`/cartes/reevaluer?ids=${[...selected].join(",")}`)}
+              title="Réévaluer"
+              aria-label="Réévaluer"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-raised hover:text-foreground disabled:opacity-40"
+            >
+              <RefreshCw size={16} aria-hidden />
             </button>
           )}
           {!readOnly && (

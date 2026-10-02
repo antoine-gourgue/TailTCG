@@ -472,6 +472,8 @@ export async function bulkDeleteItems(ids: string[]) {
 
 export type QuickValueState = { ok: boolean; message?: string } | null;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Actualisation rapide de la valeur estimée depuis la fiche (point daté)
 export async function updateItemValue(
   _prev: QuickValueState,
@@ -501,6 +503,56 @@ export async function updateItemValue(
   revalidatePath("/cartes");
   revalidatePath(`/carte/${id}`);
   return { ok: true };
+}
+
+/**
+ * Réévaluation en masse (page /cartes/reevaluer) : nouvelle valeur estimée à
+ * l'unité par exemplaire, un point daté du jour chacun — une valeur gardée
+ * telle quelle compte aussi comme réévaluée. RLS : seuls les exemplaires de
+ * l'utilisateur sont touchés.
+ */
+export async function revalueItems(
+  rows: { id: string; value: number }[]
+): Promise<{ error: string | null; count: number }> {
+  const clean = new Map<string, number>();
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!r || typeof r.id !== "string" || !UUID_RE.test(r.id)) continue;
+    const v = Number(r.value);
+    if (!Number.isFinite(v) || v < 0 || v > 1_000_000) {
+      return { error: "Une valeur est invalide.", count: 0 };
+    }
+    clean.set(r.id, Math.round(v * 100) / 100);
+  }
+  if (clean.size === 0) return { error: "Aucune valeur à enregistrer.", count: 0 };
+  if (clean.size > 500) return { error: "500 cartes au plus à la fois.", count: 0 };
+
+  const supabase = await createClient();
+  const entries = [...clean];
+  const done: string[] = [];
+  for (let i = 0; i < entries.length; i += 20) {
+    const results = await Promise.all(
+      entries.slice(i, i + 20).map(([id, value]) =>
+        supabase.from("items").update({ manual_price: value }).eq("id", id).select("id")
+      )
+    );
+    for (const { data, error } of results) {
+      if (error) console.error("revalueItems:", error.message);
+      for (const row of data ?? []) done.push(row.id);
+    }
+  }
+  if (done.length === 0) return { error: "Mise à jour impossible, réessaie.", count: 0 };
+
+  const today = new Date().toISOString().slice(0, 10);
+  const { error: histError } = await supabase.from("item_value_history").upsert(
+    done.map((id) => ({ item_id: id, value: clean.get(id)!, recorded_at: today })),
+    { onConflict: "item_id,recorded_at" }
+  );
+  if (histError) console.error("revalueItems (historique):", histError.message);
+
+  revalidatePath("/cartes");
+  revalidatePath("/collection");
+  for (const id of done) revalidatePath(`/carte/${id}`);
+  return { error: null, count: done.length };
 }
 
 export type SellState = { ok: boolean; message?: string } | null;

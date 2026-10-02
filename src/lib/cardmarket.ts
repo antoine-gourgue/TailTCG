@@ -131,6 +131,12 @@ async function fetchCardPricing(
   return null;
 }
 
+/** idProduct Cardmarket d'une carte (fiche TCGdex FR puis JA, corrections locales), null si inconnu */
+export async function cardmarketIdFor(id: string): Promise<number | null> {
+  const pricing = await fetchCardPricing(id).catch(() => null);
+  return overrideCardmarketId(id, pricing?.cm?.idProduct);
+}
+
 /**
  * Cote TCGplayer (export TCGCSV, convertie en euros) d'une carte japonaise
  * que TCGdex FR ne connaît pas : repli des cartes japonaises sans cote

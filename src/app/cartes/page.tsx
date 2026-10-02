@@ -169,9 +169,9 @@ export default async function CartesPage({
         </div>
 
         {staleItems.length > 0 && (
-          <div className="panel mb-5 flex items-start gap-3 border-accent/40 bg-accent-soft/60 px-5 py-3.5 text-sm">
-            <BellRing size={16} className="mt-0.5 shrink-0 text-accent-strong" aria-hidden />
-            <p className="min-w-0 leading-relaxed">
+          <div className="panel mb-5 flex flex-wrap items-start gap-x-3 gap-y-2.5 border-accent/40 bg-accent-soft/60 px-5 py-3.5 text-sm sm:flex-nowrap sm:items-center">
+            <BellRing size={16} className="mt-0.5 shrink-0 text-accent-strong sm:mt-0" aria-hidden />
+            <p className="min-w-0 flex-1 leading-relaxed">
               <span className="font-medium">
                 {staleItems.length} carte{staleItems.length > 1 ? "s" : ""} à
                 réévaluer :
@@ -191,6 +191,9 @@ export default async function CartesPage({
                 <span className="text-muted"> et {staleItems.length - 5} autres…</span>
               )}
             </p>
+            <Link href="/cartes/reevaluer" className="btn btn-primary ml-7 shrink-0 !py-2 text-[13px] sm:ml-0">
+              Tout réévaluer
+            </Link>
           </div>
         )}
         <CollectionClient
