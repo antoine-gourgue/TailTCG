@@ -40,6 +40,7 @@ export function SetCardsGrid({
   setName,
   wishedIds = [],
   ownedQty = {},
+  ownedEstimate = null,
 }: {
   cards: SetCard[];
   officialCount: number | null;
@@ -49,6 +50,8 @@ export function SetCardsGrid({
   wishedIds?: string[];
   /** Quantité possédée (active) par id TCGdex — pour la complétion */
   ownedQty?: Record<string, number>;
+  /** Valeur estimée (prix saisis à la main) des exemplaires possédés du set qui en ont une */
+  ownedEstimate?: { value: number; copies: number } | null;
 }) {
   const isOwned = (c: SetCard) => (ownedQty[c.id] ?? 0) > 0;
   const ownedCount = cards.reduce((n, c) => n + (isOwned(c) ? 1 : 0), 0);
@@ -56,6 +59,30 @@ export function SetCardsGrid({
   // pas seulement le total « officiel » imprimé
   const total = cards.length;
   const pct = total > 0 ? Math.round((100 * ownedCount) / total) : 0;
+
+  // Chiffres du set à la cote Cardmarket : le set complet (une de chaque),
+  // mes exemplaires, et ce qu'il reste à acheter pour le compléter
+  const money = useMemo(() => {
+    let setValue = 0;
+    let priced = 0;
+    let mine = 0;
+    let copies = 0;
+    let missing = 0;
+    let missingPriced = 0;
+    for (const c of cards) {
+      const q = ownedQty[c.id] ?? 0;
+      copies += q;
+      if (c.price == null) continue;
+      priced++;
+      setValue += c.price;
+      if (q > 0) mine += c.price * q;
+      else {
+        missing += c.price;
+        missingPriced++;
+      }
+    }
+    return { setValue, priced, mine, copies, missing, missingPriced };
+  }, [cards, ownedQty]);
   const [ownFilter, setOwnFilter] = useState<"all" | "owned" | "missing">("all");
   const router = useRouter();
   const lang = langSuffix.includes("lang=ja") ? "JP" : "FR";
@@ -176,20 +203,57 @@ export function SetCardsGrid({
 
   return (
     <div>
-      {/* Complétion du set */}
-      <div className="mb-5">
-        <div className="mb-1.5 flex items-baseline justify-between text-sm">
-          <span className="font-medium">Complétion</span>
-          <span className="num text-muted">
-            {ownedCount} / {total}
-            <span className="text-faint"> · {pct}%</span>
-          </span>
-        </div>
-        <div className="h-2 overflow-hidden rounded-full bg-raised">
-          <div
-            className="h-full rounded-full bg-accent transition-[width] duration-500"
-            style={{ width: `${pct}%` }}
+      {/* Le set en chiffres : complétion, valeur du set, ma collection (du set), reste à acheter.
+          Deux colonnes sur mobile et tablette en portrait, quatre au-delà */}
+      <div className="panel mb-5 px-5 py-4 sm:px-6">
+        <div className="grid grid-cols-2 items-start gap-x-6 gap-y-4 lg:grid-cols-4">
+          <SetStat
+            label="Possédées"
+            value={
+              <>
+                {ownedCount}
+                <span className="text-base font-semibold text-faint"> / {total}</span>
+              </>
+            }
+            sub={`${pct} % du set${money.copies > ownedCount ? ` · ${money.copies} exemplaires` : ""}`}
           />
+          <SetStat
+            label="Valeur du set"
+            value={money.priced > 0 ? formatEur(money.setValue) : "—"}
+            sub={
+              money.priced === 0
+                ? "aucune cote Cardmarket"
+                : money.priced < total
+                  ? `une de chaque · ${money.priced}/${total} cotées`
+                  : "une de chaque, cote Cardmarket"
+            }
+          />
+          <SetStat
+            label="Ma collection"
+            value={money.priced > 0 ? formatEur(money.mine) : "—"}
+            sub={
+              ownedEstimate
+                ? `estimée ${formatEur(ownedEstimate.value)}${ownedEstimate.copies < money.copies ? ` (${ownedEstimate.copies} ex.)` : ""}`
+                : ownedCount > 0
+                  ? "à la cote Cardmarket"
+                  : "aucune carte du set"
+            }
+          />
+          <SetStat
+            label="Pour compléter"
+            value={ownedCount === total && total > 0 ? "Complet" : money.missingPriced > 0 ? formatEur(money.missing) : "—"}
+            tone={ownedCount === total && total > 0 ? "gain" : undefined}
+            sub={
+              ownedCount === total && total > 0
+                ? "toutes les cartes du set"
+                : `${total - ownedCount} manquante${total - ownedCount > 1 ? "s" : ""}${
+                    money.missingPriced > 0 && money.missingPriced < total - ownedCount ? ` · ${money.missingPriced} cotées` : ""
+                  }`
+            }
+          />
+        </div>
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-raised" aria-hidden>
+          <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${pct}%` }} />
         </div>
       </div>
 
@@ -402,6 +466,31 @@ export function SetCardsGrid({
       {toast && (
         <Toast message={toast.message} tone={toast.tone} onDone={() => setToast(null)} />
       )}
+    </div>
+  );
+}
+
+/** Chiffre du panneau du set : libellé, valeur, précision */
+function SetStat({
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  label: string;
+  value: React.ReactNode;
+  sub?: string;
+  tone?: "gain";
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <span className="label-xs">{label}</span>
+      <span
+        className={`display num text-xl font-bold leading-none ${tone === "gain" ? "text-gain" : ""}`}
+      >
+        {value}
+      </span>
+      {sub && <span className="text-xs text-muted">{sub}</span>}
     </div>
   );
 }

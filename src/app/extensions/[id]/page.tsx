@@ -39,15 +39,23 @@ export default async function ExtensionPage({
   const { data: wishes } = await supabase.from("wishlist").select("tcgdex_id");
   const wishedIds = (wishes ?? []).map((w) => w.tcgdex_id);
 
-  // Exemplaires possédés de ce set et des sets fusionnés dedans (actifs, non vendus) → complétion + repères
+  // Exemplaires possédés de ce set et des sets fusionnés dedans (actifs, non vendus) → complétion + repères,
+  // et leur valeur estimée (prix saisis à la main) à côté de la cote Cardmarket
   const { data: owned } = await supabase
     .from("collection_value")
-    .select("tcgdex_id, quantity, sold_at")
+    .select("tcgdex_id, quantity, sold_at, current_price")
     .in("set_id", [id, ...(MERGED_CHILDREN[id] ?? [])]);
   const ownedQty: Record<string, number> = {};
+  let estimated = 0;
+  let estimatedCopies = 0;
   for (const o of owned ?? []) {
     if (o.sold_at == null && o.tcgdex_id) {
-      ownedQty[o.tcgdex_id] = (ownedQty[o.tcgdex_id] ?? 0) + (o.quantity ?? 1);
+      const q = o.quantity ?? 1;
+      ownedQty[o.tcgdex_id] = (ownedQty[o.tcgdex_id] ?? 0) + q;
+      if (o.current_price != null) {
+        estimated += o.current_price * q;
+        estimatedCopies += q;
+      }
     }
   }
 
@@ -113,7 +121,8 @@ export default async function ExtensionPage({
               )}
             </p>
           </div>
-          <div className="ml-auto">
+          {/* Passé sous le titre (mobile, tablette), il reste à gauche ; en bout de ligne au-delà */}
+          <div className="lg:ml-auto">
             <BinderFromSetButton setId={set.id} lang={lang} />
           </div>
         </div>
@@ -145,6 +154,7 @@ export default async function ExtensionPage({
           setName={set.name}
           wishedIds={wishedIds}
           ownedQty={ownedQty}
+          ownedEstimate={estimatedCopies > 0 ? { value: estimated, copies: estimatedCopies } : null}
         />
       </main>
     </AppShell>
