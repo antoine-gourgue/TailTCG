@@ -346,6 +346,10 @@ export type BatchRow = BulkCard & {
   purchase_price: number | null;
   /** Valeur estimée à l'unité ; null = suit la cote */
   manual_price: number | null;
+  /** Propres à la carte ; absents = ceux du lot */
+  purchase_date?: string | null;
+  source_id?: string | null;
+  notes?: string | null;
 };
 export type BatchCommon = {
   language: string;
@@ -379,14 +383,17 @@ export async function addBatchToCollection(
 
   const { LANGUAGES } = await import("@/lib/domain");
   const language = (LANGUAGES as readonly string[]).includes(common.language) ? common.language : "FR";
-  const purchase_date =
-    common.purchase_date && /^\d{4}-\d{2}-\d{2}$/.test(common.purchase_date) ? common.purchase_date : null;
-  // Boutique : seulement une des siennes (la RLS ne laisse voir que celles-là)
-  let source_id: string | null = null;
-  if (common.source_id) {
-    const { data: own } = await supabase.from("sources").select("id").eq("id", common.source_id).maybeSingle();
-    source_id = own?.id ?? null;
+  const dateOf = (d: string | null | undefined) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null);
+  // Provenances : seulement les siennes (la RLS ne laisse voir que celles-là)
+  const wanted = [...new Set([common.source_id, ...clean.map((c) => c.source_id)].filter((s): s is string => !!s))];
+  const own = new Set<string>();
+  if (wanted.length > 0) {
+    const { data } = await supabase.from("sources").select("id").in("id", wanted);
+    for (const s of data ?? []) own.add(s.id);
   }
+  const sourceOf = (s: string | null | undefined) => (s && own.has(s) ? s : null);
+  const lotDate = dateOf(common.purchase_date);
+  const lotSource = sourceOf(common.source_id);
 
   const rarityById = await raritiesFor(clean);
   const rows: ItemInsert[] = clean.map((c) => ({
@@ -401,8 +408,9 @@ export async function addBatchToCollection(
     quantity: Number.isInteger(c.quantity) && c.quantity >= 1 ? Math.min(c.quantity, 99) : 1,
     purchase_price: price(c.purchase_price),
     manual_price: price(c.manual_price),
-    purchase_date,
-    source_id,
+    purchase_date: dateOf(c.purchase_date) ?? lotDate,
+    source_id: sourceOf(c.source_id) ?? lotSource,
+    notes: c.notes?.trim().slice(0, 1000) || null,
     rarity: rarityById.get(c.tcgdex_id) ?? null,
     needs_review: false,
   }));
