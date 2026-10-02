@@ -27,6 +27,7 @@ import {
 } from "@/app/classeurs/actions";
 import { bulkDeleteItems } from "@/app/items/actions";
 import { CardImage } from "@/components/card-image";
+import { TileCheck } from "@/components/card-grid-kit";
 import { Sheet } from "@/components/sheet";
 import { FloatingBar } from "@/components/floating-bar";
 import { Logo } from "@/components/logo";
@@ -839,18 +840,7 @@ export function CollectionClient({
                     alt={item.card_name}
                     fallback={item.photo_fallback ?? null}
                   />
-                  {selecting && (
-                    <span
-                      className={`absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border transition ${
-                        sel
-                          ? "border-transparent bg-accent text-accent-ink"
-                          : "border-white/50 bg-black/40 text-transparent"
-                      }`}
-                      aria-hidden
-                    >
-                      <Check size={13} />
-                    </span>
-                  )}
+                  {selecting && <TileCheck on={sel} />}
                   {item.needs_review ? (
                     <span
                       className="tile-badge left-1.5 top-1.5 flex items-center !bg-[#f59e0b] !text-black"
@@ -874,7 +864,8 @@ export function CollectionClient({
                       {item.grade ?? "Gradée"}
                     </span>
                   )}
-                  {item.sold_at != null && (
+                  {/* En sélection, la coche prend ce coin */}
+                  {item.sold_at != null && !selecting && (
                     <span className="tile-badge bottom-1.5 right-1.5 !bg-gain !text-black">
                       Vendue
                     </span>

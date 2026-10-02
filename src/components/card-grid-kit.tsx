@@ -30,16 +30,20 @@ export function TileCaption({ name, sub }: { name: string; sub?: ReactNode }) {
 /** Contour d'une tuile sélectionnée */
 export const SELECTED_RING = "outline outline-2 outline-offset-2 outline-accent";
 
-/** Coche de sélection dans le coin bas droit d'une tuile (mode sélection) */
+/**
+ * Coche de sélection dans le coin bas droit d'une tuile (mode sélection) :
+ * cercle blanc vide, rouge coché une fois choisie — à ne pas confondre avec
+ * la pastille verte « possédée » des sets (coin haut gauche).
+ */
 export function TileCheck({ on }: { on: boolean }) {
   return (
     <span
-      className={`absolute bottom-1.5 right-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border transition ${
-        on ? "border-transparent bg-accent text-accent-ink" : "border-white/50 bg-black/40 text-transparent"
+      className={`absolute bottom-1.5 right-1.5 z-20 flex h-7 w-7 items-center justify-center rounded-full border-2 shadow transition ${
+        on ? "border-white bg-accent text-accent-ink" : "border-white/80 bg-black/45 text-transparent"
       }`}
       aria-hidden
     >
-      <Check size={13} strokeWidth={3} />
+      <Check size={14} strokeWidth={3} />
     </span>
   );
 }

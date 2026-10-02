@@ -13,6 +13,7 @@ import { Toast } from "@/components/toast";
 import { Sheet } from "@/components/sheet";
 import { FloatingBar } from "@/components/floating-bar";
 import { CardSpotlight } from "@/components/card-spotlight";
+import { TileCheck } from "@/components/card-grid-kit";
 import { rarityRank, raritySymbol } from "@/lib/rarity";
 import { ITEM_LANGUAGE, isScanLang } from "@/lib/scan/url";
 
@@ -344,18 +345,7 @@ export function SetCardsGrid({
                   }`}
                 >
                   <CardImage base={card.image} alt={card.name} />
-                  {selecting && (
-                    <span
-                      className={`absolute bottom-1.5 right-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border transition ${
-                        picked.has(card.id)
-                          ? "border-transparent bg-accent text-accent-ink"
-                          : "border-white/50 bg-black/40 text-transparent"
-                      }`}
-                      aria-hidden
-                    >
-                      <Check size={13} strokeWidth={3} />
-                    </span>
-                  )}
+                  {selecting && <TileCheck on={picked.has(card.id)} />}
                   {isOwned(card) && (
                     <span className="tile-badge num left-1.5 top-1.5 flex items-center gap-0.5 !bg-gain !text-black">
                       <Check size={11} strokeWidth={3} aria-hidden />
