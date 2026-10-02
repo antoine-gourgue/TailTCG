@@ -114,7 +114,8 @@ export default async function AjouterPage({
       localId: card.localId,
       imageBase: card.image ?? "",
     };
-    previewImage = card.image ? `${card.image}/low.webp` : null;
+    // Base TCGdex (sans extension) ou URL finale d'un autre CDN (catalogue : pokemontcg.io, Limitless)
+    previewImage = card.image ? (card.image.includes("assets.tcgdex.net") ? `${card.image}/low.webp` : card.image) : null;
     total = card.set.cardCount?.official ?? null;
     rarity = card.rarity ?? null;
     cmId = overrideCardmarketId(card.id, card.pricing?.cardmarket?.idProduct);

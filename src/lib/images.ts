@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const PREFIX = "storage:";
@@ -88,4 +90,63 @@ export async function applyRectifiedImages<
     const url = r.id ? urlById.get(r.id) : null;
     return url ? { ...r, image_url: url } : r;
   });
+}
+
+type RepairableRow = {
+  id: string | null;
+  tcgdex_id: string | null;
+  image_url: string | null;
+  language?: string | null;
+};
+
+/**
+ * Visuels manquants d'exemplaires déjà ajoutés : quand TCGdex n'avait pas le
+ * scan, l'ajout enregistrait une adresse d'asset devinée qui n'existe pas (ou
+ * rien), d'où « Pas d'image » alors que la page du set montre la carte. Si le
+ * catalogue a trouvé le visuel ailleurs (pokemontcg.io, Limitless), on le
+ * reprend : à l'affichage, et en base (client de l'utilisateur, RLS) pour
+ * que classeurs, fiche et vitrine en profitent aussi. Une adresse TCGdex
+ * n'est remplacée que par un visuel venu d'un autre CDN ; une adresse vide,
+ * par tout visuel du catalogue.
+ */
+export async function repairCatalogImages<T extends RepairableRow>(
+  supabase: SupabaseClient<Database>,
+  rows: T[]
+): Promise<T[]> {
+  const suspect = (r: T) =>
+    !!r.id &&
+    !!r.tcgdex_id &&
+    !r.tcgdex_id.startsWith("custom:") &&
+    (!r.image_url || r.image_url.includes("assets.tcgdex.net"));
+  const ids = [...new Set(rows.filter(suspect).map((r) => r.tcgdex_id as string))];
+  if (ids.length === 0) return rows;
+
+  const admin = createAdminClient();
+  const catalog = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 500) {
+    const { data } = await admin
+      .from("catalog_cards")
+      .select("id, lang, image")
+      .in("id", ids.slice(i, i + 500))
+      .not("image", "is", null);
+    for (const c of data ?? []) if (c.image) catalog.set(`${c.lang}:${c.id}`, c.image);
+  }
+
+  const fixes: { id: string; image: string }[] = [];
+  const out = rows.map((r) => {
+    if (!suspect(r)) return r;
+    const lang = r.language === "JP" ? "ja" : "fr";
+    const image =
+      catalog.get(`${lang}:${r.tcgdex_id}`) ?? catalog.get(`${lang === "ja" ? "fr" : "ja"}:${r.tcgdex_id}`);
+    if (!image || image === r.image_url) return r;
+    if (r.image_url && image.includes("assets.tcgdex.net")) return r;
+    fixes.push({ id: r.id as string, image });
+    return { ...r, image_url: image };
+  });
+
+  // Réparation en base, bornée : le reste suivra au prochain affichage
+  await Promise.all(
+    fixes.slice(0, 200).map((f) => supabase.from("items").update({ image_url: f.image }).eq("id", f.id))
+  );
+  return out;
 }

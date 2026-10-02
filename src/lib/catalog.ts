@@ -172,17 +172,26 @@ async function catalogSetAlone(id: string, lang: CatalogLang): Promise<TcgdexSet
   };
 }
 
-/** Une carte : TCGdex d'abord, sinon le catalogue en base (sets japonais absents de TCGdex) */
+/**
+ * Une carte : TCGdex d'abord, sinon le catalogue en base (sets japonais
+ * absents de TCGdex). Le visuel du catalogue passe avant celui de TCGdex :
+ * quand TCGdex n'a pas le scan (Collection Classique, galeries, kits…),
+ * getCard devine une adresse d'asset qui n'existe pas, alors que le
+ * catalogue l'a trouvé ailleurs (pokemontcg.io, Limitless) — c'est lui que
+ * montre la page du set, et c'est lui qu'enregistre l'ajout.
+ */
 export async function catalogCard(id: string, lang: CatalogLang): Promise<TcgdexCard | null> {
-  const card = await getCard(id, lang);
-  if (card) return { ...card, localId: displayLocalId(card.id, card.localId) };
   const db = createAdminClient();
-  const { data: c } = await db
-    .from("catalog_cards")
-    .select("id, set_id, local_id, name, name_en, image, rarity")
-    .eq("lang", lang)
-    .eq("id", id)
-    .maybeSingle();
+  const [card, { data: c }] = await Promise.all([
+    getCard(id, lang),
+    db
+      .from("catalog_cards")
+      .select("id, set_id, local_id, name, name_en, image, rarity")
+      .eq("lang", lang)
+      .eq("id", id)
+      .maybeSingle(),
+  ]);
+  if (card) return { ...card, image: c?.image ?? card.image, localId: displayLocalId(card.id, card.localId) };
   if (!c) return null;
   const { data: s } = await db
     .from("catalog_sets")

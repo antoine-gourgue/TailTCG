@@ -4,7 +4,7 @@ import { BellRing } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { daysAgoISO } from "@/lib/domain";
-import { signStorageImages, applyRectifiedImages } from "@/lib/images";
+import { signStorageImages, applyRectifiedImages, repairCatalogImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
 import { ShareButton } from "@/components/share-button";
 import { UndoDeleteToast } from "@/components/undo-delete-toast";
@@ -195,7 +195,10 @@ export default async function CartesPage({
           items={(
             await applyRectifiedImages(
               gradings,
-              await signStorageImages((items ?? []) as CollectionItem[], user.id),
+              await signStorageImages(
+                await repairCatalogImages(supabase, (items ?? []) as CollectionItem[]),
+                user.id
+              ),
               user.id
             )
           ).map((i) => ({

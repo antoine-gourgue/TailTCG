@@ -7,7 +7,7 @@ import { cardmarketUrl } from "@/lib/tcgdex";
 import { catalogCard } from "@/lib/catalog";
 import { japaneseFallbackPrice, resolveCardmarketRef } from "@/lib/cardmarket";
 import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
-import { signStorageImages } from "@/lib/images";
+import { repairCatalogImages, signStorageImages } from "@/lib/images";
 import { formatEur, CONDITIONS } from "@/lib/domain";
 import { rarityLabel, raritySymbol } from "@/lib/rarity";
 import { AppShell } from "@/components/app-shell";
@@ -124,8 +124,11 @@ export default async function CartePage({
   const marketPrice = marketRef?.value ?? jpMarket?.eur ?? null;
 
   // Visuel des cartes hors catalogue : photo signée depuis le bucket privé
+  // (visuel manquant d'un ajout ancien : repris du catalogue, réparé en base)
   const [{ image_url: displayImage }] = await signStorageImages(
-    [{ image_url: item.image_url }],
+    await repairCatalogImages(supabase, [
+      { id: item.id, tcgdex_id: item.tcgdex_id, image_url: item.image_url, language: item.language },
+    ]),
     user.id
   );
 
