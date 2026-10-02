@@ -85,6 +85,7 @@ async function syncTcgdex(lang) {
   const setRows = [];
   const cardRows = [];
   const listed = new Map(); // set id → nb de cartes chez TCGdex
+  const live = new Map(); // set id → numéros listés par TCGdex aujourd'hui
   for (const s of series) {
     if (s.id === "tcgp" || /pocket/i.test(s.name)) continue; // Pokémon Pocket : pas des cartes physiques
     const serie = await get(`https://api.tcgdex.net/v2/${lang}/series/${encodeURIComponent(s.id)}`);
@@ -111,6 +112,7 @@ async function syncTcgdex(lang) {
         if (fill) for (const c of missing) c.image = guessImage(c.card_lang ?? lang, serieId, d.id, c.localId);
       }
       listed.set(d.id, cards.length);
+      live.set(d.id, new Set(cards.map((c) => c.localId)));
       setRows.push({
         lang, id: d.id, name: d.name, serie_id: serieId, serie_name: serie.name, serie_logo: serie.logo ?? null,
         logo: d.logo ?? setLogos[lang]?.[d.id] ?? null, symbol: d.symbol ?? null, release_date: d.releaseDate ?? null,
@@ -129,7 +131,7 @@ async function syncTcgdex(lang) {
   await upsert("catalog_sets", setRows);
   await upsert("catalog_cards", cardRows);
   console.log(`TCGdex ${lang} : ${setRows.length} sets, ${cardRows.length} cartes`);
-  return { listed, series };
+  return { listed, live, series };
 }
 
 // ------------------------------------------------------------- Limitless
@@ -417,10 +419,12 @@ async function syncInternationalImages() {
  * source « pokemontcg ». Garde-fou : au plus 10 % du set (sinon c'est une
  * numérotation différente, pas des cartes manquantes). Le visuel est sondé,
  * TCGplayer en secours quand pokemontcg.io ne l'a pas encore ; les cartes
- * déjà ajoutées sont revues chaque nuit (visuel mort → un autre).
+ * déjà ajoutées sont revues chaque nuit (visuel mort → un autre). Une ligne
+ * TCGdex que l'API ne liste plus (périmée, visuel deviné mort) est reprise
+ * sous son identifiant. `live` : set → numéros listés par TCGdex aujourd'hui.
  * DRY_EXTRAS=1 : liste sans écrire.
  */
-async function syncInternationalExtras() {
+async function syncInternationalExtras(live) {
   const { data: sets } = await db.from("catalog_sets").select("id, serie_id").eq("lang", "fr").eq("source", "tcgdex");
   let addedTotal = 0;
   for (const st of sets ?? []) {
@@ -430,22 +434,29 @@ async function syncInternationalExtras() {
     const { data: have } = await db.from("catalog_cards").select("id, local_id, image, source").eq("lang", "fr").eq("set_id", st.id);
     if (!have?.length) continue;
     const added = new Map(have.filter((c) => c.source === "pokemontcg").map((c) => [c.id, c]));
-    const known = new Set(have.filter((c) => c.source !== "pokemontcg").map((c) => normNo(c.local_id)));
+    const listedNos = live?.get(st.id);
+    const isStale = (c) => c.source !== "pokemontcg" && !!listedNos && !listedNos.has(c.local_id);
+    const stale = new Map(have.filter(isStale).map((c) => [normNo(c.local_id), c]));
+    const known = new Set(have.filter((c) => c.source !== "pokemontcg" && !isStale(c)).map((c) => normNo(c.local_id)));
     const extras = ptcg.filter((c) => !known.has(normNo(c.number)));
-    if (!extras.length) continue;
+    if (!extras.length) {
+      if (listedNos && ptcg.length > listedNos.size) console.log(`  fr/${st.id.padEnd(12)} pokemontcg.io ${ptcg.length} cartes, TCGdex ${listedNos.size} : rien à ajouter`);
+      continue;
+    }
     if (extras.length > Math.max(3, Math.ceil(0.1 * ptcg.length))) {
       console.log(`  fr/${st.id.padEnd(12)} ${extras.length} cartes en plus chez pokemontcg.io : numérotation différente, ignoré`);
       continue;
     }
     const rows = [];
     const blind = [];
+    const replaced = [];
     const used = {};
     let tcgplayer = null; // chargé au premier besoin
     for (const c of extras) {
       const n = String(c.number).toUpperCase();
-      const prev = added.get(`${st.id}-${n}`);
-      // déjà ajoutée avec un visuel stable : rien à revoir
-      if (prev?.image && !unsure(prev.image) && !prev.image.startsWith(TCGPLAYER_CDN)) continue;
+      const prev = added.get(`${st.id}-${n}`) ?? stale.get(normNo(n));
+      // déjà ajoutée avec le visuel pokemontcg.io, sur un CDN stable : rien à revoir
+      if (prev?.image && !unsure(prev.image) && (prev.image === c.images?.large || prev.image === c.images?.small)) continue;
       let image = null;
       for (const url of [c.images?.large, c.images?.small]) {
         if (url && (await head(url))) {
@@ -462,13 +473,14 @@ async function syncInternationalExtras() {
         blind.push(`${n} ${c.name}`);
         continue;
       }
-      if (prev?.image === image) continue;
+      if (prev?.image === image && prev.source === "pokemontcg") continue;
       if (image.startsWith(TCGPLAYER_CDN)) used.TCGplayer = (used.TCGplayer ?? 0) + 1;
+      if (prev) replaced.push(`${prev.id} (${prev.source}) ${prev.image ?? "sans visuel"} → ${image}`);
       rows.push({
         lang: "fr",
-        id: `${st.id}-${n}`,
+        id: prev?.id ?? `${st.id}-${n}`,
         set_id: st.id,
-        local_id: n,
+        local_id: prev?.local_id ?? n,
         name: c.name,
         name_en: c.name,
         image,
@@ -479,6 +491,7 @@ async function syncInternationalExtras() {
       });
     }
     if (blind.length) console.log(`  fr/${st.id.padEnd(12)} sans visuel (pokemontcg.io, TCGplayer) : ${blind.join(", ")}`);
+    for (const r of replaced) console.log(`  fr/${st.id.padEnd(12)} revu : ${r}`);
     if (!rows.length) continue;
     const via = Object.entries(used).map(([k, v]) => `, visuels ${k} ${v}`).join("");
     console.log(`  fr/${st.id.padEnd(12)} +${rows.length} cartes pokemontcg.io : ${rows.map((r) => `${r.local_id} ${r.name}`).join(", ")}${via}${process.env.DRY_EXTRAS ? " (essai)" : ""}`);
@@ -492,11 +505,11 @@ async function syncInternationalExtras() {
 
 const t0 = Date.now();
 for (const lang of LANGS) {
-  const { listed, series } = await syncTcgdex(lang);
+  const { listed, live, series } = await syncTcgdex(lang);
   if (lang === "ja" && !NO_LIMITLESS) await syncLimitless(listed, series);
   if (lang === "fr" && !NO_LIMITLESS) {
     await syncInternationalImages();
-    await syncInternationalExtras();
+    await syncInternationalExtras(live);
   }
 }
 console.log(`terminé en ${((Date.now() - t0) / 60000).toFixed(1)} min`);
