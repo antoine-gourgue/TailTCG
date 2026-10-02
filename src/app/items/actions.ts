@@ -339,6 +339,111 @@ export async function bulkAddToCollection(cards: BulkCard[], language: string) {
   return { error: null, added: clean.length, items: created ?? [] };
 }
 
+export type BatchRow = BulkCard & {
+  condition: string;
+  quantity: number;
+  /** Prix payé à l'unité */
+  purchase_price: number | null;
+  /** Valeur estimée à l'unité ; null = suit la cote */
+  manual_price: number | null;
+};
+export type BatchCommon = {
+  language: string;
+  purchase_date: string | null;
+  source_id: string | null;
+};
+
+const price = (v: unknown): number | null =>
+  typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.round(v * 100) / 100 : null;
+
+/**
+ * Ajout en lot depuis la page dédiée (sélection d'un set) : chaque carte
+ * arrive avec son état, sa quantité, son prix payé et sa valeur, renseignés
+ * carte par carte — rien n'est « à compléter » ensuite. Langue, date d'achat
+ * et boutique valent pour tout le lot.
+ */
+export async function addBatchToCollection(
+  cards: BatchRow[],
+  common: BatchCommon
+): Promise<{ error: string | null; added: number }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Non connecté", added: 0 };
+
+  const clean = cards
+    .filter((c) => c.tcgdex_id && c.card_name && c.set_id && c.set_name && c.local_id)
+    .slice(0, 500);
+  if (clean.length === 0) return { error: "Aucune carte à ajouter.", added: 0 };
+
+  const { LANGUAGES } = await import("@/lib/domain");
+  const language = (LANGUAGES as readonly string[]).includes(common.language) ? common.language : "FR";
+  const purchase_date =
+    common.purchase_date && /^\d{4}-\d{2}-\d{2}$/.test(common.purchase_date) ? common.purchase_date : null;
+  // Boutique : seulement une des siennes (la RLS ne laisse voir que celles-là)
+  let source_id: string | null = null;
+  if (common.source_id) {
+    const { data: own } = await supabase.from("sources").select("id").eq("id", common.source_id).maybeSingle();
+    source_id = own?.id ?? null;
+  }
+
+  const rarityById = await raritiesFor(clean);
+  const rows: ItemInsert[] = clean.map((c) => ({
+    tcgdex_id: c.tcgdex_id,
+    card_name: c.card_name,
+    set_id: c.set_id,
+    set_name: c.set_name,
+    local_id: c.local_id,
+    image_url: c.image_url?.startsWith("storage:") ? "" : c.image_url ?? "",
+    condition: CONDITION_CODES.includes(c.condition as ConditionCode) ? c.condition : "NM",
+    language,
+    quantity: Number.isInteger(c.quantity) && c.quantity >= 1 ? Math.min(c.quantity, 99) : 1,
+    purchase_price: price(c.purchase_price),
+    manual_price: price(c.manual_price),
+    purchase_date,
+    source_id,
+    rarity: rarityById.get(c.tcgdex_id) ?? null,
+    needs_review: false,
+  }));
+
+  const { data: created, error } = await supabase
+    .from("items")
+    .insert(rows)
+    .select("id, tcgdex_id, manual_price");
+  if (error) {
+    console.error("addBatchToCollection:", error.message);
+    return { error: "Ajout impossible, réessaie.", added: 0 };
+  }
+
+  // Valeurs saisies : premier point de leur historique ; les cartes sortent
+  // des recherchées et prennent leurs pochettes « hors collection »
+  const [, , binders] = await Promise.all([
+    Promise.all(
+      (created ?? []).filter((c) => c.manual_price != null).map((c) => recordValue(supabase, c.id, c.manual_price!))
+    ),
+    supabase
+      .from("wishlist")
+      .delete()
+      .in(
+        "tcgdex_id",
+        clean.map((c) => c.tcgdex_id)
+      ),
+    adoptPlaceholders(supabase, created ?? []),
+  ]);
+  revalidateBinders(binders);
+
+  await snapshotPrices(
+    (created ?? []).map((c) => c.tcgdex_id),
+    { japanese: language === "JP" }
+  );
+
+  revalidatePath("/cartes");
+  revalidatePath("/collection");
+  revalidatePath("/wishlist");
+  return { error: null, added: rows.length };
+}
+
 /** Suppression douce en masse : les exemplaires partent à la corbeille */
 export async function bulkDeleteItems(ids: string[]) {
   const clean = [...new Set(ids)].filter(Boolean).slice(0, 1000);

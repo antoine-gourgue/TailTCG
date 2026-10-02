@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Star, Plus, Check, CheckCheck, ListChecks, X } from "lucide-react";
+import { Star, Plus, Check, CheckCheck, ListChecks, X, ArrowRight, Loader2 } from "lucide-react";
 import { toggleWishlist } from "@/app/wishlist/actions";
-import { bulkAddToCollection } from "@/app/items/actions";
+import { saveBatchDraft } from "@/lib/batch-draft";
 import { CardImage } from "@/components/card-image";
 import { cardmarketUrl } from "@/lib/tcgdex";
 import { formatEur } from "@/lib/domain";
@@ -173,33 +173,26 @@ export function SetCardsGrid({
     setSelecting(false);
     setPicked(new Set());
   }
-  async function addPicked() {
+  /** Sélection validée : direction la page d'ajout en lot (prix, valeur, état, quantité carte par carte) */
+  function addPicked() {
     const chosen = cards.filter((c) => picked.has(c.id));
     if (chosen.length === 0) return;
     setBusy(true);
-    const res = await bulkAddToCollection(
-      chosen.map((c) => ({
+    saveBatchDraft({
+      language: lang,
+      back: { href: `/extensions/${setId}${langSuffix ? "?lang=ja" : ""}`, label: setName },
+      cards: chosen.map((c) => ({
         tcgdex_id: c.id,
         card_name: c.name,
         set_id: setId,
         set_name: setName,
         local_id: c.localId,
         image_url: c.image ?? "",
+        rarity: c.rarity,
+        price: c.price,
       })),
-      lang
-    );
-    setBusy(false);
-    if (res.error) {
-      setToast({ message: res.error, tone: "error" });
-      return;
-    }
-    setToast({
-      message: `${res.added} carte${res.added > 1 ? "s" : ""} ajoutée${
-        res.added > 1 ? "s" : ""
-      } — à compléter`,
     });
-    exitSelect();
-    router.refresh();
+    router.push("/ajouter/lot");
   }
 
   return (
@@ -444,11 +437,8 @@ export function SetCardsGrid({
             disabled={busy}
             className="btn btn-primary shrink-0 !rounded-full !py-2 text-[13px] disabled:opacity-40"
           >
-            <Plus size={15} aria-hidden />
-            <span className="hidden min-[400px]:inline">
-              {busy ? "Ajout…" : "Ajouter à ma collection"}
-            </span>
-            <span className="min-[400px]:hidden">{busy ? "Ajout…" : "Ajouter"}</span>
+            {busy ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <ArrowRight size={15} aria-hidden />}
+            Valider
           </button>
         </FloatingBar>
       )}

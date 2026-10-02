@@ -29,6 +29,7 @@ export default async function CartesPage({
     select?: string;
     deleted?: string;
     added?: string;
+    lot?: string;
   }>;
 }) {
   const {
@@ -37,6 +38,7 @@ export default async function CartesPage({
     select,
     deleted,
     added,
+    lot,
   } = await searchParams;
   const supabase = await createClient();
   const {
@@ -214,7 +216,7 @@ export default async function CartesPage({
           initialSelect={select != null}
         />
         {deleted && <UndoDeleteToast itemId={deleted} />}
-        {added && Number(added) > 0 && <AddedToast count={Number(added)} />}
+        {added && Number(added) > 0 && <AddedToast count={Number(added)} complete={lot != null} />}
       </main>
       </AppShell>
     </>
