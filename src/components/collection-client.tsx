@@ -370,6 +370,7 @@ export function CollectionClient({
     let value = 0;
     let hasValue = false;
     let market = 0;
+    let marketInvested = 0;
     let hasMarket = false;
     for (const i of filtered) {
       count += i.quantity;
@@ -381,6 +382,7 @@ export function CollectionClient({
       }
       if (i.market_price != null) {
         market += i.market_price * i.quantity;
+        marketInvested += (i.purchase_price ?? 0) * i.quantity;
         hasMarket = true;
       }
     }
@@ -391,7 +393,8 @@ export function CollectionClient({
       gain: hasValue ? value - invested : null,
       market: hasMarket ? market : null,
       // plus-value « marché » : au cours Cardmarket, sur les cartes cotées
-      marketGain: hasMarket ? market - invested : null,
+      // (comparées à ce qu'elles ont coûté, pas à tout l'investi)
+      marketGain: hasMarket ? market - marketInvested : null,
     };
   }, [filtered]);
 
@@ -695,10 +698,8 @@ export function CollectionClient({
           <Stat label="Cartes" value={summary.count} />
           {!hideValues && (
             <>
-              {/* Sur mobile, l'essentiel seulement : le détail vit sur Collection */}
-              <div className="hidden sm:contents">
-                <Stat label="Investi" value={formatEur(summary.invested)} />
-              </div>
+              {/* Sur mobile, deux par rangée : chaque valeur à côté de sa plus-value */}
+              <Stat label="Investi" value={formatEur(summary.invested)} />
               <Stat label="Valeur estimée" value={formatEur(summary.value)} />
               <Stat
                 label="Plus-value estimée"
@@ -715,18 +716,16 @@ export function CollectionClient({
                       : "down"
                 }
               />
-              <div className="hidden sm:contents">
-                {summary.market != null && (
-                  <Stat label="Valeur Cardmarket" value={formatEur(summary.market)} />
-                )}
-                {summary.marketGain != null && (
-                  <Stat
-                    label="Plus-value Cardmarket"
-                    value={`${summary.marketGain > 0 ? "+" : ""}${formatEur(summary.marketGain)}`}
-                    tone={summary.marketGain >= 0 ? "up" : "down"}
-                  />
-                )}
-              </div>
+              {summary.market != null && (
+                <Stat label="Valeur Cardmarket" value={formatEur(summary.market)} />
+              )}
+              {summary.marketGain != null && (
+                <Stat
+                  label="Plus-value Cardmarket"
+                  value={`${summary.marketGain > 0 ? "+" : ""}${formatEur(summary.marketGain)}`}
+                  tone={summary.marketGain >= 0 ? "up" : "down"}
+                />
+              )}
             </>
           )}
         </div>
