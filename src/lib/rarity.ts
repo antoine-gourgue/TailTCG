@@ -26,6 +26,7 @@ const ALIASES: Record<string, string> = {
   "super rare": "Super rare",
   "amazing rare": "Magnifique",
   "radiant rare": "Radieuse rare",
+  "rgb rare": "RGB rare",
   promo: "Promo",
   none: "Sans Rareté",
   "sans rareté": "Sans Rareté",
@@ -59,6 +60,7 @@ export const RARITY_ORDER = [
   "Chromatique ultra rare",
   "Rare Secrète",
   "Secrète",
+  "RGB rare",
   "Promo",
 ];
 
@@ -79,6 +81,7 @@ const RARITY_SYMBOLS: Record<string, string> = {
   "Hyper rare": "🟊",
   "Rare Secrète": "✪",
   Secrète: "✪",
+  "RGB rare": "✪",
   Promo: "◈",
 };
 

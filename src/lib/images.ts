@@ -107,7 +107,9 @@ type RepairableRow = {
  * reprend : à l'affichage, et en base (client de l'utilisateur, RLS) pour
  * que classeurs, fiche et vitrine en profitent aussi. Une adresse TCGdex
  * n'est remplacée que par un visuel venu d'un autre CDN ; une adresse vide,
- * par tout visuel du catalogue.
+ * par tout visuel du catalogue. Même chose pour une adresse scrydex (CDN de
+ * pokemontcg.io, qui liste des visuels avant de les avoir) que le catalogue
+ * a remplacée depuis, par TCGplayer par exemple (Mew R/G/B des 30 ans).
  */
 export async function repairCatalogImages<T extends RepairableRow>(
   supabase: SupabaseClient<Database>,
@@ -117,7 +119,7 @@ export async function repairCatalogImages<T extends RepairableRow>(
     !!r.id &&
     !!r.tcgdex_id &&
     !r.tcgdex_id.startsWith("custom:") &&
-    (!r.image_url || r.image_url.includes("assets.tcgdex.net"));
+    (!r.image_url || r.image_url.includes("assets.tcgdex.net") || r.image_url.startsWith("https://images.scrydex.com/"));
   const ids = [...new Set(rows.filter(suspect).map((r) => r.tcgdex_id as string))];
   if (ids.length === 0) return rows;
 

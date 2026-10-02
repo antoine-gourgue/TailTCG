@@ -8,7 +8,9 @@
 //   - FR : visuels manquants (Shiny Vault, galeries, McDonald's, kits,
 //     énergies, 30th Classic Collection…) pris chez pokemontcg.io (données
 //     publiques GitHub, par numéro puis par nom anglais) puis Limitless
-//     international (grille du set). Scans anglais, à défaut de français.
+//     international (grille du set), TCGplayer (TCGCSV) en dernier recours ;
+//     cartes que seul pokemontcg.io connaît (Mew R/G/B des 30 ans). Scans
+//     anglais, à défaut de français.
 // Idempotent (upsert). Service role via .env.local ou les variables du job nocturne.
 //
 //   node scripts/catalog-sync.mjs [--lang fr|ja] [--set <id>] [--no-limitless]
@@ -260,6 +262,49 @@ const normName = (n) =>
     .normalize("NFKD")
     .replace(/\blv\.?\s*x\b/g, "")
     .replace(/[^a-z0-9]+/g, "");
+/** Le CDN de pokemontcg.io pour les sets récents (scrydex) liste des visuels avant de les avoir : on les sonde */
+const unsure = (url) => url.startsWith("https://images.scrydex.com/");
+
+// ------------------------------------------------------ TCGplayer (TCGCSV)
+const TCGCSV_EN = "https://tcgcsv.com/tcgplayer/3";
+const TCGPLAYER_CDN = "https://tcgplayer-cdn.tcgplayer.com/";
+/** Raretés que pokemontcg.io donne fausses (« Common » pour les Mew R/G/B ; « RGB Rare » chez TCGdex) */
+const RARITY_FIX = { "30th-R": "RGB Rare", "30th-G": "RGB Rare", "30th-B": "RGB Rare" };
+let tcgplayerGroups = null;
+/**
+ * Visuels TCGplayer d'un set (export public TCGCSV), par numéro : dernier
+ * recours pour les cartes que TCGdex et pokemontcg.io n'ont pas en image —
+ * les Mew R/G/B des 30 ans, absents de la base officielle. Groupe trouvé par
+ * le nom anglais du set, préfixe de série ôté (« ME: 30th Celebration »), s'il
+ * est seul à correspondre. numéro → [{ url, name, variant }]
+ */
+async function tcgplayerImages(enName) {
+  const byNo = new Map();
+  if (!enName) return byNo;
+  tcgplayerGroups ??= (await get(`${TCGCSV_EN}/groups`))?.results ?? [];
+  const want = normName(enName);
+  const hits = tcgplayerGroups.filter((g) => normName(String(g.name ?? "").replace(/^[^:]*:\s*/, "")) === want);
+  if (hits.length !== 1) return byNo;
+  for (const p of (await get(`${TCGCSV_EN}/${hits[0].groupId}/products`))?.results ?? []) {
+    const number = p.extendedData?.find((e) => e.name === "Number")?.value;
+    if (!number || !p.imageUrl) continue;
+    const k = normNo(String(number).split("/")[0].trim());
+    byNo.set(k, [
+      ...(byNo.get(k) ?? []),
+      { url: String(p.imageUrl).replace(/_200w\.jpg$/, "_400w.jpg"), name: normName(p.name ?? ""), variant: String(p.name ?? "").includes("(") },
+    ]);
+  }
+  return byNo;
+}
+/** Visuel TCGplayer d'une carte : même numéro et nom qui commence pareil (« Mew - R/RGB »), impression normale d'abord */
+async function tcgplayerImage(byNo, no, name) {
+  const want = normName(name);
+  const hits = (byNo.get(normNo(no)) ?? []).filter((p) => want && p.name.startsWith(want));
+  for (const p of [...hits.filter((p) => !p.variant), ...hits.filter((p) => p.variant)]) {
+    if (await head(p.url)) return p.url;
+  }
+  return null;
+}
 
 async function syncInternationalImages() {
   // sets FR dont des cartes TCGdex n'ont pas de visuel
@@ -334,6 +379,7 @@ async function syncInternationalImages() {
     });
     const rows = [];
     const used = {};
+    let tcgplayer = null; // chargé au premier besoin
     for (const c of cards) {
       let url = null;
       let src = null;
@@ -342,10 +388,17 @@ async function syncInternationalImages() {
         const byName = queue?.length ? queue[0] : null;
         url = (byNameFirst ? byName ?? s.byNo.get(normNo(c.local_id)) : s.byNo.get(normNo(c.local_id)) ?? byName) ?? null;
         if (url && url === byName) queue.shift();
+        if (url && unsure(url) && !(await head(url))) url = null;
         if (url) {
           src = s.name;
           break;
         }
+      }
+      // TCGplayer en dernier recours, par numéro (pas dans une collection de rééditions)
+      if (!url && !byNameFirst) {
+        tcgplayer ??= await tcgplayerImages(enName);
+        url = await tcgplayerImage(tcgplayer, c.local_id, en?.cards?.find((x) => x.localId === c.local_id)?.name ?? c.name);
+        if (url) src = "TCGplayer";
       }
       if (!url) continue;
       used[src] = (used[src] ?? 0) + 1;
@@ -362,8 +415,10 @@ async function syncInternationalImages() {
  * Cartes que pokemontcg.io connaît et que TCGdex n'a pas (ex. les trois Mew
  * R/G/B des 30 ans) : ajoutées au set FR avec le visuel et le nom anglais,
  * source « pokemontcg ». Garde-fou : au plus 10 % du set (sinon c'est une
- * numérotation différente, pas des cartes manquantes). DRY_EXTRAS=1 : liste
- * sans écrire.
+ * numérotation différente, pas des cartes manquantes). Le visuel est sondé,
+ * TCGplayer en secours quand pokemontcg.io ne l'a pas encore ; les cartes
+ * déjà ajoutées sont revues chaque nuit (visuel mort → un autre).
+ * DRY_EXTRAS=1 : liste sans écrire.
  */
 async function syncInternationalExtras() {
   const { data: sets } = await db.from("catalog_sets").select("id, serie_id").eq("lang", "fr").eq("source", "tcgdex");
@@ -372,9 +427,10 @@ async function syncInternationalExtras() {
     if (ONLY_SET && st.id !== ONLY_SET) continue;
     const ptcg = await get(`https://raw.githubusercontent.com/PokemonTCG/pokemon-tcg-data/master/cards/en/${pokemontcgId(st.id)}.json`);
     if (!Array.isArray(ptcg) || !ptcg.length) continue;
-    const { data: have } = await db.from("catalog_cards").select("id, local_id").eq("lang", "fr").eq("set_id", st.id);
+    const { data: have } = await db.from("catalog_cards").select("id, local_id, image, source").eq("lang", "fr").eq("set_id", st.id);
     if (!have?.length) continue;
-    const known = new Set(have.map((c) => normNo(c.local_id)));
+    const added = new Map(have.filter((c) => c.source === "pokemontcg").map((c) => [c.id, c]));
+    const known = new Set(have.filter((c) => c.source !== "pokemontcg").map((c) => normNo(c.local_id)));
     const extras = ptcg.filter((c) => !known.has(normNo(c.number)));
     if (!extras.length) continue;
     if (extras.length > Math.max(3, Math.ceil(0.1 * ptcg.length))) {
@@ -382,10 +438,32 @@ async function syncInternationalExtras() {
       continue;
     }
     const rows = [];
+    const blind = [];
+    const used = {};
+    let tcgplayer = null; // chargé au premier besoin
     for (const c of extras) {
-      const image = c.images?.large ?? c.images?.small ?? null;
-      if (!image || !(await head(image))) continue;
       const n = String(c.number).toUpperCase();
+      const prev = added.get(`${st.id}-${n}`);
+      // déjà ajoutée avec un visuel stable : rien à revoir
+      if (prev?.image && !unsure(prev.image) && !prev.image.startsWith(TCGPLAYER_CDN)) continue;
+      let image = null;
+      for (const url of [c.images?.large, c.images?.small]) {
+        if (url && (await head(url))) {
+          image = url;
+          break;
+        }
+      }
+      if (!image) {
+        tcgplayer ??= await tcgplayerImages((await get(`https://api.tcgdex.net/v2/en/sets/${encodeURIComponent(st.id)}`))?.name);
+        image = await tcgplayerImage(tcgplayer, c.number, c.name);
+      }
+      // sans visuel nulle part : pas ajoutée, ou laissée telle quelle
+      if (!image) {
+        blind.push(`${n} ${c.name}`);
+        continue;
+      }
+      if (prev?.image === image) continue;
+      if (image.startsWith(TCGPLAYER_CDN)) used.TCGplayer = (used.TCGplayer ?? 0) + 1;
       rows.push({
         lang: "fr",
         id: `${st.id}-${n}`,
@@ -394,20 +472,22 @@ async function syncInternationalExtras() {
         name: c.name,
         name_en: c.name,
         image,
-        rarity: c.rarity ?? null,
+        rarity: RARITY_FIX[`${st.id}-${n}`] ?? c.rarity ?? null,
         source: "pokemontcg",
         card_lang: "en",
         updated_at: new Date().toISOString(),
       });
     }
+    if (blind.length) console.log(`  fr/${st.id.padEnd(12)} sans visuel (pokemontcg.io, TCGplayer) : ${blind.join(", ")}`);
     if (!rows.length) continue;
-    console.log(`  fr/${st.id.padEnd(12)} +${rows.length} cartes pokemontcg.io : ${rows.map((r) => `${r.local_id} ${r.name}`).join(", ")}${process.env.DRY_EXTRAS ? " (essai)" : ""}`);
+    const via = Object.entries(used).map(([k, v]) => `, visuels ${k} ${v}`).join("");
+    console.log(`  fr/${st.id.padEnd(12)} +${rows.length} cartes pokemontcg.io : ${rows.map((r) => `${r.local_id} ${r.name}`).join(", ")}${via}${process.env.DRY_EXTRAS ? " (essai)" : ""}`);
     if (!process.env.DRY_EXTRAS) {
       await upsert("catalog_cards", rows);
       addedTotal += rows.length;
     }
   }
-  console.log(`International : ${addedTotal} cartes ajoutées depuis pokemontcg.io`);
+  console.log(`International : ${addedTotal} cartes ajoutées ou revisualisées depuis pokemontcg.io`);
 }
 
 const t0 = Date.now();

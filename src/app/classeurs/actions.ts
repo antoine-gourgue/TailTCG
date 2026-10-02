@@ -510,7 +510,8 @@ export async function placeItemInPocket(binderId: string, itemId: string, pocket
 
 /** Pages : range une carte du catalogue qu'on ne possède pas (hors collection) */
 /** Hôtes d'images de cartes du catalogue TailTCG */
-const CARD_IMAGE_HOSTS = /^https:\/\/(assets\.tcgdex\.net|limitlesstcg\.nyc3\.cdn\.digitaloceanspaces\.com|images\.pokemontcg\.io)\//;
+const CARD_IMAGE_HOSTS =
+  /^https:\/\/(assets\.tcgdex\.net|limitlesstcg\.nyc3\.cdn\.digitaloceanspaces\.com|images\.pokemontcg\.io|images\.scrydex\.com|tcgplayer-cdn\.tcgplayer\.com)\//;
 
 export async function placeWantedInPocket(
   binderId: string,
@@ -542,7 +543,7 @@ export async function placeWantedInPocket(
     card_name: name.slice(0, 120),
     set_name: card.set_name.trim().slice(0, 120),
     local_id: card.local_id.trim().slice(0, 20),
-    // Seuls les visuels des CDN connus sont acceptés (TCGdex, Limitless, pokemontcg.io)
+    // Seuls les visuels des CDN connus sont acceptés (TCGdex, Limitless, pokemontcg.io et son CDN scrydex, TCGplayer)
     image_url: card.image_url && CARD_IMAGE_HOSTS.test(card.image_url) ? card.image_url : null,
     position: pocket,
   });
