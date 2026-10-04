@@ -37,18 +37,21 @@ const HOLO =
  * sertissages et bande à déchirer. Aucune carte n'y figure. Tout est en
  * unités de conteneur : même dessin dans le carrousel et sur la scène.
  * `torn` fait partir la bande ; `progress` (0–1) la soulève quand on tire.
+ * `cursor` masque le curseur de découpe (paquet purement décoratif).
  */
 export function PackArt({
   set,
   torn = false,
   progress = 0,
   shine = true,
+  cursor = true,
   className = "",
 }: {
   set: PlayableSet;
   torn?: boolean;
   progress?: number;
   shine?: boolean;
+  cursor?: boolean;
   className?: string;
 }) {
   const hue = hueOf(set.id);
@@ -144,13 +147,15 @@ export function PackArt({
             className="absolute left-0 top-[64%] h-[3px] -translate-y-1/2 rounded-full bg-white shadow-[0_0_10px_2px_rgba(255,255,255,.8)] transition-[width] duration-75"
             style={{ width: `${progress * 100}%`, opacity: progress > 0 ? 1 : 0 }}
           />
-          <div
-            aria-hidden
-            className="absolute top-[64%] flex h-[6cqw] w-[6cqw] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-black/50 text-white shadow-[0_0_12px_rgba(255,255,255,.85)] transition-[left] duration-75"
-            style={{ left: `${Math.max(5, progress * 100)}%`, opacity: torn ? 0 : 1 }}
-          >
-            <span className="text-[3cqw]">✂</span>
-          </div>
+          {cursor && (
+            <div
+              aria-hidden
+              className="absolute top-[64%] flex h-[6cqw] w-[6cqw] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-black/50 text-white shadow-[0_0_12px_rgba(255,255,255,.85)] transition-[left] duration-75"
+              style={{ left: `${Math.max(5, progress * 100)}%`, opacity: torn ? 0 : 1 }}
+            >
+              <span className="text-[3cqw]">✂</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

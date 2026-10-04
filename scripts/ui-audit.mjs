@@ -131,9 +131,9 @@ async function shoot(out, pages) {
     const ev = async (expr) => (await send("Runtime.evaluate", { expression: expr, returnByValue: true })).result.value;
     for (const [name, path] of pages) {
       const modes = process.env.AUDIT_MODES ? process.env.AUDIT_MODES.split(",") : ["desktop", "mobile"];
-      // AUDIT_HEIGHT : hauteur du viewport desktop (900 par défaut ; plus haut pour que
+      // AUDIT_HEIGHT / AUDIT_MHEIGHT : hauteur du viewport desktop / mobile (900 et 844 par défaut ; plus haut pour que
       // les éléments collants restent à leur place naturelle dans la capture)
-      for (const [mode, w, h] of [["desktop", 1400, Number(process.env.AUDIT_HEIGHT) || 900], ["mobile", 390, 844]].filter(([m]) => modes.includes(m))) {
+      for (const [mode, w, h] of [["desktop", 1400, Number(process.env.AUDIT_HEIGHT) || 900], ["mobile", 390, Number(process.env.AUDIT_MHEIGHT) || 844]].filter(([m]) => modes.includes(m))) {
         await send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: mode === "mobile" ? 2 : 1, mobile: mode === "mobile" });
         errors.length = 0;
         await send("Page.navigate", { url: `${BASE}${path}` });

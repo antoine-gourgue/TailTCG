@@ -4,12 +4,20 @@ import {
   Boxes,
   Check,
   Database,
+  Download,
   Gem,
+  LayoutDashboard,
+  LayoutGrid,
   LineChart,
+  Link2,
+  Menu,
   NotebookTabs,
+  Package,
   ScanLine,
+  Search,
   Share2,
   Smartphone,
+  Star,
   X,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
@@ -17,16 +25,26 @@ import { Reveal } from "@/components/reveal";
 import { CardImage } from "@/components/card-image";
 import { GradedSlab } from "@/components/graded-slab";
 import { ValueHistoryChart } from "@/components/value-history-chart";
+import { StatCard } from "@/components/stat-card";
+import { PackArt } from "@/components/game/pack-art";
+import type { PlayableSet } from "@/lib/game-sets";
+import type { LandingStats } from "@/lib/landing-stats";
 
 /* Cartes réelles (catalogue TCGdex) qui illustrent la page */
+const A = "https://assets.tcgdex.net/fr";
 const CARD = {
-  dracaufeuEx: "https://assets.tcgdex.net/fr/sv/sv03.5/006",
-  dracaufeuSar: "https://assets.tcgdex.net/fr/sv/sv03.5/199",
-  pikachu: "https://assets.tcgdex.net/fr/sv/sv03.5/025",
-  pikachuEx: "https://assets.tcgdex.net/fr/sv/sv08/057",
-  evoli: "https://assets.tcgdex.net/fr/sv/sv03.5/133",
-  dracaufeuBase: "https://assets.tcgdex.net/fr/base/base1/4",
-  dracaufeuTera: "https://assets.tcgdex.net/fr/sv/sv04.5/054",
+  dracaufeuEx: `${A}/sv/sv03.5/006`,
+  dracaufeuSar: `${A}/sv/sv03.5/199`,
+  pikachu: `${A}/sv/sv03.5/025`,
+  pikachuEx: `${A}/sv/sv08/057`,
+  evoli: `${A}/sv/sv03.5/133`,
+  dracaufeuBase: `${A}/base/base1/4`,
+  dracaufeuTera: `${A}/sv/sv04.5/054`,
+  dracaufeuObsidienne: `${A}/sv/sv03/125`,
+  dracaufeuObsidienneSar: `${A}/sv/sv03/223`,
+  bulbizarre: `${A}/sv/sv03.5/002`,
+  mewSar: `${A}/sv/sv03.5/196`,
+  megaDracaufeu: `${A}/me/me01/002`,
 };
 
 /* Courbe de la maquette « valeur » : un mois de cote, en hausse douce */
@@ -37,11 +55,19 @@ const CHART_POINTS = Array.from({ length: 30 }, (_, i) => {
   return { recorded_at: d.toISOString().slice(0, 10), value: Math.round((812 + i * 4.2 + dip + noise * 4) * 100) / 100 };
 });
 
+const nf = new Intl.NumberFormat("fr-FR");
+
 /* ————— Briques ————— */
 
-function Kicker({ icon: Icon, children }: { icon: React.ComponentType<{ size?: number; className?: string; "aria-hidden"?: boolean }>; children: React.ReactNode }) {
+type IconType = React.ComponentType<{ size?: number; className?: string; strokeWidth?: number; "aria-hidden"?: boolean }>;
+
+/* `.label-xs` fixe sa couleur hors couche Tailwind : pour un surtitre en accent, on écrit les utilitaires en clair */
+const KICKER = "text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-strong";
+const MINI_LABEL = "text-[8px] font-semibold uppercase tracking-[0.12em] text-muted";
+
+function Kicker({ icon: Icon, children }: { icon: IconType; children: React.ReactNode }) {
   return (
-    <p className="label-xs flex items-center gap-1.5 text-accent-strong">
+    <p className={`${KICKER} flex items-center gap-1.5`}>
       <Icon size={13} aria-hidden />
       {children}
     </p>
@@ -57,7 +83,7 @@ function Tile({
   children,
   delay = 0,
 }: {
-  icon: React.ComponentType<{ size?: number; className?: string; "aria-hidden"?: boolean }>;
+  icon: IconType;
   kicker: string;
   title: string;
   text: string;
@@ -71,106 +97,226 @@ function Tile({
         <Kicker icon={icon}>{kicker}</Kicker>
         <h3 className="display mt-2 text-xl font-bold tracking-tight">{title}</h3>
         <p className="mt-2 text-sm leading-relaxed text-muted">{text}</p>
-        <div className="mt-6">{children}</div>
+        <div className="mt-6 flex flex-1 flex-col justify-end">{children}</div>
       </article>
     </Reveal>
   );
 }
 
-/** Le téléphone qui scanne : la carte, le cadre qui passe d'orange à vert, le bandeau « Ajoutée » */
-function PhoneScan() {
-  const tick = "absolute h-6 w-6 border-[5px]";
+/** Petite courbe de valeur : aplat dégradé, trait qui se dessine à l'apparition */
+function MiniChart({ id, className = "h-20 w-full" }: { id: string; className?: string }) {
+  const values = CHART_POINTS.map((p) => p.value);
+  const w = 320;
+  const h = 90;
+  const pad = 4;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const pts = values.map((v, i) => [(i / (values.length - 1)) * w, pad + (1 - (v - min) / span) * (h - pad * 2)] as const);
+  const line = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  const [lx, ly] = pts[pts.length - 1];
   return (
-    <div className="relative mx-auto w-[272px] sm:w-[300px]">
-      {/* Halo pokéball derrière le téléphone */}
-      <span
-        className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-70 blur-3xl"
-        style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 26%, transparent), transparent 62%)" }}
-        aria-hidden
-      />
-      {/* Cartes qui flottent derrière */}
-      <div className="float-y absolute -left-24 top-16 hidden w-32 -rotate-12 sm:block" style={{ animationDelay: "0.8s" }} aria-hidden>
-        <div className="card-tile aspect-[63/88] opacity-90">
-          <CardImage base={CARD.pikachu} alt="" />
-        </div>
-      </div>
-      <div className="float-y absolute -right-24 bottom-24 hidden w-32 rotate-12 sm:block" style={{ animationDelay: "2.1s" }} aria-hidden>
-        <div className="card-tile aspect-[63/88] opacity-90">
-          <CardImage base={CARD.evoli} alt="" />
-        </div>
-      </div>
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className={className} aria-hidden>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="var(--accent)" stopOpacity=".35" />
+          <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={`${line} L${w} ${h} L0 ${h} Z`} fill={`url(#${id})`} />
+      <path d={line} fill="none" stroke="var(--accent-strong)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" pathLength={1} className="mk-draw" />
+      <circle cx={lx} cy={ly} r="3" fill="var(--accent-strong)" />
+    </svg>
+  );
+}
 
-      <div className="relative aspect-[9/19] overflow-hidden rounded-[2.6rem] border-[7px] border-[#26252a] bg-black shadow-[0_40px_90px_rgba(0,0,0,.65)] ring-1 ring-white/10">
-        {/* La scène filmée : une table, la carte */}
-        <div className="absolute inset-0" style={{ background: "radial-gradient(120% 70% at 50% 35%, #5a4c40, #1a1715 72%)" }} aria-hidden />
-        <div className="absolute left-1/2 top-[21%] w-[64%] -translate-x-1/2 -rotate-[5deg]">
-          <div className="relative">
-            <div className="overflow-hidden rounded-[4.5%/3.5%] shadow-[0_18px_40px_rgba(0,0,0,.6)]">
-              <CardImage base={CARD.dracaufeuEx} alt="Dracaufeu ex" quality="high" />
+/* ————— Héros : l'appli telle qu'elle est ————— */
+
+const MINI_NAV: [string, IconType, string][] = [
+  ["Collection", LayoutDashboard, ""],
+  ["Cartes", LayoutGrid, "67"],
+  ["Scellés", Boxes, "13"],
+  ["Classeurs", NotebookTabs, "3"],
+  ["Recherchées", Star, "6"],
+  ["Boosters", Package, ""],
+];
+const WINDOW_CARDS = [CARD.dracaufeuEx, CARD.dracaufeuSar, CARD.pikachuEx, CARD.pikachu, CARD.bulbizarre, CARD.mewSar];
+
+/** Desktop : la fenêtre du tableau de bord (Dock à gauche, valeur et derniers ajouts), le scanner par-dessus */
+function AppWindow() {
+  return (
+    <div className="relative hidden pb-8 pr-3 lg:block">
+      <div className="grid min-h-[360px] grid-cols-[150px_1fr] overflow-hidden rounded-[22px] bg-background shadow-[0_40px_90px_rgba(0,0,0,.6)] ring-1 ring-ring">
+        {/* Le Dock */}
+        <div className="m-2 flex flex-col gap-2 rounded-[18px] bg-dock p-2.5 text-dock-text ring-1 ring-dock-edge">
+          <div className="px-1 pt-0.5">
+            <Logo variant="lockup" size={18} interactive={false} />
+          </div>
+          <div className="rounded-xl bg-dock-raised p-2 ring-1 ring-dock-edge">
+            <p className="text-[7px] font-semibold uppercase tracking-[0.12em] text-dock-faint">Ma collection</p>
+            <p className="display num mt-0.5 text-sm font-bold leading-none">1 713 €</p>
+            <p className="num mt-1 text-[8px] text-gain">+997 € · +140 %</p>
+          </div>
+          <span className="flex items-center justify-center gap-1 rounded-full bg-gradient-to-r from-accent to-accent-strong py-1.5 text-[9px] font-semibold text-white shadow-lg shadow-accent/30">
+            <ScanLine size={10} aria-hidden /> Scanner
+          </span>
+          <ul className="flex flex-col gap-0.5 text-[10px]">
+            {MINI_NAV.map(([label, Icon, n], i) => (
+              <li key={label} className={`flex items-center gap-1.5 rounded-lg px-2 py-1 ${i === 0 ? "bg-gradient-to-r from-accent to-accent-strong font-semibold text-white" : "text-dock-muted"}`}>
+                <Icon size={11} aria-hidden />
+                <span className="flex-1">{label}</span>
+                {n && <span className={`num text-[9px] ${i === 0 ? "text-white/80" : "text-dock-faint"}`}>{n}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+        {/* Le tableau de bord */}
+        <div className="flex flex-col gap-2 py-3.5 pl-1.5 pr-3.5">
+          <p className={MINI_LABEL}>Tableau de bord</p>
+          <p className="display -mt-1 text-base font-extrabold tracking-tight">Collection</p>
+          <div className="grid grid-cols-[2fr_1fr] gap-2">
+            <div className="rounded-[14px] bg-surface p-3 ring-1 ring-ring">
+              <p className={MINI_LABEL}>Valeur estimée</p>
+              <p className="display num text-[22px] font-extrabold leading-tight">1 713,01 €</p>
+              <p className="num text-[9px] text-gain">+997,85 € · +140 % depuis l&apos;achat</p>
+              <MiniChart id="mc-window" className="mt-1.5 h-[72px] w-full" />
             </div>
-            {/* Cadre orange (cherche), puis vert (reconnue) — même géométrie que le scanner */}
-            {(["seek", "lock"] as const).map((tone) => {
-              const c = tone === "seek" ? "#f97316" : "#34d399";
-              const bg = tone === "seek" ? "rgba(249,115,22,.10)" : "rgba(16,185,129,.16)";
-              return (
-                <div key={tone} className={`absolute -inset-[3%] rounded-[5%/4%] mk-${tone}`} style={{ background: bg, boxShadow: `inset 0 0 0 3px ${c}80` }} aria-hidden>
-                  <span className={`${tick} left-0 top-0 rounded-tl-lg border-b-0 border-r-0`} style={{ borderColor: c }} />
-                  <span className={`${tick} right-0 top-0 rounded-tr-lg border-b-0 border-l-0`} style={{ borderColor: c }} />
-                  <span className={`${tick} bottom-0 left-0 rounded-bl-lg border-r-0 border-t-0`} style={{ borderColor: c }} />
-                  <span className={`${tick} bottom-0 right-0 rounded-br-lg border-l-0 border-t-0`} style={{ borderColor: c }} />
+            <div className="flex flex-col gap-2">
+              {[
+                ["Cardmarket", "1 323 €"],
+                ["Investi", "715 €"],
+                ["Sur 30 jours", "+42 €"],
+              ].map(([l, v]) => (
+                <div key={l} className="rounded-[14px] bg-surface px-2.5 py-2 ring-1 ring-ring">
+                  <p className="text-[7px] font-semibold uppercase tracking-[0.12em] text-muted">{l}</p>
+                  <p className="display num text-[13px] font-bold">{v}</p>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-6 gap-1.5">
+            {WINDOW_CARDS.map((b, i) => (
+              <div key={b} className="mk-pop card-tile aspect-[63/88]" style={{ animationDelay: `${0.3 + i * 0.08}s` }}>
+                <CardImage base={b} alt="" placeholder="compact" />
+              </div>
+            ))}
           </div>
         </div>
-        {/* Flash vert de l'ajout */}
-        <div className="mk-flash pointer-events-none absolute inset-0 bg-emerald-500" aria-hidden />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/70 to-transparent" aria-hidden />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/75 to-transparent" aria-hidden />
+      </div>
+      <MiniPhone />
+    </div>
+  );
+}
 
-        {/* Barre haute du scanner */}
-        <div className="absolute inset-x-0 top-0 flex items-center justify-between px-4 pt-5 text-white">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15">
-            <X size={14} aria-hidden />
-          </span>
-          <span className="display text-sm font-semibold">Scanner</span>
-          <span className="num rounded-full bg-gain px-2 py-0.5 text-[10px] font-bold text-black">3 ajoutées</span>
+/** Le téléphone qui scanne, posé sur la fenêtre : carte cadrée, reconnue, prête à être ajoutée */
+function MiniPhone() {
+  return (
+    <div className="absolute -bottom-7 -right-3.5 aspect-[390/844] w-[168px] overflow-hidden rounded-[28px] bg-[#0b0a0d] text-white shadow-[0_0_0_6px_#1f1e23,0_30px_60px_rgba(0,0,0,.7)]">
+      <div className="absolute inset-0" style={{ background: "radial-gradient(60% 40% at 50% 40%, rgba(74,222,128,.25), transparent 70%)" }} aria-hidden />
+      <div className="absolute inset-x-3.5 top-3.5 flex items-center justify-between text-[9px] font-semibold">
+        <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white/15">
+          <X size={9} aria-hidden />
+        </span>
+        Scanner
+        <span className="num rounded-full bg-gain px-1.5 py-px text-[8px] font-bold text-black">3 ajoutées</span>
+      </div>
+      <div className="absolute left-[12%] top-[28%] w-[76%] -rotate-3 rounded-lg shadow-[0_20px_40px_rgba(0,0,0,.6)] outline-2 outline-offset-4 outline-gain">
+        <div className="card-tile aspect-[63/88]">
+          <CardImage base={CARD.dracaufeuObsidienne} alt="" placeholder="compact" />
         </div>
-
-        {/* Bandeau de la carte ajoutée */}
-        <div className="mk-banner absolute inset-x-3 bottom-[4.4rem] flex items-center gap-2.5 rounded-2xl border border-white/15 bg-black/75 p-2.5 text-white backdrop-blur-md">
-          <div className="card-tile w-10 shrink-0 aspect-[63/88]">
-            <CardImage base={CARD.dracaufeuEx} alt="" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="label-xs flex items-center gap-1 text-emerald-300">
-              <Check size={10} aria-hidden /> Ajoutée
-            </p>
-            <p className="display truncate text-[13px] font-bold leading-tight">Dracaufeu ex</p>
-            <p className="truncate text-[10px] text-white/70">
-              151 <span className="num">· n° 006</span>
-              <span className="num ml-1.5 font-semibold text-emerald-300">42,00 €</span>
-            </p>
-          </div>
-        </div>
-
-        {/* Pastille d'état : orange puis verte */}
-        <div className="absolute inset-x-0 bottom-5 flex justify-center px-4 text-white">
-          <span className="relative inline-flex items-center gap-2 rounded-full bg-black/60 px-3.5 py-1.5 text-[11px] backdrop-blur">
-            <span className="mk-seek absolute inset-0 inline-flex items-center gap-2 px-3.5 py-1.5">
-              <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-orange-400" aria-hidden />
-              Carte repérée, ne bouge plus
-            </span>
-            <span className="mk-lock inline-flex items-center gap-2">
-              <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
-              Ajoutée · retire la carte
-            </span>
-          </span>
-        </div>
+      </div>
+      <div className="absolute inset-x-3 bottom-3.5 rounded-full bg-white/10 px-2.5 py-1.5 text-center text-[8px] leading-snug backdrop-blur">
+        Dracaufeu-ex reconnue · touche pour ajouter
       </div>
     </div>
   );
 }
+
+const PHONE_STATS: [string, string, string][] = [
+  ["Cartes", "67", "13 références"],
+  ["Investi", "715 €", "13 payées"],
+  ["Valeur estimée", "1 713 €", "+140 %"],
+  ["Cardmarket", "1 323 €", "tendance"],
+];
+const PHONE_CARDS = [CARD.dracaufeuEx, CARD.dracaufeuSar, CARD.pikachuEx, CARD.pikachu];
+
+function DockItem({ icon: Icon, label, active = false }: { icon: IconType; label: string; active?: boolean }) {
+  return (
+    <span className={`flex flex-col items-center gap-0.5 ${active ? "text-accent-strong" : "text-dock-muted"}`}>
+      <Icon size={14} strokeWidth={active ? 2.2 : 1.9} aria-hidden />
+      {label}
+    </span>
+  );
+}
+
+/** Mobile : le tableau de bord tel qu'on le voit sur le téléphone, dock bas compris */
+function PhoneDashboard() {
+  return (
+    <div
+      className="relative mx-auto aspect-[390/760] w-full max-w-[330px] overflow-hidden rounded-[36px] bg-background text-[11px] shadow-[0_0_0_8px_#1f1e23,0_30px_60px_rgba(0,0,0,.6)] lg:hidden"
+      style={{ contain: "inline-size" }}
+    >
+      <div className="flex items-center justify-between px-4 pt-4">
+        <Logo variant="lockup" size={20} interactive={false} />
+        <div className="flex gap-1.5">
+          <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-surface text-muted ring-1 ring-ring">
+            <Search size={11} aria-hidden />
+          </span>
+          <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-gradient-to-br from-accent to-[#f4c361] text-[9px] font-bold text-white">S</span>
+        </div>
+      </div>
+      <div className="px-4 pt-3.5">
+        <p className={MINI_LABEL}>Tableau de bord</p>
+        <p className="display text-xl font-extrabold tracking-tight">Collection</p>
+      </div>
+      <div className="flex gap-1.5 overflow-hidden px-4 pt-2.5">
+        {PHONE_STATS.map(([k, v, s]) => (
+          <div key={k} className="w-[104px] flex-none rounded-xl bg-surface px-2.5 py-2 ring-1 ring-ring">
+            <p className="text-[7px] font-semibold uppercase tracking-[0.12em] text-muted">{k}</p>
+            <p className="display num mt-0.5 text-[13px] font-bold">{v}</p>
+            <p className="num text-[8px] text-muted">{s}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mx-4 mt-2.5 rounded-2xl bg-surface p-3 ring-1 ring-ring">
+        <p className="text-[7px] font-semibold uppercase tracking-[0.12em] text-muted">Valeur estimée</p>
+        <p className="display num text-[22px] font-extrabold leading-tight">1 713,01 €</p>
+        <p className="num text-[9px] text-gain">+997,85 € · +140 % depuis l&apos;achat</p>
+        <MiniChart id="mc-phone" className="mt-1.5 h-[76px] w-full" />
+        <div className="mt-2 flex gap-1">
+          {["30 j", "1 an", "Tout"].map((r, i) => (
+            <span key={r} className="seg rounded-full px-2 py-0.5 text-[8px] font-medium" data-on={i === 0 ? "true" : undefined}>
+              {r}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-baseline justify-between px-4 pt-3">
+        <span className="text-[11px] font-bold">Derniers ajouts</span>
+        <span className="text-[9px] text-muted">Tout voir</span>
+      </div>
+      <div className="grid grid-cols-4 gap-1.5 px-4 pt-1.5">
+        {PHONE_CARDS.map((b, i) => (
+          <div key={b} className="mk-pop card-tile aspect-[63/88]" style={{ animationDelay: `${0.3 + i * 0.1}s` }}>
+            <CardImage base={b} alt="" placeholder="compact" />
+          </div>
+        ))}
+      </div>
+      {/* Dock bas : Scanner rond au centre */}
+      <div className="absolute inset-x-3 bottom-3 flex h-[58px] items-center justify-around rounded-[24px] bg-dock px-1 text-[8px] font-medium ring-1 ring-dock-edge">
+        <DockItem icon={LayoutDashboard} label="Collection" active />
+        <DockItem icon={LayoutGrid} label="Cartes" />
+        <span className="relative -top-3.5 flex h-[46px] w-[46px] items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-strong text-white shadow-[0_10px_24px_rgba(240,72,62,.35)] ring-4 ring-background">
+          <ScanLine size={18} aria-hidden />
+        </span>
+        <DockItem icon={Boxes} label="Scellés" />
+        <DockItem icon={Menu} label="Menu" />
+      </div>
+    </div>
+  );
+}
+
+/* ————— Les fonctions, une par tuile ————— */
 
 /** Maquette « scan » : trois cartes reconnues à la suite */
 function ScanRows() {
@@ -180,19 +326,19 @@ function ScanRows() {
     { name: "Évoli", set: "151 · 133", img: CARD.evoli, price: "0,35 €" },
   ];
   return (
-    <ul className="w-full divide-y divide-edge rounded-2xl border border-edge bg-raised/40">
+    <ul className="flex w-full flex-col gap-1.5">
       {rows.map((r, i) => (
-        <li key={r.name} className="mk-row flex items-center gap-3 px-3 py-2.5" style={{ animationDelay: `${0.25 + i * 0.45}s` }}>
-          <div className="card-tile w-9 shrink-0 aspect-[63/88]">
+        <li key={r.name} className="mk-row flex items-center gap-3 rounded-xl bg-raised px-3 py-2" style={{ animationDelay: `${0.25 + i * 0.45}s` }}>
+          <div className="card-tile w-8 shrink-0 aspect-[63/88]">
             <CardImage base={r.img} alt="" placeholder="compact" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{r.name}</p>
+            <p className="truncate text-[13px] font-semibold">{r.name}</p>
             <p className="truncate text-xs text-muted">{r.set}</p>
           </div>
-          <span className="num text-xs text-muted">{r.price}</span>
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gain/15 text-gain">
-            <Check size={12} strokeWidth={3} aria-hidden />
+          <span className="num text-xs font-semibold">{r.price}</span>
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gain text-black">
+            <Check size={11} strokeWidth={3} aria-hidden />
           </span>
         </li>
       ))}
@@ -206,12 +352,12 @@ function ValueMock() {
     <div className="w-full">
       <div className="grid grid-cols-3 gap-2">
         {[
-          ["Valeur estimée", "934,60 €", ""],
+          ["Estimée", "934,60 €", ""],
           ["Cardmarket", "901,20 €", ""],
           ["Plus-value", "+267,42 €", "text-gain"],
         ].map(([l, v, cls], i) => (
-          <div key={l} className="mk-pop rounded-xl border border-edge bg-raised/40 px-3 py-2" style={{ animationDelay: `${i * 0.12}s` }}>
-            <p className="label-xs truncate">{l}</p>
+          <div key={l} className="mk-pop rounded-xl bg-raised px-3 py-2" style={{ animationDelay: `${i * 0.12}s` }}>
+            <p className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">{l}</p>
             <p className={`display num mt-0.5 truncate text-sm font-bold ${cls}`}>{v}</p>
           </div>
         ))}
@@ -223,7 +369,9 @@ function ValueMock() {
   );
 }
 
-/** Maquette « classeur » : quatre vraies cartes sur une page à anneaux */
+const BINDER_CARDS = [CARD.dracaufeuEx, CARD.dracaufeuSar, CARD.dracaufeuObsidienne, CARD.dracaufeuObsidienneSar, CARD.dracaufeuTera, CARD.dracaufeuBase];
+
+/** Maquette « classeur » : six vraies cartes sur une page à anneaux */
 function BinderMock() {
   return (
     <div className="w-full">
@@ -234,21 +382,23 @@ function BinderMock() {
           ))}
         </div>
         <div className="ml-7 p-2.5">
-          <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-raised/40 p-2 ring-1 ring-edge/60">
-            {[CARD.dracaufeuSar, CARD.dracaufeuTera, CARD.dracaufeuEx, CARD.dracaufeuBase].map((b, i) => (
-              <div key={b} className="mk-pop card-tile aspect-[63/88]" style={{ animationDelay: `${0.15 + i * 0.15}s` }}>
+          <div className="grid grid-cols-3 gap-1.5 rounded-lg bg-raised/60 p-2 ring-1 ring-edge/60">
+            {BINDER_CARDS.map((b, i) => (
+              <div key={b} className="mk-pop card-tile aspect-[63/88]" style={{ animationDelay: `${0.15 + i * 0.12}s` }}>
                 <CardImage base={b} alt="" placeholder="compact" />
               </div>
             ))}
           </div>
         </div>
       </div>
-      <p className="mk-pop mt-2.5 text-sm font-semibold" style={{ animationDelay: "0.8s" }}>
-        Mes Dracaufeu
-      </p>
-      <p className="mk-pop text-xs text-muted" style={{ animationDelay: "0.9s" }}>
-        12 cartes · <span className="num">1 240,00 €</span>
-      </p>
+      <div className="mt-2.5 flex items-baseline justify-between">
+        <p className="mk-pop text-sm font-semibold" style={{ animationDelay: "0.9s" }}>
+          Mes Dracaufeu
+        </p>
+        <p className="mk-pop text-xs text-muted" style={{ animationDelay: "1s" }}>
+          12 cartes · <span className="num">1 240,00 €</span>
+        </p>
+      </div>
     </div>
   );
 }
@@ -264,13 +414,12 @@ function GradingMock() {
   ];
   return (
     <div className="w-full">
-      <div className="mx-auto w-full max-w-[228px]">
+      <div className="mx-auto w-full max-w-[200px]">
         <GradedSlab name="Dracaufeu" setName="Set de base" localId="4/102" imageUrl={CARD.dracaufeuBase} grade={9} centering={9} corners={10} edges={9.5} surface={9} />
       </div>
-      <p className="label-xs mt-5 text-center">Estimation chez chaque grader</p>
-      <ul className="mt-2 grid grid-cols-5 gap-1.5">
+      <ul className="mt-4 grid grid-cols-5 gap-1.5">
         {graders.map(([g, n, l], i) => (
-          <li key={g} className="mk-row rounded-xl border border-edge bg-raised/40 px-1 py-2 text-center" style={{ animationDelay: `${0.5 + i * 0.12}s` }}>
+          <li key={g} className="mk-row rounded-xl bg-raised px-1 py-2 text-center" style={{ animationDelay: `${0.5 + i * 0.12}s` }}>
             <p className="text-[10px] font-semibold text-muted">{g}</p>
             <p className="display num text-lg font-bold leading-tight">{n}</p>
             <p className="truncate text-[9px] text-faint">{l}</p>
@@ -281,94 +430,108 @@ function GradingMock() {
   );
 }
 
-/** Maquette « scellés » : la réserve en trois chiffres, puis cinq vrais produits avec leur visuel officiel */
-function SealedMock() {
-  const rows = [
-    { name: "Coffret Dresseur d'Élite 151", paid: "59,99 €", cote: "112,00 €", gain: "+87 %", img: "https://tcgplayer-cdn.tcgplayer.com/product/503313_400w.jpg" },
-    { name: "Coffret Dresseur d'Élite Évolutions Prismatiques", paid: "64,90 €", cote: "119,00 €", gain: "+83 %", img: "https://tcgplayer-cdn.tcgplayer.com/product/593355_400w.jpg" },
-    { name: "Coffret Ultra-Premium Dracaufeu", paid: "129,90 €", cote: "168,00 €", gain: "+29 %", img: "https://tcgplayer-cdn.tcgplayer.com/product/654213_400w.jpg" },
-    { name: "Tin Détective Pikachu", paid: "24,90 €", cote: "27,50 €", gain: "+10 %", img: "https://tcgplayer-cdn.tcgplayer.com/product/502477_400w.jpg" },
-    { name: "Booster Étincelles Déferlantes", paid: "6,50 €", cote: "6,90 €", gain: "+6 %", img: "https://tcgplayer-cdn.tcgplayer.com/product/565602_400w.jpg" },
+/* Trois produits scellés réels, avec leur visuel officiel */
+const SEALED = [
+  { name: "Coffret Dresseur d'Élite 151", kind: "Coffret Dresseur d'Élite", cote: "112,00 €", gain: "+87 %", img: "https://tcgplayer-cdn.tcgplayer.com/product/503313_400w.jpg" },
+  { name: "Coffret Dresseur d'Élite Évolutions Prismatiques", kind: "Coffret Dresseur d'Élite", cote: "119,00 €", gain: "+83 %", img: "https://tcgplayer-cdn.tcgplayer.com/product/593355_400w.jpg" },
+  { name: "Booster sous blister Étincelles Déferlantes", kind: "Booster", cote: "11,48 €", gain: "+76 %", img: "https://tcgplayer-cdn.tcgplayer.com/product/565602_400w.jpg" },
+];
+
+/** Tuile « scellés » : le texte à gauche, trois tuiles produit comme sur la page Scellés */
+function SealedTile({ count }: { count: number }) {
+  return (
+    <Reveal className="md:col-span-6" delay={100}>
+      <article className="panel grid gap-6 overflow-hidden p-6 md:grid-cols-[minmax(0,300px)_1fr] md:items-center">
+        <div>
+          <Kicker icon={Boxes}>Scellés</Kicker>
+          <h3 className="display mt-2 text-xl font-bold tracking-tight">Coffrets, displays, tins.</h3>
+          <p className="mt-2 text-sm leading-relaxed text-muted">
+            <span className="num">{nf.format(count)}</span>&nbsp;produits avec leur cote et leur historique. Tu sais ce que vaut ta réserve, et ce qu&apos;elle a pris.
+          </p>
+        </div>
+        <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          {SEALED.map((p, i) => (
+            <li key={p.name} className="mk-pop overflow-hidden rounded-2xl bg-surface ring-1 ring-ring" style={{ animationDelay: `${0.15 + i * 0.12}s` }}>
+              <div className="relative aspect-[4/3] bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.img} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-contain p-2.5" />
+                <span className="num absolute left-1.5 top-1.5 rounded-md bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">{p.gain}</span>
+              </div>
+              <div className="p-2.5">
+                <p className="line-clamp-2 text-xs font-semibold leading-tight">{p.name}</p>
+                <p className="mt-0.5 text-[10px] text-muted">{p.kind}</p>
+                <p className="num mt-1 text-xs font-bold">{p.cote}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </article>
+    </Reveal>
+  );
+}
+
+const SHARE_CARDS = [CARD.dracaufeuEx, CARD.pikachu, CARD.pikachuEx, CARD.evoli, CARD.megaDracaufeu];
+
+/** Maquette « vitrine » : le lien, copié, et ce que l'ami voit */
+function ShareMock() {
+  return (
+    <div className="w-full">
+      <div className="mk-pop flex items-center gap-2 rounded-full bg-raised px-3.5 py-2 text-xs text-muted ring-1 ring-ring">
+        <Link2 size={13} className="shrink-0" aria-hidden />
+        <span className="num min-w-0 truncate">tailtcg.vercel.app/vitrine/sacha</span>
+        <span className="mk-pulse ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-gain/15 px-2 py-0.5 text-[10px] font-semibold text-gain">
+          <Check size={10} strokeWidth={3} aria-hidden /> Copié
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-5 gap-1.5">
+        {SHARE_CARDS.map((b, i) => (
+          <div key={b} className="mk-pop card-tile aspect-[63/88]" style={{ animationDelay: `${0.3 + i * 0.1}s` }}>
+            <CardImage base={b} alt="" placeholder="compact" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Maquette « catalogue » : la recherche, les filtres de la vraie page, et ce qui va avec */
+function CatalogueMock() {
+  const facts: [IconType, string, string][] = [
+    [Download, "Exports", "JSON et CSV"],
+    [Smartphone, "Installable", "iPhone et Android"],
+    [Check, "Gratuit", "sans pub"],
   ];
   return (
     <div className="w-full">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="mk-pop flex items-center gap-2 rounded-full bg-raised px-3.5 py-2 text-xs text-muted ring-1 ring-ring">
+        <Search size={13} className="shrink-0" aria-hidden />
+        <span className="truncate">pikachu 25 · mew ex 151 · SV4a 205</span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
         {[
-          ["Payé", "286,19 €", ""],
-          ["Cote", "433,40 €", ""],
-          ["Gain", "+51 %", "text-gain"],
-        ].map(([l, v, cls], i) => (
-          <div key={l} className="mk-pop rounded-xl border border-edge bg-raised/40 px-3 py-2" style={{ animationDelay: `${i * 0.12}s` }}>
-            <p className="label-xs truncate">{l}</p>
-            <p className={`display num mt-0.5 truncate text-sm font-bold ${cls}`}>{v}</p>
-          </div>
-        ))}
-      </div>
-      <ul className="mt-3 divide-y divide-edge rounded-2xl border border-edge bg-raised/40">
-        {rows.map((r, i) => (
-          <li key={r.name} className="mk-row flex items-center gap-3 px-3 py-2" style={{ animationDelay: `${0.35 + i * 0.22}s` }}>
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/[0.06] p-1">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={r.img} alt="" loading="lazy" className="h-full w-full object-contain" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="line-clamp-2 text-[13px] font-semibold leading-tight">{r.name}</p>
-              <p className="num mt-0.5 text-[11px] text-muted">
-                {r.paid} <span className="text-faint">→</span> {r.cote}
-              </p>
-            </div>
-            <span className="num shrink-0 rounded-full bg-gain/15 px-2 py-0.5 text-[11px] font-bold text-gain">{r.gain}</span>
-          </li>
-        ))}
-      </ul>
-      <p className="mk-fade mt-2.5 text-[11px] text-faint" style={{ animationDelay: "1.6s" }}>
-        Cote relevée chaque nuit · 2 700 produits suivis, du booster au display
-      </p>
-    </div>
-  );
-}
-
-/** Maquette « vitrine » : le lien partagé, vu par un ami */
-function ShareMock() {
-  return (
-    <div className="panel w-full overflow-hidden !p-0 shadow-xl">
-      <div className="flex items-center gap-1.5 border-b border-edge bg-raised/60 px-3 py-2">
-        <span className="h-2 w-2 rounded-full bg-loss/60" aria-hidden />
-        <span className="h-2 w-2 rounded-full bg-accent/60" aria-hidden />
-        <span className="h-2 w-2 rounded-full bg-gain/60" aria-hidden />
-        <span className="mk-pop num ml-2 flex-1 truncate rounded-md bg-surface px-2 py-0.5 text-[10px] text-faint">tailtcg.vercel.app/vitrine/sacha</span>
-      </div>
-      <div className="p-4">
-        <div className="mk-pop flex items-center gap-2" style={{ animationDelay: "0.2s" }}>
-          <Logo variant="mark" size={22} />
-          <div>
-            <p className="text-sm font-bold leading-tight">La collection de Sacha</p>
-            <p className="text-[10px] text-muted">Vitrine en lecture seule · 132 cartes · 4 classeurs</p>
-          </div>
-        </div>
-        <div className="mt-3 grid grid-cols-4 gap-2">
-          {[CARD.dracaufeuEx, CARD.pikachu, CARD.evoli, CARD.pikachuEx].map((b, i) => (
-            <div key={b} className="mk-pop card-tile aspect-[63/88]" style={{ animationDelay: `${0.4 + i * 0.1}s` }}>
-              <CardImage base={b} alt="" placeholder="compact" />
-            </div>
-          ))}
-        </div>
-        <div className="mk-pop mt-3 flex justify-end" style={{ animationDelay: "1s" }}>
-          <span className="mk-pulse inline-flex items-center gap-1 rounded-full bg-gain/15 px-2.5 py-1 text-[10px] font-semibold text-gain">
-            <Check size={10} strokeWidth={3} aria-hidden /> Lien copié
+          ["FR · EN", true],
+          ["JA", false],
+          ["Pokédex", false],
+          ["Hors catalogue", false],
+        ].map(([label, on], i) => (
+          <span key={label as string} className="seg mk-pop rounded-full px-3 py-1 text-xs font-medium" data-on={on ? "true" : undefined} style={{ animationDelay: `${0.2 + i * 0.08}s` }}>
+            {label as string}
+            {label === "Pokédex" && <span className="num ml-1.5 text-muted">1025</span>}
           </span>
-        </div>
+        ))}
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {facts.map(([Icon, t, s], i) => (
+          <div key={t} className="mk-pop rounded-xl bg-raised p-2.5" style={{ animationDelay: `${0.5 + i * 0.1}s` }}>
+            <Icon size={14} aria-hidden />
+            <p className="mt-1.5 text-xs font-semibold">{t}</p>
+            <p className="text-[10px] leading-snug text-muted">{s}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
-
-const STATS: [string, string][] = [
-  ["43 000", "cartes au catalogue, FR et JP"],
-  ["94 000", "cartes reconnues au scan"],
-  ["2 700", "produits scellés suivis"],
-  ["Chaque nuit", "la cote Cardmarket relevée"],
-];
 
 const STEPS = [
   {
@@ -389,7 +552,14 @@ const STEPS = [
 ];
 
 // Page d'accueil publique pour les visiteurs non connectés
-export function Landing() {
+export function Landing({ stats, packs }: { stats: LandingStats; packs: PlayableSet[] }) {
+  const faq: [string, string][] = [
+    ["C'est vraiment gratuit ?", "Oui, sans pub ni abonnement. Le projet est fait par un collectionneur, pour les collectionneurs."],
+    ["Mes données m'appartiennent ?", "Oui. Tu exportes tout en JSON ou CSV quand tu veux, et ta vitrine ne montre que ce que tu décides."],
+    ["Et les cartes japonaises ?", `Le catalogue couvre ${nf.format(stats.jaSets)} extensions japonaises avec leurs scans, et la cote TCGplayer quand Cardmarket n'en a pas.`],
+    ["Ça marche sur mon téléphone ?", "Le site s'installe comme une appli sur iPhone et Android, et le scan tourne directement sur l'appareil."],
+  ];
+
   return (
     <div className="min-h-dvh">
       {/* En-tête */}
@@ -412,24 +582,24 @@ export function Landing() {
 
       <main className="mx-auto w-full max-w-6xl px-4 sm:px-6">
         {/* Héros */}
-        <section className="grid items-center gap-12 py-14 sm:py-20 lg:min-h-[calc(100dvh-4rem)] lg:grid-cols-[1.1fr_0.9fr] lg:gap-8 lg:py-10">
+        <section className="grid items-center gap-10 py-10 sm:py-16 lg:grid-cols-[1fr_1.05fr] lg:gap-12 lg:py-20">
           <div className="max-w-xl">
-            <span className="rise-in inline-flex items-center gap-2 rounded-full border border-edge bg-raised/60 px-4 py-1.5 text-[13px] text-muted" style={{ animationDelay: "0.05s" }}>
+            <span className="rise-in inline-flex items-center gap-2 rounded-full bg-raised px-4 py-1.5 text-[13px] text-muted ring-1 ring-ring" style={{ animationDelay: "0.05s" }}>
               <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden />
               Gratuit · Sans pub · Fait par un collectionneur
             </span>
-            <h1 className="display rise-in mt-6 text-4xl font-bold leading-[1.05] tracking-tight sm:text-6xl" style={{ animationDelay: "0.15s" }}>
+            <h1 className="display rise-in mt-5 text-[38px] font-bold leading-[1.04] tracking-tight sm:text-6xl" style={{ animationDelay: "0.15s" }}>
               Ta collection Pokémon,
               <br />
               <span className="text-accent-strong">enfin à sa hauteur.</span>
             </h1>
-            <p className="rise-in mt-6 text-base leading-relaxed text-muted sm:text-lg" style={{ animationDelay: "0.28s" }}>
+            <p className="rise-in mt-5 text-base leading-relaxed text-muted sm:text-lg" style={{ animationDelay: "0.28s" }}>
               Scanne tes cartes avec ton téléphone, suis leur <strong className="text-foreground">cote Cardmarket</strong> chaque nuit, range-les en{" "}
               <strong className="text-foreground">classeurs</strong> et partage ta <strong className="text-foreground">vitrine</strong>. Cartes et scellés,
               français et japonais.
             </p>
-            <div className="rise-in mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: "0.4s" }}>
-              <Link href="/inscription" className="btn btn-primary !px-7 !py-3.5 text-base shadow-xl">
+            <div className="rise-in mt-7 flex flex-wrap items-center gap-3" style={{ animationDelay: "0.4s" }}>
+              <Link href="/inscription" className="btn btn-primary !px-7 !py-3.5 text-base shadow-lg shadow-accent/30">
                 Créer ma collection
                 <ArrowRight size={16} aria-hidden />
               </Link>
@@ -437,7 +607,7 @@ export function Landing() {
                 Voir ce que ça fait
               </a>
             </div>
-            <ul className="rise-in mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs text-faint" style={{ animationDelay: "0.5s" }}>
+            <ul className="rise-in mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted" style={{ animationDelay: "0.5s" }}>
               {["100 % gratuit", "Catalogue FR & JP", "Installable sur ton téléphone", "Tes données t'appartiennent"].map((t) => (
                 <li key={t} className="flex items-center gap-1.5">
                   <Check size={12} className="text-gain" aria-hidden />
@@ -446,39 +616,38 @@ export function Landing() {
               ))}
             </ul>
           </div>
-          <div className="rise-in relative py-6 lg:py-0" style={{ animationDelay: "0.35s" }}>
-            <PhoneScan />
-          </div>
+          <Reveal className="min-w-0">
+            <AppWindow />
+            <PhoneDashboard />
+          </Reveal>
         </section>
 
         {/* Chiffres */}
         <Reveal>
-          <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-edge bg-edge md:grid-cols-4">
-            {STATS.map(([n, l]) => (
-              <div key={l} className="bg-surface px-5 py-5">
-                <p className="display num text-2xl font-bold tracking-tight sm:text-3xl">{n}</p>
-                <p className="mt-1 text-xs text-muted sm:text-sm">{l}</p>
-              </div>
-            ))}
-          </section>
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-4">
+            <StatCard label="Au catalogue" value={nf.format(stats.cards)} sub="cartes FR et JP" />
+            <StatCard label="Extensions" value={nf.format(stats.sets)} sub="de 1999 à aujourd'hui" />
+            <StatCard label="Scellés suivis" value={nf.format(stats.sealed)} sub="coffrets et displays" />
+            <StatCard label="Cote Cardmarket" value="Chaque nuit" sub="carte par carte" />
+          </div>
         </Reveal>
 
         {/* Fonctions */}
-        <section id="fonctions" className="scroll-mt-20 py-20 sm:py-28">
+        <section id="fonctions" className="scroll-mt-20 py-16 sm:py-24">
           <Reveal className="mx-auto max-w-2xl text-center">
-            <p className="label-xs text-accent-strong">Tout au même endroit</p>
-            <h2 className="display mt-3 text-3xl font-bold tracking-tight sm:text-5xl">Le scan, la cote, les classeurs. Et le reste.</h2>
+            <p className={KICKER}>Tout au même endroit</p>
+            <h2 className="display mt-3 text-balance text-3xl font-bold tracking-tight sm:text-5xl">Le scan, la cote, les classeurs. Et le reste.</h2>
             <p className="mt-4 text-base leading-relaxed text-muted">
               Pensé par un collectionneur qui en avait assez des tableurs : chaque carte a sa fiche, sa cote, sa place dans un classeur, et son histoire.
             </p>
           </Reveal>
 
-          <div className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-6">
+          <div className="mt-10 grid grid-cols-1 gap-3.5 md:grid-cols-6">
             <Tile
               icon={ScanLine}
               kicker="Scan mains libres"
               title="Pointe, c'est ajouté."
-              text="La carte est cadrée au pixel, reconnue sur ton téléphone parmi 94 000 cartes, et ajoutée d'elle-même. Passe la suivante. Rien n'est envoyé sur un serveur."
+              text="Reconnue sur ton téléphone parmi 94 000 cartes, en français comme en japonais, et ajoutée d'elle-même. Rien n'est envoyé sur un serveur."
               className="md:col-span-3"
             >
               <ScanRows />
@@ -487,7 +656,7 @@ export function Landing() {
               icon={LineChart}
               kicker="Cote Cardmarket"
               title="La valeur, relevée chaque nuit."
-              text="Valeur estimée, valeur Cardmarket, plus-value depuis le prix payé : pour chaque carte, chaque scellé, et toute la collection sur une courbe."
+              text="Valeur estimée, cote Cardmarket, plus-value depuis le prix payé : pour chaque carte, chaque scellé, et toute la collection sur une courbe."
               className="md:col-span-3"
               delay={100}
             >
@@ -498,7 +667,7 @@ export function Landing() {
               kicker="Classeurs"
               title="Range-les à ton image."
               text="Pages à anneaux, couverture sur mesure, glisser-déposer. Une carte peut vivre dans plusieurs classeurs, et le Pokédex se range aussi."
-              className="md:col-span-2"
+              className="md:col-span-3"
             >
               <BinderMock />
             </Tile>
@@ -507,74 +676,102 @@ export function Landing() {
               kicker="Pré-gradation"
               title="Note-la avant de l'envoyer."
               text="Recto, verso : centrage mesuré, coins, bords et surface, avec l'estimation chez PSA, PCA, CCC, CGC et BGS. Carte en boîtier à la fin."
-              className="md:col-span-2"
+              className="md:col-span-3"
               delay={100}
             >
               <GradingMock />
             </Tile>
-            <Tile
-              icon={Boxes}
-              kicker="Scellés"
-              title="Coffrets, displays, tins."
-              text="Tes produits scellés ont leur cote et leur historique comme les cartes. Tu sais ce que vaut ta réserve, et ce qu'elle a pris."
-              className="md:col-span-2"
-              delay={200}
-            >
-              <SealedMock />
-            </Tile>
+            <SealedTile count={stats.sealed} />
             <Tile
               icon={Share2}
               kicker="Vitrine"
               title="Partage d'un lien."
-              text="Une adresse à ton pseudo, en lecture seule, classeurs compris, avec un bel aperçu sur WhatsApp et Discord. Révocable quand tu veux."
+              text="Une adresse à ton pseudo, en lecture seule, classeurs et scellés compris, avec un bel aperçu sur WhatsApp et Discord. Révocable quand tu veux."
               className="md:col-span-3"
             >
               <ShareMock />
             </Tile>
             <Tile
               icon={Database}
-              kicker="Catalogue et données"
+              kicker="Catalogue"
               title="FR, JP, Pokédex. Et c'est à toi."
-              text="43 000 cartes françaises et japonaises, 516 sets, les produits scellés, le Pokédex à ranger. Exports JSON et CSV, aucune pub, aucun abonnement."
+              text={`${nf.format(stats.cards)} cartes, ${nf.format(stats.sets)} extensions, les produits scellés, le Pokédex à ranger. Exports JSON et CSV, aucune pub, aucun abonnement.`}
               className="md:col-span-3"
               delay={100}
             >
-              <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3">
-                {[
-                  [Database, "43 000 cartes", "français et japonais, 516 sets"],
-                  [Boxes, "2 700 scellés", "coffrets, displays, tins, avec leur cote"],
-                  [Gem, "Pokédex", "1 025 espèces à ranger en classeur"],
-                  [Smartphone, "Installable", "sur iPhone et Android, comme une app"],
-                  [Share2, "Exports", "JSON et CSV en un clic"],
-                  [Check, "Gratuit", "sans pub ni abonnement"],
-                ].map(([Icon, t, s], i) => {
-                  const I = Icon as React.ComponentType<{ size?: number; "aria-hidden"?: boolean }>;
-                  return (
-                    <div key={t as string} className="mk-pop rounded-xl border border-edge bg-raised/40 p-3" style={{ animationDelay: `${i * 0.12}s` }}>
-                      <I size={16} aria-hidden />
-                      <p className="mt-2 text-sm font-semibold">{t as string}</p>
-                      <p className="mt-0.5 text-[11px] leading-snug text-muted">{s as string}</p>
-                    </div>
-                  );
-                })}
-              </div>
+              <CatalogueMock />
             </Tile>
           </div>
         </section>
 
+        {/* Boosters */}
+        <Reveal>
+          <section
+            className="panel relative grid overflow-hidden md:grid-cols-[1.1fr_1fr] md:items-center"
+            style={{ background: "radial-gradient(60% 70% at 70% 50%, hsl(268 70% 45% / .32), var(--surface) 70%)" }}
+          >
+            <div className="min-w-0 p-7 sm:p-9">
+              <p className={KICKER}>Et pour souffler</p>
+              <h2 className="display mt-3 text-balance text-2xl font-bold tracking-tight sm:text-3xl">Des boosters à ouvrir, sans toucher à ta vraie collection.</h2>
+              <p className="mt-3 max-w-md text-sm leading-relaxed text-muted sm:text-base">
+                <span className="num">{stats.playable}</span> sets jouables, cinq cartes par paquet, la cinquième toujours rare ou mieux. Collectionne, fais grader tes tirages,
+                échange tes doubles avec les autres dresseurs.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2.5">
+                <Link href="/inscription" className="btn btn-primary shadow-lg shadow-accent/30">
+                  <Package size={15} aria-hidden /> Ouvrir un booster
+                </Link>
+                <a href="#etapes" className="btn btn-ghost">
+                  Comment ça marche
+                </a>
+              </div>
+            </div>
+            <div className="flex min-w-0 items-end justify-center gap-3 px-5 pb-8 pt-2 sm:gap-4 md:py-8">
+              {packs.map((set, i) => {
+                const mid = i === 1;
+                return (
+                  <div key={set.id} className="mk-pop" style={{ animationDelay: `${0.15 + i * 0.12}s` }}>
+                    <div className={mid ? "w-[124px] -translate-y-1.5 sm:w-[150px]" : "w-[92px] translate-y-2.5 scale-90 opacity-55 sm:w-[110px]"}>
+                      <PackArt set={set} shine={mid} cursor={false} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </Reveal>
+
         {/* Comment ça marche */}
-        <section className="border-t border-edge py-20 sm:py-28">
+        <section id="etapes" className="scroll-mt-20 py-16 sm:py-24">
           <Reveal className="mx-auto max-w-2xl text-center">
-            <p className="label-xs text-accent-strong">Comment ça marche</p>
-            <h2 className="display mt-3 text-3xl font-bold tracking-tight sm:text-5xl">Trois gestes, et ta collection vit.</h2>
+            <p className={KICKER}>Comment ça marche</p>
+            <h2 className="display mt-3 text-balance text-3xl font-bold tracking-tight sm:text-5xl">Trois gestes, et ta collection vit.</h2>
           </Reveal>
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
+          <div className="mt-10 grid gap-3.5 md:grid-cols-3">
             {STEPS.map((s, i) => (
               <Reveal key={s.n} delay={i * 120}>
                 <div className="panel h-full p-6">
-                  <p className="display num text-4xl font-bold text-accent-strong/70">{s.n}</p>
-                  <h3 className="display mt-4 text-xl font-bold tracking-tight">{s.title}</h3>
+                  <p className="display num text-3xl font-extrabold text-accent-strong">{s.n}</p>
+                  <h3 className="display mt-3 text-lg font-bold tracking-tight">{s.title}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-muted">{s.text}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+
+        {/* Questions */}
+        <section className="pb-16 sm:pb-24">
+          <Reveal className="mx-auto max-w-2xl text-center">
+            <p className={KICKER}>Questions</p>
+            <h2 className="display mt-3 text-3xl font-bold tracking-tight sm:text-5xl">Avant de te lancer</h2>
+          </Reveal>
+          <div className="mt-10 grid gap-3 md:grid-cols-2">
+            {faq.map(([q, a], i) => (
+              <Reveal key={q} delay={i * 80}>
+                <div className="panel h-full px-5 py-4.5">
+                  <p className="font-semibold">{q}</p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-muted">{a}</p>
                 </div>
               </Reveal>
             ))}
@@ -583,23 +780,20 @@ export function Landing() {
 
         {/* Appel final */}
         <Reveal>
-          <section className="relative overflow-hidden rounded-3xl border border-edge bg-surface px-6 py-16 text-center sm:py-24">
-            <span
-              className="pointer-events-none absolute inset-x-0 -top-40 -z-0 h-96"
-              style={{ background: "radial-gradient(55% 60% at 50% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 75%)" }}
-              aria-hidden
-            />
+          <section
+            className="panel relative overflow-hidden px-6 py-14 text-center sm:py-20"
+            style={{ background: "radial-gradient(60% 80% at 50% 0%, color-mix(in srgb, var(--accent) 22%, transparent), var(--surface) 70%)" }}
+          >
             <div className="relative">
-              <Logo variant="mark" size={56} />
-              <h2 className="display mx-auto mt-8 max-w-2xl text-3xl font-bold tracking-tight sm:text-5xl">Prêt à donner à ta collection la place qu&apos;elle mérite ?</h2>
-              <p className="mx-auto mt-5 max-w-lg text-base leading-relaxed text-muted">
-                Scan, cote, classeurs, pré-gradation, scellés, vitrine : tout au même endroit, gratuit, sans pub.
-              </p>
-              <Link href="/inscription" className="btn btn-primary mt-8 !px-8 !py-3.5 text-base shadow-xl">
-                Commencer maintenant
+              <div className="flex justify-center">
+                <Logo variant="mark" size={56} />
+              </div>
+              <h2 className="display mx-auto mt-6 max-w-2xl text-balance text-3xl font-bold tracking-tight sm:text-5xl">Prêt à donner à ta collection la place qu&apos;elle mérite ?</h2>
+              <Link href="/inscription" className="btn btn-primary mt-8 !px-8 !py-3.5 text-base shadow-lg shadow-accent/30">
+                Créer ma collection
                 <ArrowRight size={16} aria-hidden />
               </Link>
-              <p className="mt-4 text-xs text-faint">Sans engagement · Tes données t&apos;appartiennent (exports JSON &amp; CSV)</p>
+              <p className="mt-4 text-xs text-muted">Sans engagement · Tes données t&apos;appartiennent (exports JSON &amp; CSV)</p>
             </div>
           </section>
         </Reveal>
@@ -607,21 +801,21 @@ export function Landing() {
       </main>
 
       <footer className="border-t border-edge">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-6 text-xs text-faint sm:px-6">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-7 text-xs text-muted sm:px-6">
           <span className="flex items-center gap-2">
-            <Logo variant="mark" size={18} /> TailTCG
+            <Logo variant="mark" size={18} interactive={false} />
+            TailTCG · Fait par un collectionneur, pour les collectionneurs
           </span>
-          <span className="flex items-center gap-4">
-            <span className="hidden items-center gap-1 sm:flex">
-              <ScanLine size={11} aria-hidden /> Scan sur l&apos;appareil
-            </span>
-            <span className="hidden items-center gap-1 sm:flex">
-              <NotebookTabs size={11} aria-hidden /> Classeurs
-            </span>
-            <span className="hidden items-center gap-1 sm:flex">
-              <Share2 size={11} aria-hidden /> Vitrine
-            </span>
-            <span>Fait avec ❤️ pour les collectionneurs</span>
+          <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+            <a href="https://tcgdex.dev" target="_blank" rel="noreferrer" className="transition hover:text-foreground">
+              Catalogue TCGdex
+            </a>
+            <span aria-hidden>·</span>
+            <span>Cotes Cardmarket &amp; TCGplayer</span>
+            <span aria-hidden>·</span>
+            <Link href="/connexion" className="transition hover:text-foreground">
+              Se connecter
+            </Link>
           </span>
         </div>
       </footer>

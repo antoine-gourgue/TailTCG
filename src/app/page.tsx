@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Landing } from "@/components/landing";
+import { landingPacks, landingStats } from "@/lib/landing-stats";
 
 // Accueil : landing pour les visiteurs ; une fois connecté, la page
 // principale est le tableau de bord Collection. Les anciens liens vers la
@@ -17,7 +18,7 @@ export default async function Home({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return <Landing />;
+    return <Landing stats={await landingStats()} packs={landingPacks()} />;
   }
 
   const query = new URLSearchParams();
