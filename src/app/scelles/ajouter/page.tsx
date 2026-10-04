@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ChevronLeft, Boxes } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app-shell";
 import { PageHead } from "@/components/page-head";
@@ -22,18 +22,32 @@ export default async function AjouterScellePage() {
   if (!user) redirect("/connexion");
 
   // Catalogue en cache partagé : la page ne refait pas 2 700 lignes + le guide à chaque ouverture
-  const { products: rows, cotes } = await getSealedCatalog();
+  const [{ products: rows, cotes }, { data: mine }] = await Promise.all([
+    getSealedCatalog(),
+    // Ce que tu possèdes déjà : repères « ✓ ×n » et « Encore un ? »
+    supabase.from("sealed_items").select("product_id, quantity, created_at").order("created_at", { ascending: false }),
+  ]);
   const tree = buildSealedTree(rows, new Map(cotes));
+  const ownedQty: Record<number, number> = {};
+  const recentIds: number[] = [];
+  for (const m of mine ?? []) {
+    ownedQty[m.product_id] = (ownedQty[m.product_id] ?? 0) + m.quantity;
+    if (!recentIds.includes(m.product_id) && recentIds.length < 8) recentIds.push(m.product_id);
+  }
 
   return (
     <AppShell>
-      <main className="page py-8">
+      <main className="relative z-10 page py-8">
         <Link href="/scelles" className="mb-4 inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground">
-          <ArrowLeft size={14} aria-hidden />
+          <ChevronLeft size={16} aria-hidden />
           Scellés
         </Link>
-        <PageHead kicker="Scellés" title="Ajouter un scellé" count={rows.length} sub="Par série puis par extension, ou cherche directement un nom." />
-        <CatalogClient series={tree} />
+        <PageHead kicker="Scellés" title="Ajouter un scellé" count={rows.length} sub="Cherche un produit, filtre par type, ou feuillette les extensions : la cote Cardmarket est relevée chaque nuit.">
+          <Link href="/scelles" className="btn btn-ghost">
+            <Boxes size={15} aria-hidden /> Mes scellés
+          </Link>
+        </PageHead>
+        <CatalogClient series={tree} ownedQty={ownedQty} recentIds={recentIds} />
       </main>
     </AppShell>
   );
