@@ -61,7 +61,7 @@ export default async function GameCollectionPage({ searchParams }: { searchParam
     supabase
       .from("game_cards")
       .select("id, tcgdex_id, set_id, set_name, card_name, local_id, image_url, tier, rarity, for_trade, obtained_at, graded, grade_centering, grade_corners, grade_edges, grade_surface, grade_overall")
-      .order("obtained_at", { ascending: false })
+      .order("obtained_at", { ascending: false }).order("id")
       .range(from, to)
   );
   const qtyById = new Map<string, number>();

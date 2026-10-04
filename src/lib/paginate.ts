@@ -2,7 +2,10 @@
  * Lit toutes les lignes d'une requête Supabase par pages de 1000 (le plafond
  * PostgREST par requête). Borné par `maxPages` pour rester sûr même avec
  * d'énormes collections. `make(from, to)` doit renvoyer une requête avec ses
- * colonnes, filtres et tri, à laquelle on applique `.range`.
+ * colonnes, filtres et tri, à laquelle on applique `.range`. Le tri doit être
+ * total (ajouter `.order("id")` après une date : les cartes d'un même booster
+ * partagent leur `obtained_at`, et une page coupée dans un groupe d'égaux
+ * fait réapparaître des lignes sur la suivante — clés React en double).
  */
 export async function fetchAll<T>(
   make: (from: number, to: number) => PromiseLike<{ data: T[] | null }>,

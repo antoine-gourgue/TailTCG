@@ -74,7 +74,7 @@ export default async function BoostersPage({ searchParams }: { searchParams: Pro
       supabase
         .from("game_cards")
         .select("tcgdex_id, set_id, set_name, card_name, local_id, image_url, rarity, tier, graded, grade_overall, obtained_at")
-        .order("obtained_at", { ascending: false })
+        .order("obtained_at", { ascending: false }).order("id")
         .range(from, to)
     ),
     supabase.from("game_openings").select("set_id, tcgdex_ids, opened_at").order("opened_at", { ascending: false }).limit(400),

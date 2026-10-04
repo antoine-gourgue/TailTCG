@@ -54,8 +54,8 @@ export default async function EchangesPage() {
   const admin = createAdminClient();
 
   const [mine, market, { data: trades }, { count: realized }] = await Promise.all([
-    fetchAll<Row>((from, to) => admin.from("game_cards").select(SELECT).eq("owner_id", uid).order("obtained_at", { ascending: false }).range(from, to)),
-    fetchAll<Row>((from, to) => admin.from("game_cards").select(SELECT).eq("for_trade", true).neq("owner_id", uid).order("obtained_at", { ascending: false }).range(from, to), { maxPages: 3 }),
+    fetchAll<Row>((from, to) => admin.from("game_cards").select(SELECT).eq("owner_id", uid).order("obtained_at", { ascending: false }).order("id").range(from, to)),
+    fetchAll<Row>((from, to) => admin.from("game_cards").select(SELECT).eq("for_trade", true).neq("owner_id", uid).order("obtained_at", { ascending: false }).order("id").range(from, to), { maxPages: 3 }),
     admin
       .from("game_trades")
       .select("id, from_owner, to_owner, from_card_id, to_card_id, tier, status, created_at")

@@ -74,7 +74,7 @@ export default async function GradationPage() {
     supabase
       .from("game_cards")
       .select("id, tcgdex_id, set_id, card_name, set_name, local_id, image_url, tier, rarity, obtained_at, graded_at, graded, grade_centering, grade_corners, grade_edges, grade_surface, grade_overall")
-      .order("obtained_at", { ascending: false })
+      .order("obtained_at", { ascending: false }).order("id")
       .range(from, to)
   );
 
