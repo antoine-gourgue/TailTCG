@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { fetchSeriesWithSets, type TcgdexSetDetail } from "@/lib/tcgdex";
+import { fetchSeriesWithSets, hostedLogo, type TcgdexSetDetail } from "@/lib/tcgdex";
 import SNAPSHOT from "@/data/playable-sets.json";
 
 /**
@@ -30,7 +30,8 @@ export type PlayableSet = {
   cover: string | null;
 };
 
-const snapshot = SNAPSHOT as PlayableSet[];
+// Sets sans logo TCGdex (30 ans, Set de base…) : logo auto-hébergé de public/set-logos
+const snapshot = (SNAPSHOT as PlayableSet[]).map((s) => (s.logo ? s : { ...s, logo: hostedLogo("fr", s.id) ?? null }));
 /** Sets de l'instantané par id (totaux, noms), sans requête */
 export const PLAYABLE_BY_ID: ReadonlyMap<string, PlayableSet> = new Map(snapshot.map((s) => [s.id, s]));
 
@@ -102,9 +103,12 @@ const cachedLive = unstable_cache(computeLive, ["playable-sets", `snap-${snapsho
   revalidate: DAY,
 });
 
+/** Logo auto-hébergé pour les sets que TCGdex ne fournit pas (30 ans, Set de base…) — après le cache, qui peut dater */
+const withHostedLogos = (list: PlayableSet[]): PlayableSet[] => list.map((s) => (s.logo ? s : { ...s, logo: hostedLogo("fr", s.id) ?? null }));
+
 export async function fetchPlayableSets(): Promise<PlayableSet[]> {
   try {
-    return await cachedLive();
+    return withHostedLogos(await cachedLive());
   } catch {
     return snapshot;
   }

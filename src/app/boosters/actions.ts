@@ -33,7 +33,15 @@ export type DrawnCard = {
 
 export type OpenResult =
   | { error: string }
-  | { cards: DrawnCard[]; profile: Profile; setId: string; setName: string };
+  | {
+      cards: DrawnCard[];
+      profile: Profile;
+      setId: string;
+      setName: string;
+      /** Cartes distinctes du set possédées après cette ouverture, et taille du set */
+      setOwned: number;
+      setTotal: number;
+    };
 
 const rand = () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
 
@@ -128,6 +136,8 @@ export async function openBooster(setId: string): Promise<OpenResult> {
     setId,
     setName,
     profile: nextProfile,
+    setOwned: new Set([...ownedIds, ...drawn.map((c) => c.id)]).size,
+    setTotal: pool.length,
     cards: drawn.map((c, i) => ({
       id: inserted[i]?.id ?? `${c.id}-${i}`,
       tcgdex_id: c.id,

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-/** Onglets de la section Boosters, à part du reste du site */
+/** Onglets de la section Boosters : pilules, l'onglet actif en dégradé accent comme le Dock */
 export function GameNav({
   current,
 }: {
@@ -13,19 +13,21 @@ export function GameNav({
     { key: "echanges" as const, href: "/boosters/echanges", label: "Échanges" },
   ];
   return (
-    <div className="inline-flex rounded-lg border border-edge bg-surface p-0.5">
-      {tabs.map((t) => (
-        <Link
-          key={t.key}
-          href={t.href}
-          aria-current={current === t.key ? "page" : undefined}
-          className={`rounded-md px-3 py-1.5 text-[13px] font-medium transition ${
-            current === t.key ? "bg-raised text-foreground shadow-sm" : "text-muted hover:text-foreground"
-          }`}
-        >
-          {t.label}
-        </Link>
-      ))}
-    </div>
+    <nav aria-label="Boosters" className="scrollbar-none -mx-4 flex max-w-[calc(100%+2rem)] gap-1 overflow-x-auto px-4 sm:mx-0 sm:max-w-full sm:px-0">
+      <div className="flex gap-1 rounded-full bg-surface p-1 ring-1 ring-ring">
+        {tabs.map((t) => (
+          <Link
+            key={t.key}
+            href={t.href}
+            aria-current={current === t.key ? "page" : undefined}
+            className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
+              current === t.key ? "bg-gradient-to-r from-accent to-accent-strong text-white shadow-lg shadow-accent/30" : "text-muted hover:text-foreground"
+            }`}
+          >
+            {t.label}
+          </Link>
+        ))}
+      </div>
+    </nav>
   );
 }

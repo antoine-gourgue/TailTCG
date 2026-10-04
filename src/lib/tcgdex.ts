@@ -6,7 +6,7 @@ import setLogos from "@/data/set-logos.json";
 const TCGDEX_BASE = "https://api.tcgdex.net/v2/fr";
 
 /** Logo auto-hébergé (scripts/set-logos.mjs) pour un set que TCGdex ne fournit pas */
-function hostedLogo(lang: CatalogLang, setId: string): string | undefined {
+export function hostedLogo(lang: CatalogLang, setId: string): string | undefined {
   const table = (setLogos as Record<string, Record<string, string>>)[lang];
   return table?.[setId];
 }

@@ -17,9 +17,9 @@ import { CardImage } from "@/components/card-image";
 import { CardBack } from "@/components/game/card-back";
 import { PackArt } from "@/components/game/pack-art";
 import { GameCardDetail } from "@/components/game/card-detail";
-import { TIER_TILE } from "@/components/game/tier-badge";
+import { RarityPill, TIER_TILE, rarityText } from "@/components/game/tier-badge";
 import { Toast } from "@/components/toast";
-import { formatCountdown, TIER_LABEL, TIERS, type Tier } from "@/lib/game";
+import { formatCountdown, TIERS, type Tier } from "@/lib/game";
 import { isMuted, play, setMuted } from "@/lib/sfx";
 
 export type StageSet = PlayableSet;
@@ -52,12 +52,9 @@ const GLOW: Partial<Record<Tier, string>> = {
   ultra: "rgba(251, 191, 36, .65)",
   secret: "rgba(253, 164, 175, .7)",
 };
-const BANNER: Partial<Record<Tier, string>> = {
-  rare: "Rare",
-  holo: "Holo !",
-  ultra: "Ultra rare !!",
-  secret: "Secrète !!!",
-};
+/** Ponctuation de la bannière selon le palier ; le texte est la rareté TCGdex de la carte */
+const BANG: Partial<Record<Tier, string>> = { rare: "", holo: " !", ultra: " !!", secret: " !!!" };
+const bannerFor = (c: DrawnCard) => (BANG[c.tier] == null ? null : `${rarityText(c.rarity, c.tier)}${BANG[c.tier]}`);
 const rank = (t: Tier) => TIERS.indexOf(t);
 const rareOrBetter = (t: Tier) => rank(t) >= rank("holo");
 /** Temps d'exposition d'une carte en grand, selon sa rareté */
@@ -127,6 +124,7 @@ export function BoosterStage({
   const idle = !rv.flipping && !rv.show;
   const done = stage === "revealing" && rv.remaining.length === 0 && idle;
   const newCount = rv.revealed.filter((c) => c.isNew).length;
+  const dupCount = rv.revealed.length - newCount;
   const best = rv.revealed.reduce<DrawnCard | null>(
     (b, c) => (b == null || rank(c.tier) > rank(b.tier) ? c : b),
     null
@@ -313,7 +311,7 @@ export function BoosterStage({
 
   const focus = rv.show?.card ?? (rv.flipping ? rv.remaining.find((c) => c.id === rv.flipping) : null) ?? null;
   const glow = focus ? GLOW[focus.tier] : null;
-  const banner = rv.show && !rv.show.leaving ? BANNER[rv.show.card.tier] : null;
+  const banner = rv.show && !rv.show.leaving ? bannerFor(rv.show.card) : null;
   const showingRow = stage === "revealing" && !done;
 
   return createPortal(
@@ -516,9 +514,11 @@ export function BoosterStage({
                   {banner}
                 </div>
               )}
-              <p className="mt-3 text-center text-sm font-medium">
-                {rv.show.card.name}
-                <span className="text-muted"> · {TIER_LABEL[rv.show.card.tier]}</span>
+              <p className="display mt-3 text-center text-lg font-bold leading-tight">{rv.show.card.name}</p>
+              <p className="num mt-0.5 text-center text-xs text-muted">
+                {set.name} · {rv.show.card.local_id}
+                {pack?.setTotal ? ` / ${pack.setTotal}` : ""}
+                {rv.show.card.isNew && <span className="font-sans font-semibold text-[#f4c361]"> · nouvelle !</span>}
               </p>
               {!rv.show.leaving && (
                 <p className="mt-1 text-center text-[11px] text-white/40">Touche pour continuer</p>
@@ -528,9 +528,6 @@ export function BoosterStage({
         )}
 
         {/* Éventail final */}
-        {done && (
-          <p className="label-xs mb-2 !text-white/50">Résultat</p>
-        )}
         {done && (
           <div className="relative flex h-[min(58vw,270px)] w-full items-center justify-center">
             {rv.revealed.map((c, i) => {
@@ -555,7 +552,7 @@ export function BoosterStage({
                   >
                     <CardImage base={c.image} alt={c.name} quality="high" />
                     <span className={`tile-badge bottom-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap !px-1.5 !text-[10px] ${TIER_CLASS[c.tier]}`}>
-                      {TIER_LABEL[c.tier]}
+                      {rarityText(c.rarity, c.tier)}
                     </span>
                     {c.isNew && (
                       <span className="tile-badge left-1.5 top-1.5 !bg-accent !px-1.5 !text-[10px] !text-accent-ink">Nouvelle</span>
@@ -591,29 +588,39 @@ export function BoosterStage({
             </div>
           )}
           {done && (
-            <>
-              <p className="display text-2xl font-bold">
-                {newCount > 0 ? `${newCount} nouvelle${newCount > 1 ? "s" : ""} !` : "Que des doublons"}
-              </p>
+            <div className="flex w-full max-w-md flex-col items-center gap-1">
+              <p className="label-xs !text-white/50">Meilleur tirage</p>
               {best && (
-                <p className="-mt-1 text-sm text-muted">
-                  Meilleur tirage : <span className="font-medium text-foreground">{best.name}</span>
-                  <span className="text-faint"> · {TIER_LABEL[best.tier]}</span>
+                <p className="display flex flex-wrap items-center justify-center gap-2 text-2xl font-bold leading-tight">
+                  {best.name}
+                  <RarityPill rarity={best.rarity} tier={best.tier} />
                 </p>
               )}
-              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
-                <button type="button" onClick={onClose} className="btn btn-ghost">
-                  Changer de set
-                </button>
-                <Link href="/boosters/collection" className="btn btn-ghost">
-                  Ma collection
-                </Link>
-                <button type="button" onClick={again} disabled={!canOpen} className="btn btn-primary">
+              <p className="num text-sm text-muted">
+                {newCount > 0 ? `${newCount} nouvelle${newCount > 1 ? "s" : ""}` : "aucune nouvelle"} · {dupCount} double{dupCount > 1 ? "s" : ""}
+                {pack?.setTotal ? ` · ${set.name} ${pack.setOwned} / ${pack.setTotal}` : ""}
+              </p>
+              <div className="mt-3 flex w-full flex-col gap-2">
+                <button type="button" onClick={again} disabled={!canOpen} className="btn btn-primary w-full !py-3 shadow-lg shadow-accent/30">
                   <Package size={15} aria-hidden />
-                  {canOpen ? "Encore un !" : "Plus de booster"}
+                  {canOpen ? "Encore un booster" : "Plus de booster"}
                 </button>
+                <div className="flex gap-2">
+                  <Link href="/boosters/collection" className="btn btn-ghost flex-1 !border-white/10 !bg-white/5">
+                    Ma collection
+                  </Link>
+                  {best && rank(best.tier) >= rank("rare") ? (
+                    <button type="button" onClick={() => setDetail(best)} className="btn btn-ghost flex-1 !border-white/10 !bg-white/5">
+                      <Sparkles size={14} aria-hidden /> Grader {best.name.length > 14 ? "la meilleure" : best.name}
+                    </button>
+                  ) : (
+                    <button type="button" onClick={onClose} className="btn btn-ghost flex-1 !border-white/10 !bg-white/5">
+                      Changer de set
+                    </button>
+                  )}
+                </div>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -636,7 +643,7 @@ export function BoosterStage({
               <div className="card-tile aspect-[63/88]">
                 <CardImage base={c.image} alt={c.name} />
                 <span className={`tile-badge bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap !px-1.5 !text-[9px] sm:!text-[10px] ${TIER_CLASS[c.tier]}`}>
-                  {TIER_LABEL[c.tier]}
+                  {rarityText(c.rarity, c.tier)}
                 </span>
                 {c.isNew && (
                   <span className="tile-badge left-1 top-1 !bg-accent !px-1.5 !text-[9px] !text-accent-ink sm:!text-[10px]">
@@ -656,10 +663,13 @@ export function BoosterStage({
                 image: detail.image,
                 name: detail.name,
                 set_name: set.name,
+                set_id: set.id,
                 local_id: detail.local_id,
                 tier: detail.tier,
+                rarity: detail.rarity,
                 isNew: detail.isNew,
                 gradable: true,
+                setProgress: pack ? { owned: pack.setOwned, total: pack.setTotal } : undefined,
               }
             : null
         }

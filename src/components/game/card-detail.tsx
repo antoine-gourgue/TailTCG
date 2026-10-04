@@ -1,13 +1,16 @@
 "use client";
 
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { RotateCw, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { useRef, useState, useTransition, type PointerEvent as ReactPointerEvent } from "react";
+import { Package, RotateCw, Sparkles, Tag } from "lucide-react";
 import { gradeGameCard } from "@/app/boosters/actions";
+import { setForTrade } from "@/app/boosters/trade-actions";
+import { RarityPill } from "@/components/game/tier-badge";
 import { Sheet } from "@/components/sheet";
 import { CardImage } from "@/components/card-image";
 import { CardBack } from "@/components/game/card-back";
 import { GradedSlab } from "@/components/graded-slab";
-import { GRADE_AXES, TIER_LABEL, TIERS, type Grade, type Tier } from "@/lib/game";
+import { GRADE_AXES, gradeLabel, TIERS, type Grade, type Tier } from "@/lib/game";
 import { play } from "@/lib/sfx";
 
 export type GameCardView = {
@@ -18,22 +21,47 @@ export type GameCardView = {
   set_name?: string;
   local_id?: string;
   tier: Tier;
+  /** Rareté TCGdex brute (« Double rare »…) ; le palier sert de secours */
+  rarity?: string | null;
+  set_id?: string;
+  /** Total de cartes du set, pour « 087 / 120 » */
+  set_total?: number | null;
   qty?: number;
   isNew?: boolean;
+  /** Date d'obtention (ISO) */
+  obtained_at?: string | null;
+  /** Sur la place d'échange ; absent = pas d'action d'échange */
+  for_trade?: boolean;
+  /** Avancement du set de la carte */
+  setProgress?: { owned: number; total: number } | null;
   /** Notes si la carte est déjà gradée */
   grade?: Grade | null;
   /** Peut être gradée maintenant (potentiel caché non révélé) */
   gradable?: boolean;
 };
 
-export const TIER_BADGE: Record<Tier, string> = {
-  common: "bg-neutral-700/90 text-neutral-100",
-  uncommon: "bg-emerald-700/90 text-emerald-50",
-  rare: "bg-sky-700/90 text-sky-50",
-  holo: "bg-violet-700/90 text-violet-50",
-  ultra: "bg-amber-500/95 text-black",
-  secret: "bg-gradient-to-r from-amber-300 via-rose-300 to-sky-300 text-black",
+/** Teinte de fond de la fiche selon le palier */
+const TINT: Record<Tier, string> = {
+  common: "rgba(120,120,130,.35)",
+  uncommon: "rgba(16,185,129,.3)",
+  rare: "rgba(56,189,248,.3)",
+  holo: "rgba(167,139,250,.38)",
+  ultra: "rgba(251,191,36,.35)",
+  secret: "rgba(253,164,175,.38)",
 };
+
+/** « il y a 2 h », « hier », « il y a 5 j » */
+function since(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const ms = Date.now() - new Date(iso).getTime();
+  const h = Math.floor(ms / 3_600_000);
+  if (h < 1) return "à l’instant";
+  if (h < 24) return `il y a ${h} h`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return "hier";
+  if (d < 30) return `il y a ${d} j`;
+  return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+}
 
 const rareOrBetter = (t: Tier) => TIERS.indexOf(t) >= TIERS.indexOf("holo");
 const MAX_TILT = 16;
@@ -77,7 +105,7 @@ function TiltCard({ card }: { card: GameCardView }) {
               setFlipped((f) => !f);
             }
           }}
-          className="relative aspect-[63/88] w-[min(62vw,270px)] cursor-pointer touch-none [transform-style:preserve-3d]"
+          className="relative aspect-[63/88] w-[min(58vw,230px)] cursor-pointer touch-none [transform-style:preserve-3d]"
           style={{
             transform: `rotateX(${tilt.rx}deg) rotateY(${tilt.ry + (flipped ? 180 : 0)}deg)`,
             transition: tilt.active ? "none" : "transform .5s cubic-bezier(.2,.8,.3,1)",
@@ -156,8 +184,9 @@ function ScanView({ card }: { card: GameCardView }) {
   );
 }
 
-/** Corps du détail : gradation (scan → boîtier), inclinaison, retournement.
- * L'état est réinitialisé par la `key` du parent à chaque carte ouverte. */
+/** Corps du détail : visuel inclinable à gauche, identité, chiffres et actions
+ * à droite (empilés sur mobile). Gradation : scan puis boîtier. L'état est
+ * réinitialisé par la `key` du parent à chaque carte ouverte. */
 function DetailBody({
   card,
   onGraded,
@@ -167,9 +196,11 @@ function DetailBody({
 }) {
   const [grade, setGrade] = useState<Grade | null>(card.grade ?? null);
   // idle | scanning | done — "done" ré-anime l'entrée du boîtier
-  const [phase, setPhase] = useState<"idle" | "scanning" | "done">(card.grade ? "idle" : "idle");
+  const [phase, setPhase] = useState<"idle" | "scanning" | "done">("idle");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [onTrade, setOnTrade] = useState(card.for_trade ?? false);
+  const [tradeBusy, startTrade] = useTransition();
 
   async function grade5() {
     if (!card.id || pending) return;
@@ -192,97 +223,150 @@ function DetailBody({
       onGraded?.(card.id!, res.grade);
     }, wait);
   }
-
-  // ——— Carte gradée : le boîtier ———
-  if (grade) {
-    const fresh = phase === "done";
-    return (
-      <div>
-        <div className={`mx-auto w-[min(66vw,290px)] ${fresh ? "animate-[slab-in_.6s_cubic-bezier(.2,.9,.3,1.2)_both]" : ""}`}>
-          <GradedSlab
-            name={card.name}
-            setName={card.set_name ?? ""}
-            localId={card.local_id ?? ""}
-            imageUrl={card.image}
-            grade={grade.overall}
-            centering={grade.centering}
-            corners={grade.corners}
-            edges={grade.edges}
-            surface={grade.surface}
-          />
-        </div>
-        {fresh && (
-          <p className="mt-3 text-center text-sm font-medium text-accent-strong animate-[grade-tick_.5s_ease-out_.3s_both]">
-            Carte gradée {grade.overall}/10 !
-          </p>
-        )}
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-center">
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${TIER_BADGE[card.tier]}`}>
-            {TIER_LABEL[card.tier]}
-          </span>
-        </div>
-      </div>
-    );
+  function toggleTrade() {
+    if (!card.id) return;
+    const next = !onTrade;
+    setOnTrade(next);
+    startTrade(async () => {
+      const res = await setForTrade(card.id!, next);
+      if ("error" in res) {
+        setOnTrade(!next);
+        setError(res.error);
+      }
+    });
   }
 
-  // ——— Analyse en cours ———
-  if (phase === "scanning") {
-    return (
-      <div>
-        <ScanView card={card} />
-        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5">
-          {GRADE_AXES.map((a, i) => (
-            <div key={a.key}>
-              <div className="mb-1 flex items-baseline justify-between">
-                <span className="text-xs text-muted">{a.label}</span>
-                <span className="num text-xs text-faint">···</span>
+  const fresh = phase === "done";
+  const obtained = since(card.obtained_at);
+  const pct = card.setProgress?.total ? Math.round((card.setProgress.owned / card.setProgress.total) * 100) : null;
+  const tradeKnown = card.for_trade !== undefined && !!card.id;
+
+  const visual =
+    phase === "scanning" ? (
+      <ScanView card={card} />
+    ) : grade ? (
+      <div className={`mx-auto w-[min(62vw,250px)] ${fresh ? "animate-[slab-in_.6s_cubic-bezier(.2,.9,.3,1.2)_both]" : ""}`}>
+        <GradedSlab
+          name={card.name}
+          setName={card.set_name ?? ""}
+          localId={card.local_id ?? ""}
+          imageUrl={card.image}
+          grade={grade.overall}
+          centering={grade.centering}
+          corners={grade.corners}
+          edges={grade.edges}
+          surface={grade.surface}
+        />
+      </div>
+    ) : (
+      <TiltCard card={card} />
+    );
+
+  return (
+    <div className="-mx-5 -mt-4 sm:-mt-5">
+      {/* Fond teinté par le palier, visuel et identité */}
+      <div className="relative overflow-hidden rounded-t-2xl">
+        <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(80% 60% at 30% 20%, ${TINT[card.tier]}, transparent 70%)` }} />
+        <div className="relative grid gap-5 px-5 pb-4 pt-7 sm:grid-cols-[250px_minmax(0,1fr)] sm:items-start sm:pt-6">
+          <div>{visual}</div>
+          <div className="min-w-0 sm:pr-8">
+            <p className="label-xs text-accent-strong">
+              {card.set_name ?? "Carte"}
+              {card.local_id && (
+                <span className="num">
+                  {" "}
+                  · {card.local_id}
+                  {card.set_total ? ` / ${card.set_total}` : ""}
+                </span>
+              )}
+            </p>
+            <h2 className="display mt-0.5 flex flex-wrap items-center gap-2 text-2xl font-bold leading-[1.1] tracking-tight">
+              {card.name}
+              <RarityPill rarity={card.rarity} tier={card.tier} />
+              {card.isNew && <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-semibold text-accent-ink">Nouvelle</span>}
+            </h2>
+            <p className="mt-1.5 text-sm text-muted">
+              {obtained ? `Obtenue ${obtained}` : "Tirée dans un booster"}
+              {card.qty != null && card.qty > 0 && (
+                <>
+                  {" "}
+                  · <span className="num font-semibold text-foreground">{card.qty}</span> exemplaire{card.qty > 1 ? "s" : ""}
+                </>
+              )}
+            </p>
+            {fresh && grade && (
+              <p className="mt-2 text-sm font-medium text-accent-strong animate-[grade-tick_.5s_ease-out_.3s_both]">
+                Carte gradée {grade.overall}/10 !
+              </p>
+            )}
+
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <div className="min-w-0 rounded-2xl bg-background/60 px-3 py-2.5 ring-1 ring-ring">
+                <p className="label-xs !text-[10px] text-muted">Gradation</p>
+                <p className={`num truncate text-sm font-bold leading-tight ${grade ? "text-[#f4c361]" : ""}`}>{grade ? `${gradeLabel(grade.overall)} ${grade.overall}` : phase === "scanning" ? "Analyse…" : "Non gradée"}</p>
+                <p className="truncate text-[11px] text-muted">{grade ? "boîtier TailTCG" : card.gradable === false ? "depuis la collection" : "potentiel caché"}</p>
               </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-foreground/[0.08]">
-                <div
-                  className="h-full w-1/3 rounded-full bg-accent/70"
-                  style={{ animation: `bar-indet 1s linear ${i * 150}ms infinite` }}
-                />
+              <div className="min-w-0 rounded-2xl bg-background/60 px-3 py-2.5 ring-1 ring-ring">
+                <p className="label-xs !text-[10px] text-muted">Échange</p>
+                <p className="truncate text-sm font-bold leading-tight">{tradeKnown ? (onTrade ? "Sur la place" : "Possible") : "Même rareté"}</p>
+                <p className="truncate text-[11px] text-muted">{onTrade ? "visible des dresseurs" : "contre une carte de même palier"}</p>
+              </div>
+              <div className="min-w-0 rounded-2xl bg-background/60 px-3 py-2.5 ring-1 ring-ring">
+                <p className="label-xs !text-[10px] text-muted">Dans le set</p>
+                <p className="num truncate text-sm font-bold leading-tight">{card.setProgress ? `${card.setProgress.owned} / ${card.setProgress.total}` : "—"}</p>
+                <p className="truncate text-[11px] text-muted">{pct != null ? `${pct} % possédé` : card.set_name ?? ""}</p>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
 
-  // ——— Carte non gradée : recto interactif + bouton ———
-  return (
-    <div>
-      <TiltCard card={card} />
-      <div className="mt-4 text-center">
-        <p className="display text-xl font-semibold leading-tight">{card.name}</p>
-        <p className="mt-1 text-sm text-muted">
-          {card.set_name}
-          {card.local_id && <span className="num text-faint"> · {card.local_id}</span>}
-        </p>
-        <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2">
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${TIER_BADGE[card.tier]}`}>
-            {TIER_LABEL[card.tier]}
-          </span>
-          {card.isNew && (
-            <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-semibold text-accent-ink">
-              Nouvelle
-            </span>
-          )}
+            {(grade || phase === "scanning") && (
+              <div className="mt-3">
+                <p className="label-xs !text-[10px] mb-1.5 text-muted">Sous-notes</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {GRADE_AXES.map((a, i) => (
+                    <div key={a.key} className="rounded-xl bg-raised/60 px-2.5 py-2">
+                      <p className="label-xs !text-[10px] truncate text-muted">{a.label}</p>
+                      {grade ? (
+                        <p className="num font-bold">{grade[a.key]}</p>
+                      ) : (
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-foreground/[0.08]">
+                          <div className="h-full w-1/3 rounded-full bg-accent/70" style={{ animation: `bar-indet 1s linear ${i * 150}ms infinite` }} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-      {card.id && card.gradable !== false && (
-        <div className="mt-4">
-          <button type="button" onClick={grade5} disabled={pending} className="btn btn-primary w-full !py-3">
+
+      {/* Actions */}
+      <div className="flex flex-wrap gap-2 px-5 pt-3">
+        {card.id && card.gradable !== false && !grade && phase !== "scanning" && (
+          <button type="button" onClick={grade5} disabled={pending} className="btn btn-primary shadow-lg shadow-accent/30">
             <Sparkles size={15} aria-hidden />
-            Faire grader cette carte
+            Faire grader
           </button>
-          <p className="mt-2 text-center text-[11px] text-faint">
-            Met la carte sous boîtier : centrage, coins, bords, surface et note globale.
-          </p>
-          {error && <p className="mt-2 text-center text-sm text-loss">{error}</p>}
-        </div>
+        )}
+        {tradeKnown && (
+          <button type="button" onClick={toggleTrade} disabled={tradeBusy} className={`btn ${onTrade ? "bg-accent-soft text-accent-strong ring-1 ring-accent" : "btn-ghost"}`}>
+            <Tag size={15} aria-hidden />
+            {onTrade ? "Retirer de la place" : "Mettre à l’échange"}
+          </button>
+        )}
+        {card.set_id && (
+          <Link href={`/boosters?set=${encodeURIComponent(card.set_id)}`} className="btn btn-ghost">
+            <Package size={15} aria-hidden />
+            Ouvrir {card.set_name ?? "le set"}
+          </Link>
+        )}
+      </div>
+      {error && <p className="px-5 pt-2 text-sm text-loss">{error}</p>}
+      {card.id && card.gradable !== false && !grade && phase !== "scanning" && (
+        <p className="px-5 pt-2 text-[11px] text-faint">La gradation révèle centrage, coins, bords, surface et la note globale, puis met la carte sous boîtier.</p>
       )}
+      <div className="h-1" />
     </div>
   );
 }
@@ -301,7 +385,7 @@ export function GameCardDetail({
   z?: string;
 }) {
   return (
-    <Sheet open={card != null} onClose={onClose} size="sm" label={card?.name ?? "Carte"} z={z}>
+    <Sheet open={card != null} onClose={onClose} size="xl" label={card?.name ?? "Carte"} z={z}>
       {card && <DetailBody key={card.id ?? card.name} card={card} onGraded={onGraded} />}
     </Sheet>
   );

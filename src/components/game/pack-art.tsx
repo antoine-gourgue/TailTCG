@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { Package } from "lucide-react";
 import type { PlayableSet } from "@/lib/game-sets";
 
@@ -106,13 +106,7 @@ export function PackArt({
           {/* Logo de l'extension, grand, au centre */}
           <div className="absolute inset-x-[8cqw] top-[26cqw] flex h-[42cqw] items-center justify-center">
             {set.logo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={`${set.logo}.png`}
-                alt=""
-                draggable={false}
-                className="max-h-full max-w-full object-contain drop-shadow-[0_4cqw_8cqw_rgba(0,0,0,.7)]"
-              />
+              <PackLogo logo={set.logo} />
             ) : (
               <Package className="h-[20cqw] w-[20cqw] text-white/85" aria-hidden />
             )}
@@ -161,4 +155,14 @@ export function PackArt({
       </div>
     </div>
   );
+}
+
+/** Logo sur l'emballage : .png d'abord (TCGdex), puis .webp (logos auto-hébergés), sinon l'icône */
+function PackLogo({ logo }: { logo: string }) {
+  const [idx, setIdx] = useState(0);
+  // Logos auto-hébergés (chemin local) : .webp d'abord ; TCGdex : .png d'abord
+  const candidates = logo.startsWith("/") ? [`${logo}.webp`, `${logo}.png`] : [`${logo}.png`, `${logo}.webp`];
+  if (idx >= candidates.length) return <Package className="h-[20cqw] w-[20cqw] text-white/85" aria-hidden />;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={candidates[idx]} alt="" draggable={false} onError={() => setIdx((i) => i + 1)} className="max-h-full max-w-full object-contain drop-shadow-[0_4cqw_8cqw_rgba(0,0,0,.7)]" />;
 }
