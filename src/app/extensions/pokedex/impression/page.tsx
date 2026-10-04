@@ -19,7 +19,7 @@ export default async function PokedexPrintPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
 
   const gen = GENERATIONS.find((g) => g.gen === Number(genParam))?.gen ?? 1;
   const list = (await loadPokedex(supabase)).filter((p) => p.generation === gen);

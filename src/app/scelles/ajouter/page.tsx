@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app-shell";
+import { PageHead } from "@/components/page-head";
 import { buildSealedTree } from "@/lib/sealed";
 import { getSealedCatalog } from "@/lib/sealed-prices";
 import { CatalogClient } from "./catalog-client";
@@ -18,7 +19,7 @@ export default async function AjouterScellePage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
 
   // Catalogue en cache partagé : la page ne refait pas 2 700 lignes + le guide à chaque ouverture
   const { products: rows, cotes } = await getSealedCatalog();
@@ -27,12 +28,11 @@ export default async function AjouterScellePage() {
   return (
     <AppShell>
       <main className="page py-8">
-        <Link href="/scelles" className="mb-6 inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground">
+        <Link href="/scelles" className="mb-4 inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground">
           <ArrowLeft size={14} aria-hidden />
           Scellés
         </Link>
-        <h1 className="display mb-1 text-3xl font-bold tracking-tight">Ajouter un produit scellé</h1>
-        <p className="mb-6 text-sm text-muted">{rows.length} produits, par série puis par extension. Ou cherche directement un nom.</p>
+        <PageHead kicker="Scellés" title="Ajouter un scellé" count={rows.length} sub="Par série puis par extension, ou cherche directement un nom." />
         <CatalogClient series={tree} />
       </main>
     </AppShell>

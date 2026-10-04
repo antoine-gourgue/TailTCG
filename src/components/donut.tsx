@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatEur } from "@/lib/domain";
 import type { Slice } from "@/components/stats-widgets";
 
 /* Couleur unique (accent) déclinée en intensité plutôt qu'une palette */
@@ -13,7 +14,7 @@ const C = 2 * Math.PI * R;
  * une tranche ou sa ligne de légende la met en avant et affiche son détail au
  * centre de l'anneau — pas d'infobulle du navigateur.
  */
-export function Donut({ slices, unit = "cartes", label }: { slices: Slice[]; unit?: string; label: string }) {
+export function Donut({ slices, unit = "cartes", label, size = "md" }: { slices: Slice[]; unit?: string; label: string; size?: "md" | "lg" }) {
   const [active, setActive] = useState<string | null>(null);
   const present = slices.filter((s) => s.count > 0);
   const total = present.reduce((a, s) => a + s.count, 0);
@@ -29,8 +30,8 @@ export function Donut({ slices, unit = "cartes", label }: { slices: Slice[]; uni
   const pct = (n: number) => Math.round((n / total) * 100);
 
   return (
-    <div className="flex items-center gap-5 md:flex-col md:items-start md:gap-4 lg:flex-row lg:items-center lg:gap-5">
-      <svg viewBox="0 0 100 100" className="h-28 w-28 shrink-0" role="img" aria-label={label} onMouseLeave={() => setActive(null)}>
+    <div className={size === "lg" ? "flex flex-col items-center gap-4" : "flex items-center gap-5 md:flex-col md:items-start md:gap-4 lg:flex-row lg:items-center lg:gap-5"}>
+      <svg viewBox="0 0 100 100" className={`shrink-0 ${size === "lg" ? "h-36 w-36" : "h-28 w-28"}`} role="img" aria-label={label} onMouseLeave={() => setActive(null)}>
         <circle cx={50} cy={50} r={R} fill="none" stroke="currentColor" strokeOpacity={0.06} strokeWidth={12} />
         {segs.map((s) => {
           const on = current?.code === s.code;
@@ -76,6 +77,7 @@ export function Donut({ slices, unit = "cartes", label }: { slices: Slice[]; uni
               <span className={`num ml-auto shrink-0 text-[11px] ${on ? "text-foreground" : "text-muted"}`}>
                 {s.count} · {pct(s.count)}%
               </span>
+              {s.value != null && <span className={`num w-[4.5rem] shrink-0 text-right text-[11px] ${on ? "text-foreground" : "text-faint"}`}>{formatEur(s.value)}</span>}
             </li>
           );
         })}

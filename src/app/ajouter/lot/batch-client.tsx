@@ -327,7 +327,7 @@ export function BatchAddClient({ sources: initialSources }: { sources: SourceOpt
         <p className="text-sm text-muted">
           Choisis des cartes sur la page d&apos;un set avec « Ajout rapide », puis valide : elles arrivent ici.
         </p>
-        <Link href={draft?.back.href ?? "/recherche"} className="btn btn-primary mt-2">
+        <Link href={draft?.back.href ?? "/catalogue"} className="btn btn-primary mt-2">
           {draft ? `Retour à ${draft.back.label}` : "Parcourir les sets"}
         </Link>
       </div>

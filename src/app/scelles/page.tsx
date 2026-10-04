@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { Boxes, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app-shell";
+import { PageHead } from "@/components/page-head";
+import { StatCard, StatStrip } from "@/components/stat-card";
 import { formatEur } from "@/lib/domain";
 import { kindLabel, sealedSetName } from "@/lib/sealed";
 import { sealedCotes, sealedVariations } from "@/lib/sealed-prices";
@@ -39,7 +41,7 @@ export default async function ScellesPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
 
   const { data } = await supabase
     .from("sealed_items")
@@ -91,16 +93,13 @@ export default async function ScellesPage() {
   return (
     <AppShell>
       <main className="page py-8">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="display mb-1 text-3xl font-bold tracking-tight">Scellés</h1>
-            <p className="text-sm text-muted">Boosters, displays, coffrets et tins gardés fermés, cotés d&apos;après Cardmarket.</p>
-          </div>
-          <Link href="/scelles/ajouter" className="btn btn-primary">
+        <PageHead kicker="Ma collection" title="Scellés" count={count || null} sub={lines.length === 0 ? "Boosters, displays, coffrets et tins gardés fermés, cotés d'après Cardmarket." : undefined}>
+          <Link href="/scelles/ajouter" className="btn btn-primary shadow-lg shadow-accent/30">
             <Plus size={16} aria-hidden />
-            Ajouter un produit
+            <span className="hidden sm:inline">Ajouter un scellé</span>
+            <span className="sm:hidden">Ajouter</span>
           </Link>
-        </div>
+        </PageHead>
 
         {lines.length === 0 ? (
           <div className="panel rise-in flex flex-col items-center gap-3 p-12 text-center">
@@ -116,59 +115,33 @@ export default async function ScellesPage() {
           </div>
         ) : (
           <>
-            {/* Valeurs clés : 2, 3 puis 6 colonnes — rangées pleines et colonnes alignées (en flex-wrap, chaque rangée se calait différemment, ex. iPad) */}
-            <div className="panel mb-6 grid grid-cols-2 items-start gap-x-6 gap-y-4 sm:grid-cols-3 xl:grid-cols-6 px-5 py-4 sm:px-6">
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="label-xs">Produits</span>
-                <span className="display num text-xl font-bold leading-none">{count}</span>
-                <span className="text-xs text-muted">{lines.length} référence{lines.length > 1 ? "s" : ""}</span>
-              </div>
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="label-xs">Payé</span>
-                <span className="display num text-xl font-bold leading-none">{formatEur(totalPaid)}</span>
-                <span className="text-xs text-muted">{pricedCount === count ? "prix connu partout" : `prix connu pour ${pricedCount} sur ${count}`}</span>
-              </div>
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="label-xs">Valeur estimée</span>
-                <span className="display num text-xl font-bold leading-none">{formatEur(totalEst)}</span>
-                <span className="text-xs text-muted">
-                  {[
-                    "cote Cardmarket",
-                    lowBased > 0 ? `${lowBased} sur annonce (pas de vente)` : null,
-                    usEstimated > 0 ? `${usEstimated} estimé${usEstimated > 1 ? "s" : ""} d'après le marché US` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
-              </div>
-              {totalPaid > 0 && (
-                <div className="flex min-w-0 flex-col gap-0.5">
-                  <span className="label-xs">Plus-value</span>
-                  <span className={`display num text-xl font-bold leading-none ${gain > 0 ? "text-gain" : gain < 0 ? "text-loss" : ""}`}>
-                    {gain > 0 ? "+" : ""}
-                    {formatEur(gain)}
-                  </span>
-                  <span className="text-xs text-muted">{pct((gain / totalPaid) * 100)} sur le payé</span>
-                </div>
-              )}
-              {v7All != null && (
-                <div className="flex min-w-0 flex-col gap-0.5">
-                  <span className="label-xs">7 jours</span>
-                  <span className={`display num text-xl font-bold leading-none ${v7All > 0 ? "text-gain" : v7All < 0 ? "text-loss" : ""}`}>
-                    {v7All > 0 ? "+" : ""}
-                    {v7All.toFixed(1).replace(".", ",")} %
-                  </span>
-                  <span className="text-xs text-muted">
-                    cote de {withV7.length} produit{withV7.length > 1 ? "s" : ""} relevé{withV7.length > 1 ? "s" : ""}
-                  </span>
-                </div>
-              )}
+            {/* Chiffres clés */}
+            <div className="mb-5">
+              <StatStrip cols={5}>
+                <StatCard label="Produits" value={count} sub={`${lines.length} référence${lines.length > 1 ? "s" : ""}${pricedCount < count ? ` · ${pricedCount} au prix connu` : ""}`} />
+                <StatCard label="Payé" value={formatEur(totalPaid)} />
+                <StatCard
+                  label="Cote"
+                  value={formatEur(totalEst)}
+                  sub={[lowBased > 0 ? `${lowBased} dès` : null, usEstimated > 0 ? `${usEstimated} ≈ US` : null].filter(Boolean).join(" · ") || "Cardmarket"}
+                />
+                <StatCard
+                  label="Plus-value"
+                  value={totalPaid > 0 ? `${gain > 0 ? "+" : ""}${formatEur(gain)}` : "—"}
+                  sub={totalPaid > 0 ? pct((gain / totalPaid) * 100) : "prix d'achat inconnu"}
+                  tone={totalPaid > 0 ? (gain > 0 ? "up" : gain < 0 ? "down" : undefined) : undefined}
+                />
+                <StatCard
+                  label="7 jours"
+                  value={v7All != null ? `${v7All > 0 ? "+" : ""}${v7All.toFixed(1).replace(".", ",")} %` : "—"}
+                  sub={v7All != null ? `${withV7.length} produit${withV7.length > 1 ? "s" : ""} relevé${withV7.length > 1 ? "s" : ""}` : "relevé en cours"}
+                  tone={v7All != null ? (v7All > 0 ? "up" : v7All < 0 ? "down" : undefined) : undefined}
+                />
+              </StatStrip>
               {best && best.gain! > 0 && (
-                <div className="flex min-w-0 flex-col gap-0.5">
-                  <span className="label-xs">Meilleure plus-value</span>
-                  <span className="display num text-xl font-bold leading-none text-gain">+{formatEur(best.gain!)}</span>
-                  <span className="truncate text-xs text-muted">{best.product.name}</span>
-                </div>
+                <p className="mt-2 text-xs text-muted">
+                  Meilleure plus-value : <span className="font-medium text-foreground">{best.product.name}</span> <span className="num text-gain">+{formatEur(best.gain!)}</span>
+                </p>
               )}
             </div>
 
@@ -177,38 +150,49 @@ export default async function ScellesPage() {
                 <li key={l.product.id}>
                   <Link
                     href={`/scelles/produit/${l.product.id}`}
-                    className="group flex h-full flex-col overflow-hidden rounded-2xl border border-edge bg-surface transition hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-lg"
+                    className="group flex h-full flex-col overflow-hidden rounded-3xl bg-surface ring-1 ring-ring transition hover:-translate-y-0.5 hover:shadow-xl hover:ring-accent/40"
                   >
-                    <div className="relative flex aspect-square items-center justify-center bg-white p-4">
+                    <div className="relative aspect-[4/3] overflow-hidden bg-white">
                       {l.product.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={l.product.image} alt="" className="max-h-full max-w-full object-contain transition group-hover:scale-[1.03]" loading="lazy" />
+                        <img src={l.product.image} alt="" className="absolute inset-0 h-full w-full object-contain p-5 transition group-hover:scale-[1.03]" loading="lazy" />
                       ) : (
-                        <Boxes size={40} className="text-neutral-400" aria-hidden />
-                      )}
-                      {l.quantity > 1 && (
-                        <span className="num absolute right-2 top-2 rounded-full bg-black/75 px-2 py-0.5 text-xs font-semibold text-white">× {l.quantity}</span>
-                      )}
-                      {l.v7 != null && (
-                        <span
-                          className={`num absolute left-2 top-2 rounded-full px-2 py-0.5 text-xs font-semibold ${l.v7 >= 0 ? "bg-gain/15 text-gain" : "bg-loss/15 text-loss"}`}
-                          title="Variation de la cote sur 7 jours"
-                        >
-                          {l.v7 >= 0 ? "+" : ""}
-                          {l.v7.toFixed(1).replace(".", ",")} %
+                        <span className="absolute inset-0 flex items-center justify-center">
+                          <Boxes size={40} className="text-neutral-400" aria-hidden />
                         </span>
                       )}
+                      {l.quantity > 1 && (
+                        <span className="num absolute right-3 top-3 rounded-full bg-black/80 px-2 py-0.5 text-xs font-semibold text-white">× {l.quantity}</span>
+                      )}
+                      {l.gainPct != null ? (
+                        <span
+                          className={`num absolute left-3 top-3 rounded-full px-2 py-0.5 text-xs font-bold ${l.gainPct >= 0 ? "bg-gain/90 text-black" : "bg-loss/90 text-white"}`}
+                          title="Plus-value depuis le prix payé"
+                        >
+                          {pct(l.gainPct)}
+                        </span>
+                      ) : (
+                        l.v7 != null && (
+                          <span
+                            className={`num absolute left-3 top-3 rounded-full px-2 py-0.5 text-xs font-semibold ${l.v7 >= 0 ? "bg-gain/15 text-gain" : "bg-loss/15 text-loss"}`}
+                            title="Variation de la cote sur 7 jours"
+                          >
+                            {l.v7 >= 0 ? "+" : ""}
+                            {l.v7.toFixed(1).replace(".", ",")} %
+                          </span>
+                        )
+                      )}
                     </div>
-                    <div className="flex flex-1 flex-col gap-1 p-3">
+                    <div className="flex flex-1 flex-col gap-1 p-4">
                       <p className="line-clamp-2 text-sm font-semibold leading-tight">{l.product.name}</p>
                       <p className="truncate text-xs text-muted">
                         {kindLabel(l.product.kind)} · {sealedSetName(l.product)}
                       </p>
                       {l.since && <p className="text-[11px] text-faint">Acheté le {fmtShort(l.since)}</p>}
-                      {/* Valeur, payé et plus-value empilés : tient dans une carte étroite (2 colonnes sur mobile) */}
-                      <div className="mt-auto flex flex-col gap-0.5 pt-2">
+                      <div className="mt-auto flex flex-wrap items-baseline justify-between gap-x-2 pt-2">
+                        <span className="num order-2 whitespace-nowrap text-[11px] text-muted sm:order-none sm:text-xs">{l.paid > 0 ? `payé ${formatEur(l.paid)}` : "prix inconnu"}</span>
                         <span
-                          className={`num text-[15px] font-bold leading-tight ${l.estimated == null ? "text-faint" : ""}`}
+                          className={`num text-sm font-bold ${l.estimated == null ? "text-faint" : ""}`}
                           title={
                             l.manual != null
                               ? "Estimation saisie à la main"
@@ -223,20 +207,16 @@ export default async function ScellesPage() {
                           {l.estimated != null ? formatEur(l.estimated) : "—"}
                           {l.cote?.source === "tcgplayer" && l.manual == null && <span className="ml-1 text-[10px] font-normal text-faint">≈ US</span>}
                         </span>
-                        <span className="num text-xs text-muted">{l.paid > 0 ? `payé ${formatEur(l.paid)}` : "prix non renseigné"}</span>
-                        {l.gain != null && (
-                          <span
-                            className={`num flex flex-wrap items-baseline gap-x-1 text-xs font-semibold ${l.gain > 0 ? "text-gain" : l.gain < 0 ? "text-loss" : "text-muted"}`}
-                            title="Plus-value"
-                          >
-                            <span>
-                              {l.gain > 0 ? "+" : ""}
-                              {formatEur(l.gain)}
-                            </span>
-                            {l.gainPct != null && <span className="font-normal text-muted">{pct(l.gainPct)}</span>}
-                          </span>
-                        )}
                       </div>
+                      {l.gain != null && (
+                        <p className={`num flex items-baseline justify-between text-[11px] font-semibold sm:text-xs ${l.gain > 0 ? "text-gain" : l.gain < 0 ? "text-loss" : "text-muted"}`}>
+                          <span className="font-normal text-faint">plus-value</span>
+                          <span>
+                            {l.gain > 0 ? "+" : ""}
+                            {formatEur(l.gain)}
+                          </span>
+                        </p>
+                      )}
                     </div>
                   </Link>
                 </li>

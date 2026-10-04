@@ -14,7 +14,7 @@ export default async function BatchAddPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
 
   const { data: sources } = await supabase.from("sources").select("id, name, kind, city, url").order("name");
 

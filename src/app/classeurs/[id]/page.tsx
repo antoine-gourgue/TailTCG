@@ -42,7 +42,7 @@ export default async function ClasseurPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
 
   const { data: binder } = await supabase
     .from("binders")
@@ -225,7 +225,7 @@ export default async function ClasseurPage({
               href="/classeurs"
               aria-label="Retour aux classeurs"
               title="Classeurs"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-edge text-muted transition hover:border-edge-strong hover:text-foreground"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface text-muted ring-1 ring-ring transition hover:text-foreground"
             >
               <ChevronLeft size={16} aria-hidden />
             </Link>

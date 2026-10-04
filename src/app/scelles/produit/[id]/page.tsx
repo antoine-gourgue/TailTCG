@@ -21,7 +21,7 @@ export default async function ProduitScellePage({ params }: { params: Promise<{ 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
 
   const { data: product } = await supabase.from("sealed_products").select("*").eq("id", id).maybeSingle();
   if (!product) notFound();

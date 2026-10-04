@@ -142,7 +142,7 @@ export async function createItem(
   await snapshotPrices([tcgdex_id], { japanese: fields.language === "JP" });
 
   revalidatePath("/cartes");
-  revalidatePath("/wishlist");
+  revalidatePath("/recherchees");
 
   // Carte scannée depuis le téléphone : on la marque ajoutée et on enchaîne
   // sur la suivante de la session, puis sur le récapitulatif
@@ -163,8 +163,8 @@ export async function createItem(
         .order("created_at")
         .limit(1)
         .maybeSingle();
-      revalidatePath(`/scan/${scan.session_id}`);
-      redirect(next ? addCardUrl({ id: next.tcgdex_id, lang: next.lang, scan: next.id }) : `/scan/${scan.session_id}`);
+      revalidatePath(`/scanner/${scan.session_id}`);
+      redirect(next ? addCardUrl({ id: next.tcgdex_id, lang: next.lang, scan: next.id }) : `/scanner/${scan.session_id}`);
     }
   }
   redirect("/cartes");
@@ -335,7 +335,7 @@ export async function bulkAddToCollection(cards: BulkCard[], language: string) {
   );
 
   revalidatePath("/cartes");
-  revalidatePath("/wishlist");
+  revalidatePath("/recherchees");
   return { error: null, added: clean.length, items: created ?? [] };
 }
 
@@ -448,7 +448,7 @@ export async function addBatchToCollection(
 
   revalidatePath("/cartes");
   revalidatePath("/collection");
-  revalidatePath("/wishlist");
+  revalidatePath("/recherchees");
   return { error: null, added: rows.length };
 }
 

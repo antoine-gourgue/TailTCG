@@ -1,14 +1,19 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Check, Plus } from "lucide-react";
+import { Sheet } from "@/components/sheet";
 import { addSealedItem, type AddSealedState } from "../../actions";
 
-/** Ajout d'un lot à la collection : quantité, prix et date d'achat */
-export function AddForm({ productId }: { productId: number }) {
+/**
+ * Ajout d'un lot à la collection : quantité, prix et date d'achat. En mode
+ * `compact`, un bouton ouvre le formulaire dans une sheet (héros de la fiche).
+ */
+export function AddForm({ productId, compact = false }: { productId: number; compact?: boolean }) {
   const [state, action, pending] = useActionState<AddSealedState, FormData>(addSealedItem, null);
+  const [open, setOpen] = useState(false);
 
-  return (
+  const form = (
     <form action={action} className="space-y-3">
       <input type="hidden" name="product_id" value={productId} />
       {/* Mobile : quantité et prix côte à côte, la date sur toute la largeur */}
@@ -38,5 +43,18 @@ export function AddForm({ productId }: { productId: number }) {
         {pending ? "Ajout…" : "Ajouter à mes scellés"}
       </button>
     </form>
+  );
+
+  if (!compact) return form;
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="btn btn-primary shadow-lg shadow-accent/30">
+        <Plus size={16} aria-hidden />
+        Ajouter à mes scellés
+      </button>
+      <Sheet open={open} onClose={() => setOpen(false)} dismissible={!pending} title="Ajouter à mes scellés" description="Quantité, prix et date d'achat du lot.">
+        {form}
+      </Sheet>
+    </>
   );
 }

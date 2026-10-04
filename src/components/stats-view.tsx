@@ -1,32 +1,10 @@
 import Link from "next/link";
-import {
-  Award,
-  BadgeCheck,
-  Boxes,
-  CalendarDays,
-  ClipboardList,
-  Coins,
-  Gem,
-  Heart,
-  Languages,
-  Layers,
-  LineChart,
-  ListChecks,
-  ShoppingBag,
-  Sparkles,
-  Store,
-  Tag,
-  TrendingDown,
-  TrendingUp,
-  Wallet,
-  Activity,
-  type LucideIcon,
-} from "lucide-react";
+import { BadgeCheck, Boxes, ClipboardList, Heart, Tag, TrendingDown, TrendingUp, type LucideIcon } from "lucide-react";
 import { formatEur } from "@/lib/domain";
 import { kindLabel } from "@/lib/sealed";
 import { combineStats, type SealedRank, type SealedStats } from "@/lib/stats-data";
 import { ValueHistoryChart, type ValuePoint } from "@/components/value-history-chart";
-import { BarRow, Empty, Fact, Panel, RankRow, StatTile, type MonthPoint, type RankItem, type Slice } from "@/components/stats-widgets";
+import { BarRow, Empty, Fact, Panel, RankRow, RankTile, type MonthPoint, type RankItem, type Slice } from "@/components/stats-widgets";
 import { Donut } from "@/components/donut";
 import { MonthlyBars } from "@/components/monthly-bars";
 
@@ -82,12 +60,24 @@ const signed = (v: number) => `${v > 0 ? "+" : ""}${formatEur(v)}`;
 const signedPct = (v: number) => `${v > 0 ? "+" : ""}${Math.round(v)}%`;
 const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 const shortDate = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
-const SETS_SHOWN = 8;
+const SETS_SHOWN = 6;
+
+/** Carte de chiffre de la colonne du héros */
+function Kpi({ label, value, sub, tone, children }: { label: string; value: string; sub?: React.ReactNode; tone?: "up" | "down"; children?: React.ReactNode }) {
+  return (
+    <div className="panel flex min-w-0 flex-1 flex-col justify-center p-5">
+      <p className="label-xs text-muted">{label}</p>
+      <p className={`display num mt-1 truncate text-2xl font-bold ${tone === "up" ? "text-gain" : tone === "down" ? "text-loss" : ""}`}>{value}</p>
+      {children}
+      {sub && <p className="num mt-1 text-xs text-muted">{sub}</p>}
+    </div>
+  );
+}
 
 /**
- * Tableau de bord : cartes seules, ou cartes + scellés (`s` fourni) — le haut
- * devient alors global (3 chiffres, comparatif cartes / scellés, courbe et
- * achats en couches) et une section Scellés s'ajoute en bas.
+ * Tableau de bord en bento : un héros (le chiffre et la courbe), une colonne
+ * de chiffres, puis des panneaux de tailles différentes — cartes seules, ou
+ * cartes + scellés (`s` fourni) avec le comparatif et la section Scellés.
  */
 export function StatsView({ d, s }: { d: StatsData; s?: SealedStats }) {
   const maxSpent = d.sources[0]?.spent ?? 0;
@@ -96,163 +86,181 @@ export function StatsView({ d, s }: { d: StatsData; s?: SealedStats }) {
   const months = c ? c.months : d.months;
   const yearSpend = c ? c.yearSpend : d.yearSpend;
   const activeMonths = c ? c.activeMonths : d.activeMonths;
+  const value = c ? c.value : d.value;
+  const gain = c ? c.gain : d.gain;
+  const gainPct = c ? c.gainPct : d.gainPct;
+  const monthDelta = c ? c.monthDelta : d.monthDelta;
+  const market = c ? c.market : d.market;
+  const invested = c ? c.invested : d.invested;
+  const series = c ? c.valueSeries : d.valueSeries;
+  const sealedShare = c && sealed && invested > 0 ? Math.round((sealed.invested / invested) * 100) : null;
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* ——— Chiffres clés ——— */}
-      {c && sealed ? (
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <StatTile
-            icon={Coins}
-            label="Valeur estimée"
-            value={formatEur(c.value)}
-            sub={c.value == null ? "Aucune cote ni valeur saisie" : c.monthDelta != null ? `${signed(c.monthDelta)} sur 30 jours, achats inclus` : `${plural(c.count, "objet")}, cartes et scellés`}
-          />
-          <StatTile
-            icon={Store}
+    <div className="flex flex-col gap-4">
+      {/* ——— Héros : le chiffre, sa plus-value, la courbe ——— */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <section className="panel relative col-span-1 overflow-hidden p-5 sm:p-6 lg:col-span-8">
+          <span className="pointer-events-none absolute -left-20 -top-24 h-72 w-72 rounded-full bg-accent/15 blur-3xl" aria-hidden />
+          <div className="relative">
+            <p className="label-xs text-muted">Valeur estimée{sealed ? " · cartes et scellés" : ""}</p>
+            <p className={`display num mt-1 text-[36px] font-bold leading-none tracking-tight sm:text-[44px] ${value == null ? "text-faint" : ""}`}>{formatEur(value)}</p>
+            <p className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+              {gain != null ? (
+                <>
+                  <span className={`num inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold ${gain >= 0 ? "bg-gain/15 text-gain" : "bg-loss/15 text-loss"}`}>
+                    {gain >= 0 ? <TrendingUp size={12} aria-hidden /> : <TrendingDown size={12} aria-hidden />}
+                    {signed(gain)}
+                    {gainPct != null && ` · ${signedPct(gainPct)}`}
+                  </span>
+                  <span>depuis le prix payé, latente</span>
+                </>
+              ) : value == null ? (
+                <span>Saisis une valeur sur tes fiches, ou laisse la cote faire : la courbe se dessinera ici.</span>
+              ) : (
+                <span>Renseigne tes prix d&apos;achat pour suivre la plus-value.</span>
+              )}
+            </p>
+            <div className="mt-5">
+              {series.length > 0 ? (
+                c && sealed ? (
+                  <ValueHistoryChart
+                    points={c.valueSeries}
+                    layers={[
+                      { label: "Cartes", points: d.valueSeries },
+                      { label: "Scellés", points: sealed.series },
+                    ]}
+                    height={220}
+                  />
+                ) : (
+                  <ValueHistoryChart points={d.valueSeries} height={220} />
+                )
+              ) : (
+                <Empty>Actualise la valeur estimée de tes cartes depuis leur fiche : la courbe se dessinera ici.</Empty>
+              )}
+            </div>
+            {c?.sealedStart && <p className="mt-2 text-[11px] text-faint">Cote des scellés relevée chaque nuit depuis le {shortDate(c.sealedStart)}.</p>}
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:col-span-4 lg:grid-cols-1">
+          <Kpi
             label="Valeur Cardmarket"
-            value={formatEur(c.market)}
-            sub={d.market == null ? "Aucune carte cotée · scellés à la cote" : `${d.marketCount} carte${d.marketCount > 1 ? "s" : ""} sur ${d.count} cotée${d.marketCount > 1 ? "s" : ""} · scellés à la cote`}
-          />
-          <StatTile icon={Wallet} label="Investi" value={formatEur(c.invested)} sub={c.pricedCount === 0 ? "Aucun prix d'achat saisi" : `${plural(c.pricedCount, "objet")} au prix d'achat connu`} />
-          <StatTile
-            icon={c.gain != null && c.gain < 0 ? TrendingDown : TrendingUp}
-            label="Plus-value"
-            value={c.gain == null ? "—" : signed(c.gain)}
-            tone={c.gain == null ? undefined : c.gain >= 0 ? "up" : "down"}
-            sub={c.gain == null ? "Latente, hors ventes" : `${c.gainPct != null ? signedPct(c.gainPct) : "—"} · latente, hors ventes`}
-          />
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <StatTile
-            icon={Layers}
-            label="Cartes"
-            value={String(d.count)}
-            sub={`${plural(d.unique, "unique")} · ${d.completeSets > 0 ? `${plural(d.completeSets, "set")} complet${d.completeSets > 1 ? "s" : ""}` : plural(d.sets.length, "set")}`}
-          />
-          <StatTile
-            icon={Wallet}
-            label="Investi"
-            value={formatEur(d.invested)}
-            sub={d.pricedCount === 0 ? "Aucun prix d'achat saisi" : `${formatEur(d.invested / d.pricedCount)} par carte · ${pct(d.pricedCount, d.count)}% renseignées`}
-          />
-          <StatTile
-            icon={Coins}
-            label="Valeur estimée"
-            value={formatEur(d.value)}
+            value={formatEur(market)}
             sub={
-              d.value != null
-                ? `${d.market != null ? `Cardmarket ${formatEur(d.market)} · ` : ""}${pct(d.valuedCount, d.count)}% des cartes valorisées`
-                : d.market != null
-                  ? `Cardmarket ${formatEur(d.market)} · saisis une valeur sur tes fiches`
-                  : "Saisis une valeur sur tes fiches"
+              d.market == null
+                ? sealed
+                  ? "Aucune carte cotée · scellés à la cote"
+                  : "Aucune carte cotée sur les 10 derniers jours"
+                : `${d.marketCount} carte${d.marketCount > 1 ? "s" : ""} sur ${d.count} cotée${d.marketCount > 1 ? "s" : ""}${sealed ? " · scellés à la cote" : ""}`
             }
           />
-          <StatTile
-            icon={d.gain != null && d.gain < 0 ? TrendingDown : TrendingUp}
-            label="Plus-value"
-            value={d.gain == null ? "—" : signed(d.gain)}
-            tone={d.gain == null ? undefined : d.gain >= 0 ? "up" : "down"}
-            sub={d.gain == null ? "Latente, hors ventes" : `${d.gainPct != null ? signedPct(d.gainPct) : "—"}${d.monthDelta != null ? ` · ${signed(d.monthDelta)} sur 30 j` : ""}`}
-          />
-        </div>
-      )}
-
-      {/* ——— Cartes vs scellés : chaque ligne se partage entre les deux, barres dos à dos ——— */}
-      {c && sealed && (
-        <Panel icon={Layers} title="Cartes et scellés" hint="Chaque ligne se partage entre les deux : les barres se rejoignent au centre, à proportion.">
-          <div className="grid grid-cols-2 items-end gap-2 pb-3 sm:grid-cols-[1fr_6rem_1fr]">
-            <SideHead tone="accent" label="Cartes" sub={`${plural(d.count, "carte")} · ${plural(d.sets.length, "set")}`} href="/cartes" align="right" />
-            <span className="hidden sm:block" />
-            <SideHead tone="sealed" label="Scellés" sub={`${plural(sealed.count, "produit")} · ${plural(sealed.unique, "référence")}`} href="/scelles" align="left" />
-          </div>
-          <Butterfly label="Valeur" a={d.value} b={sealed.value} />
-          <Butterfly label="Cardmarket" a={d.market} b={sealed.value} />
-          <Butterfly label="Investi" a={d.invested} b={sealed.invested} />
-          <Butterfly label="Plus-value" a={d.gain} b={sealed.gain} pa={d.gainPct} pb={sealed.gainPct} signed />
-          <Butterfly label="Sur 30 jours" a={c.cardsMonthDelta} b={c.sealedMonthDelta} signed missingB="Relevé en cours" />
-        </Panel>
-      )}
-
-      {/* ——— Courbe + suivi ——— */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <Panel
-          icon={LineChart}
-          title="Évolution de la valeur"
-          hint={
-            c && sealed
-              ? `Cartes et scellés empilés, total en trait plein.${c.sealedStart ? ` Cote des scellés relevée chaque nuit depuis le ${shortDate(c.sealedStart)}.` : ""}`
-              : "Construite à partir de tes actualisations datées, carte par carte."
-          }
-        >
-          {(c ? c.valueSeries : d.valueSeries).length > 0 ? (
-            <Scrollable>
-              {c && sealed ? (
-                <ValueHistoryChart
-                  points={c.valueSeries}
-                  layers={[
-                    { label: "Cartes", points: d.valueSeries },
-                    { label: "Scellés", points: sealed.series },
-                  ]}
-                />
-              ) : (
-                <ValueHistoryChart points={d.valueSeries} />
-              )}
-            </Scrollable>
+          <Kpi
+            label="Investi"
+            value={formatEur(invested)}
+            sub={
+              c && sealed
+                ? `cartes ${formatEur(d.invested)} · scellés ${formatEur(sealed.invested)}`
+                : d.pricedCount === 0
+                  ? "Aucun prix d'achat saisi"
+                  : `${plural(d.pricedCount, "carte")} au prix connu · ${formatEur(d.invested / d.pricedCount)} par carte`
+            }
+          >
+            {sealedShare != null && (
+              <div className="mt-2.5 flex h-2 overflow-hidden rounded-full bg-raised" aria-hidden>
+                <span className="bg-accent" style={{ width: `${100 - sealedShare}%` }} />
+                <span className="bg-sealed" style={{ width: `${sealedShare}%` }} />
+              </div>
+            )}
+          </Kpi>
+          {monthDelta != null ? (
+            <Kpi label="Sur 30 jours" value={signed(monthDelta)} tone={monthDelta >= 0 ? "up" : "down"} sub={value ? `${signedPct((monthDelta / Math.max(value - monthDelta, 1)) * 100)} · achats inclus` : "achats inclus"} />
           ) : (
-            <Empty>Actualise la valeur estimée de tes cartes depuis leur fiche : la courbe se dessinera ici.</Empty>
+            <Kpi label="Cartes" value={String(d.count)} sub={`${plural(d.unique, "unique")} · ${d.completeSets > 0 ? `${plural(d.completeSets, "set")} complet${d.completeSets > 1 ? "s" : ""}` : plural(d.sets.length, "set")}`} />
+          )}
+        </div>
+      </div>
+
+      {/* ——— Comparatif, achats, rareté ——— */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-12">
+        {c && sealed && (
+          <Panel title="Cartes et scellés" hint="Ce que chacun pèse dans la collection." className="lg:col-span-4">
+            <ShareBar a={d.value ?? 0} b={sealed.value ?? 0} />
+            <div className="mt-4 grid grid-cols-2 divide-x divide-ring">
+              <SideCol
+                tone="accent"
+                label="Cartes"
+                sub={`${plural(d.count, "carte")} · ${plural(d.sets.length, "set")}`}
+                href="/cartes"
+                rows={[
+                  ["Valeur", d.value == null ? null : formatEur(d.value)],
+                  ["Cardmarket", d.market == null ? null : formatEur(d.market)],
+                  ["Investi", formatEur(d.invested)],
+                  ["Plus-value", d.gain == null ? null : <Gain v={d.gain} p={d.gainPct} />],
+                  ["30 jours", c.cardsMonthDelta == null ? null : <Gain v={c.cardsMonthDelta} />],
+                ]}
+              />
+              <SideCol
+                tone="sealed"
+                label="Scellés"
+                sub={`${plural(sealed.count, "produit")} · ${plural(sealed.unique, "référence")}`}
+                href="/scelles"
+                rows={[
+                  ["Valeur", sealed.value == null ? null : formatEur(sealed.value)],
+                  ["Cardmarket", sealed.value == null ? null : formatEur(sealed.value)],
+                  ["Investi", formatEur(sealed.invested)],
+                  ["Plus-value", sealed.gain == null ? null : <Gain v={sealed.gain} p={sealed.gainPct} />],
+                  ["30 jours", c.sealedMonthDelta == null ? <span className="text-xs font-normal text-faint">relevé en cours</span> : <Gain v={c.sealedMonthDelta} />],
+                ]}
+              />
+            </div>
+          </Panel>
+        )}
+        <Panel
+          title="Achats par mois"
+          href="/journal"
+          hrefLabel="Journal"
+          hint={
+            yearSpend > 0
+              ? `${formatEur(yearSpend)} sur 12 mois${c && c.yearSealedSpend > 0 ? `, dont ${formatEur(c.yearSealedSpend)} de scellés` : ""} · ${plural(activeMonths, "mois actif")}`
+              : d.yearCards > 0
+                ? `${plural(d.yearCards, "carte")} ajoutées sur 12 mois · saisis les prix d'achat pour suivre ton budget`
+                : "Selon la date d'achat, sinon la date d'ajout."
+          }
+          className={c && sealed ? "lg:col-span-4" : "lg:col-span-8"}
+        >
+          {d.yearCards === 0 && yearSpend === 0 ? (
+            <Empty>Aucun achat daté sur les 12 derniers mois.</Empty>
+          ) : (
+            <div className="flex flex-1 flex-col justify-end">
+              <MonthlyBars months={months} metric={yearSpend > 0 ? "spend" : "cards"} height={176} />
+              {yearSpend > 0 && <MonthFacts months={months} yearSpend={yearSpend} activeMonths={activeMonths} />}
+            </div>
           )}
         </Panel>
-
-        <Panel icon={ListChecks} title={sealed ? "Suivi des cartes" : "Vue d'ensemble"}>
-          <div className="-mx-2.5 flex flex-col">
-            <Fact icon={ClipboardList} label="À compléter" sub="Ajoutées sans état ni prix" value={String(d.toReview)} />
-            <Fact icon={BadgeCheck} label="Gradées" sub="PSA, CGC…" value={String(d.graded)} />
-            <Fact
-              icon={Heart}
-              label="Wishlist"
-              sub={d.wishCount === 0 ? "Aucune carte recherchée" : d.wishCost != null ? `≈ ${formatEur(d.wishCost)} au cours du marché` : "Cote marché inconnue"}
-              value={String(d.wishCount)}
-              href="/wishlist"
-            />
-            <Fact
-              icon={Tag}
-              label="Ventes"
-              sub={d.soldCount === 0 ? "Aucune vente" : `${plural(d.soldCount, "exemplaire")} vendu${d.soldCount > 1 ? "s" : ""}`}
-              value={d.soldCount === 0 ? "0" : signed(d.realized)}
-              tone={d.soldCount === 0 ? undefined : d.realized >= 0 ? "up" : "down"}
-            />
+        <Panel title="Par rareté" hint={d.value != null ? "Nombre de cartes et valeur estimée de chaque rareté." : undefined} className="lg:col-span-4">
+          <div className="flex flex-1 flex-col justify-center">
+            <Donut slices={d.raritySlices} label="Répartition par rareté" size="lg" />
+            <TopSlice slices={d.raritySlices} total={d.value} noun="rareté" />
           </div>
         </Panel>
       </div>
 
-      {/* ——— Achats par mois ——— */}
-      <Panel
-        icon={CalendarDays}
-        title="Achats par mois"
-        hint={
-          yearSpend > 0
-            ? `${formatEur(yearSpend)} sur 12 mois${c && c.yearSealedSpend > 0 ? `, dont ${formatEur(c.yearSealedSpend)} de scellés` : ""} · ${plural(d.yearCards, "carte")} · ${formatEur(yearSpend / Math.max(activeMonths, 1))} par mois actif`
-            : d.yearCards > 0
-              ? `${plural(d.yearCards, "carte")} ajoutées sur 12 mois · saisis les prix d'achat pour suivre ton budget`
-              : "Selon la date d'achat, sinon la date d'ajout."
-        }
-      >
-        {d.yearCards === 0 && yearSpend === 0 ? (
-          <Empty>Aucun achat daté sur les 12 derniers mois.</Empty>
-        ) : (
-          <Scrollable>
-            <MonthlyBars months={months} metric={yearSpend > 0 ? "spend" : "cards"} />
-          </Scrollable>
+      {/* ——— Les cartes qui montent, les sets en cours ——— */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        {d.hasGain && (
+          <Panel title="Meilleures plus-values" hint="Valeur estimée moins prix d'achat." href="/cartes?sort=gain" hrefLabel="Toutes" className="lg:col-span-7">
+            {d.top.length === 0 ? (
+              <Empty>Pas encore de plus-value.</Empty>
+            ) : (
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+                {d.top.map((i) => (
+                  <RankTile key={i.id} item={i} />
+                ))}
+              </div>
+            )}
+          </Panel>
         )}
-      </Panel>
-
-      {/* ═══ Cartes ═══ */}
-      {sealed && <SectionTitle icon={Layers} title="Cartes" hint={`${plural(d.count, "carte")} · ${plural(d.unique, "unique")}`} />}
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <Panel icon={Award} title="Progression par set" hint="Cartes distinctes possédées sur le total du set.">
+        <Panel title="Sets en cours" hint="Cartes distinctes possédées sur le total du set." href="/catalogue" hrefLabel="Extensions" className={d.hasGain ? "lg:col-span-5" : "lg:col-span-12"}>
           {d.sets.length === 0 ? (
             <Empty>Aucune carte pour l&apos;instant.</Empty>
           ) : (
@@ -278,42 +286,12 @@ export function StatsView({ d, s }: { d: StatsData; s?: SealedStats }) {
             </>
           )}
         </Panel>
-
-        <Panel icon={ShoppingBag} title="Dépenses par source" hint={d.sourcesCount > 0 ? `${formatEur(d.invested)} répartis sur ${plural(d.sourcesCount, "source")}` : undefined}>
-          {d.sources.length === 0 ? (
-            <Empty>Aucun prix d&apos;achat renseigné pour l&apos;instant.</Empty>
-          ) : (
-            <div className="-mx-2.5 flex flex-col">
-              {d.sources.map((src) => (
-                <BarRow key={src.key} label={src.label} value={`${formatEur(src.spent)} · ${pct(src.spent, d.invested)}%`} pct={maxSpent > 0 ? (src.spent / maxSpent) * 100 : 0} />
-              ))}
-            </div>
-          )}
-        </Panel>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-        <Panel icon={Sparkles} title="Par état">
-          <Donut slices={d.conditionSlices} label="Répartition par état" />
-        </Panel>
-        <Panel icon={Languages} title="Par langue">
-          <Donut slices={d.languageSlices} label="Répartition par langue" />
-        </Panel>
-        <Panel icon={Gem} title="Par rareté">
-          <Donut slices={d.raritySlices} label="Répartition par rareté" />
-        </Panel>
-      </div>
-
-      {d.hasGain && (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-          <Panel icon={TrendingUp} title="Meilleures plus-values" hint="Valeur estimée moins prix d'achat.">
-            <ul className="-mx-2.5 flex flex-col">
-              {d.top.map((i) => (
-                <RankRow key={i.id} item={i} />
-              ))}
-            </ul>
-          </Panel>
-          <Panel icon={TrendingDown} title="Moins bonnes plus-values">
+      {/* ——— Pertes, sources, suivi ——— */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {d.hasGain && (
+          <Panel title="Moins bonnes plus-values" hint="Les cartes qui ont baissé depuis l'achat.">
             {d.flop.length === 0 ? (
               <Empty>Aucune carte en perte, tout est dans le vert.</Empty>
             ) : (
@@ -324,8 +302,49 @@ export function StatsView({ d, s }: { d: StatsData; s?: SealedStats }) {
               </ul>
             )}
           </Panel>
-        </div>
-      )}
+        )}
+        <Panel title="Dépenses par source" hint={d.sourcesCount > 0 ? `${formatEur(d.invested)} répartis sur ${plural(d.sourcesCount, "source")}` : undefined} href="/boutiques" hrefLabel="Boutiques">
+          {d.sources.length === 0 ? (
+            <Empty>Aucun prix d&apos;achat renseigné pour l&apos;instant.</Empty>
+          ) : (
+            <div className="-mx-2.5 flex flex-col">
+              {d.sources.map((src) => (
+                <BarRow key={src.key} label={src.label} value={`${formatEur(src.spent)} · ${pct(src.spent, d.invested)}%`} pct={maxSpent > 0 ? (src.spent / maxSpent) * 100 : 0} />
+              ))}
+            </div>
+          )}
+        </Panel>
+        <Panel title="Suivi des cartes">
+          <div className="-mx-2.5 flex flex-col">
+            <Fact icon={ClipboardList} label="À compléter" sub="Ajoutées sans état ni prix" value={String(d.toReview)} />
+            <Fact icon={BadgeCheck} label="Gradées" sub="PSA, CGC…" value={String(d.graded)} />
+            <Fact
+              icon={Heart}
+              label="Recherchées"
+              sub={d.wishCount === 0 ? "Aucune carte recherchée" : d.wishCost != null ? `≈ ${formatEur(d.wishCost)} au cours du marché` : "Cote marché inconnue"}
+              value={String(d.wishCount)}
+              href="/recherchees"
+            />
+            <Fact
+              icon={Tag}
+              label="Ventes"
+              sub={d.soldCount === 0 ? "Aucune vente" : `${plural(d.soldCount, "exemplaire")} vendu${d.soldCount > 1 ? "s" : ""}`}
+              value={d.soldCount === 0 ? "0" : signed(d.realized)}
+              tone={d.soldCount === 0 ? undefined : d.realized >= 0 ? "up" : "down"}
+            />
+          </div>
+        </Panel>
+      </div>
+
+      {/* ——— État, langue ——— */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Panel title="Par état">
+          <Donut slices={d.conditionSlices} label="Répartition par état" />
+        </Panel>
+        <Panel title="Par langue">
+          <Donut slices={d.languageSlices} label="Répartition par langue" />
+        </Panel>
+      </div>
 
       {/* ═══ Scellés ═══ */}
       {sealed && (
@@ -335,27 +354,31 @@ export function StatsView({ d, s }: { d: StatsData; s?: SealedStats }) {
             title="Scellés"
             hint={`${plural(sealed.count, "produit")} · ${sealed.value != null ? formatEur(sealed.value) : "cote inconnue"}${sealed.gain != null ? ` · ${signed(sealed.gain)}` : ""}`}
           />
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-            <Panel icon={Boxes} title="Par type">
-              <Donut slices={sealed.kindSlices} unit="produits" label="Scellés par type" />
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Panel title="Par type" hint={sealed.value != null ? `${formatEur(sealed.value)} au total, nombre et valeur par type.` : undefined}>
+              <div className="flex flex-1 flex-col justify-center">
+                <Donut slices={sealed.kindSlices} unit="produits" label="Scellés par type" size="lg" />
+                <TopSlice slices={sealed.kindSlices} total={sealed.value} noun="type" />
+              </div>
             </Panel>
-            <Panel icon={Coins} title="Valeur par type" hint={sealed.value != null ? `${formatEur(sealed.value)} au total` : undefined}>
-              {sealed.kindValues.length === 0 ? (
+            <Panel title="Par set" hint="Cote × quantité, du set le plus cher au moins cher.">
+              {sealed.setValues.length === 0 ? (
                 <Empty>Pas encore de cote.</Empty>
               ) : (
-                <div className="-mx-2.5 flex flex-col">
-                  {sealed.kindValues.map((k) => (
+                <div className="-mx-2.5 flex flex-1 flex-col justify-center">
+                  {sealed.setValues.slice(0, 6).map((k) => (
                     <BarRow
                       key={k.key}
                       label={`${k.label} · ${k.count}`}
-                      value={`${formatEur(k.value)} · ${pct(k.value, sealed.value ?? 0)}%`}
-                      pct={sealed.kindValues[0].value > 0 ? (k.value / sealed.kindValues[0].value) * 100 : 0}
+                      value={sealed.value ? `${formatEur(k.value)} · ${pct(k.value, sealed.value)}%` : formatEur(k.value)}
+                      pct={sealed.setValues[0].value > 0 ? (k.value / sealed.setValues[0].value) * 100 : 0}
                     />
                   ))}
+                  {sealed.setValues.length > 6 && <p className="px-2.5 pt-2 text-[11px] text-muted">et {sealed.setValues.length - 6} autre{sealed.setValues.length - 6 > 1 ? "s" : ""} set{sealed.setValues.length - 6 > 1 ? "s" : ""}</p>}
                 </div>
               )}
             </Panel>
-            <Panel icon={Activity} title="Cotes en mouvement" hint="Variation sur 7 jours, d'après le relevé quotidien.">
+            <Panel title="Cotes en mouvement" hint="Variation sur 7 jours, d'après le relevé quotidien.">
               {sealed.movers.length === 0 ? (
                 <Empty>L&apos;historique se constitue nuit après nuit : les variations apparaîtront d&apos;ici quelques jours.</Empty>
               ) : (
@@ -367,8 +390,8 @@ export function StatsView({ d, s }: { d: StatsData; s?: SealedStats }) {
               )}
             </Panel>
           </div>
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <Panel icon={Coins} title="Scellés les plus cotés" hint="Cote × quantité possédée.">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Panel title="Scellés les plus cotés" hint="Cote × quantité possédée." href="/scelles" hrefLabel="Scellés">
               {sealed.top.length === 0 ? (
                 <Empty>Pas encore de cote.</Empty>
               ) : (
@@ -379,13 +402,13 @@ export function StatsView({ d, s }: { d: StatsData; s?: SealedStats }) {
                 </ul>
               )}
             </Panel>
-            <Panel icon={TrendingUp} title="Plus-values scellés" hint="Cote moins prix d'achat, sur les lots au prix connu.">
+            <Panel title="Plus-values scellés" hint="Cote moins prix d'achat, sur les lots au prix connu.">
               {sealed.gains.length === 0 ? (
                 <Empty>Renseigne le prix d&apos;achat de tes scellés pour suivre leur plus-value.</Empty>
               ) : (
                 <ul className="-mx-2.5 flex flex-col">
                   {sealed.gains.map((r) => (
-                    <SealedRow key={r.id} r={r} right={<Gain v={r.gain} p={r.gainPct} stack />} />
+                    <SealedRow key={r.id} r={r} right={<Gain v={r.gain} p={r.gainPct} />} />
                   ))}
                 </ul>
               )}
@@ -397,89 +420,89 @@ export function StatsView({ d, s }: { d: StatsData; s?: SealedStats }) {
   );
 }
 
-/**
- * En-tête d'un côté du comparatif : pastille, nom cliquable, sous-titre.
- * `align` vaut à partir de sm (côté collé au centre) ; sur mobile chaque
- * en-tête est calé sur son bord, comme les montants en dessous.
- */
-function SideHead({ tone, label, sub, href, align }: { tone: "accent" | "sealed"; label: string; sub: string; href: string; align: "left" | "right" }) {
-  const right = align === "right";
+/** Sous les barres mensuelles : le mois le plus actif, la moyenne, ce mois-ci */
+function MonthFacts({ months, yearSpend, activeMonths }: { months: MonthPoint[]; yearSpend: number; activeMonths: number }) {
+  const best = months.reduce((b, m) => (m.spend > (b?.spend ?? 0) ? m : b), null as MonthPoint | null);
+  const current = months.find((m) => m.current) ?? null;
+  const facts: [string, string, string][] = [
+    ["Meilleur mois", best && best.spend > 0 ? formatEur(best.spend) : "—", best && best.spend > 0 ? best.label : ""],
+    ["Par mois actif", activeMonths > 0 ? formatEur(yearSpend / activeMonths) : "—", `sur ${plural(activeMonths, "mois")}`],
+    ["Ce mois-ci", current && current.spend > 0 ? formatEur(current.spend) : "0 €", current ? plural(current.cards, "carte") : ""],
+  ];
   return (
-    <div className={`min-w-0 ${right ? "sm:text-right" : "text-right sm:text-left"}`}>
-      <Link
-        href={href}
-        className={`inline-flex items-center gap-1.5 font-semibold underline-offset-4 hover:text-accent-strong hover:underline ${right ? "sm:flex-row-reverse" : "flex-row-reverse sm:flex-row"}`}
-      >
-        <span className={`h-2.5 w-2.5 shrink-0 rounded-sm ${tone === "accent" ? "bg-accent" : "bg-sealed"}`} aria-hidden />
+    <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-ring pt-3">
+      {facts.map(([k, v, sub]) => (
+        <div key={k} className="min-w-0">
+          <dt className="label-xs !text-[10px] truncate text-muted">{k}</dt>
+          <dd className="num truncate text-sm font-semibold leading-tight">{v}</dd>
+          {sub && <dd className="truncate text-[11px] text-faint">{sub}</dd>}
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** La tranche qui pèse le plus en valeur, avec sa part du total */
+function TopSlice({ slices, total, noun }: { slices: Slice[]; total: number | null; noun: string }) {
+  const withValue = slices.filter((x) => x.value != null && x.code !== "__rest__");
+  if (!total || withValue.length === 0) return null;
+  const top = withValue.reduce((b, x) => (x.value! > (b?.value ?? 0) ? x : b), null as Slice | null);
+  if (!top || !top.value) return null;
+  return (
+    <p className="mt-4 border-t border-ring pt-3 text-xs text-muted">
+      {noun === "type" ? "Le type" : "La rareté"} qui pèse le plus : <span className="font-medium text-foreground">{top.label}</span> ·{" "}
+      <span className="num text-foreground">{formatEur(top.value)}</span> · <span className="num">{Math.round((top.value / total) * 100)} %</span> de la valeur
+      {top.count > 0 && <> · <span className="num">{formatEur(top.value / top.count)}</span> par {noun === "type" ? "produit" : "carte"}</>}
+    </p>
+  );
+}
+
+/** Part de la valeur : une seule barre, cartes à gauche, scellés à droite */
+function ShareBar({ a, b }: { a: number; b: number }) {
+  const sum = a + b;
+  const pa = sum > 0 ? Math.round((a / sum) * 100) : 50;
+  return (
+    <div>
+      <div className="flex h-2.5 overflow-hidden rounded-full bg-raised" aria-hidden>
+        <span className="bg-accent" style={{ width: `${pa}%` }} />
+        <span className="bg-sealed" style={{ width: `${100 - pa}%` }} />
+      </div>
+      <p className="num mt-1.5 flex justify-between text-[11px] text-muted">
+        <span>Cartes {pa} % de la valeur</span>
+        <span>Scellés {100 - pa} %</span>
+      </p>
+    </div>
+  );
+}
+
+/** Une colonne du comparatif : pastille, nom cliquable, sous-titre, puis ses chiffres */
+function SideCol({ tone, label, sub, href, rows }: { tone: "accent" | "sealed"; label: string; sub: string; href: string; rows: [string, React.ReactNode][] }) {
+  return (
+    <div className="min-w-0 first:pr-4 last:pl-4">
+      <Link href={href} className="flex items-center gap-1.5 font-semibold underline-offset-4 hover:text-accent-strong hover:underline">
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${tone === "accent" ? "bg-accent" : "bg-sealed"}`} aria-hidden />
         {label}
       </Link>
-      <p className="text-xs text-muted sm:truncate">{sub}</p>
+      <p className="truncate text-[11px] text-muted">{sub}</p>
+      <dl className="mt-3 flex flex-col gap-2.5">
+        {rows.map(([k, v]) => (
+          <div key={k} className="min-w-0">
+            <dt className="label-xs !text-[10px] text-muted">{k}</dt>
+            <dd className="num truncate text-sm font-semibold leading-tight">{v ?? <span className="font-normal text-faint">—</span>}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
 
-/**
- * Ligne du comparatif : cartes à gauche, scellés à droite, barres dos à dos
- * qui se partagent la ligne à proportion des deux montants. Sur mobile, le
- * libellé passe au-dessus et chaque montant au-dessus de sa barre : la
- * colonne centrale tronquait les libellés et les montants écrasaient les barres.
- */
-function Butterfly({
-  label,
-  a,
-  b,
-  pa,
-  pb,
-  signed: isSigned = false,
-  missingB = "—",
-}: {
-  label: string;
-  a: number | null;
-  b: number | null;
-  pa?: number | null;
-  pb?: number | null;
-  signed?: boolean;
-  missingB?: string;
-}) {
-  const wa = Math.max(a ?? 0, 0);
-  const wb = Math.max(b ?? 0, 0);
-  const sum = wa + wb;
-  const shareA = sum > 0 ? (wa / sum) * 100 : 0;
-  const shareB = sum > 0 ? (wb / sum) * 100 : 0;
-  const cell = (v: number | null, p: number | null | undefined, missing: string) =>
-    v == null ? (
-      <span className="text-xs font-normal text-faint">{missing}</span>
-    ) : isSigned ? (
-      <Gain v={v} p={p} />
-    ) : (
-      <span className="num text-sm font-semibold">{formatEur(v)}</span>
-    );
-  return (
-    <div className="grid grid-cols-2 items-center gap-x-1 gap-y-1.5 border-t border-edge py-2.5 sm:grid-cols-[1fr_6rem_1fr] sm:gap-2">
-      <div className="flex min-w-0 flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-end sm:gap-2.5">
-        <span className="shrink-0 whitespace-nowrap">{cell(a, pa, "—")}</span>
-        <div className="flex h-2.5 w-full min-w-0 justify-end overflow-hidden rounded-l-full bg-raised/70 sm:w-auto sm:flex-1">
-          <span className="h-full rounded-l-full bg-accent" style={{ width: `${shareA}%` }} />
-        </div>
-      </div>
-      <span className="label-xs order-first col-span-2 text-center text-faint sm:order-none sm:col-span-1 sm:truncate">{label}</span>
-      <div className="flex min-w-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-2.5">
-        <div className="h-2.5 w-full min-w-0 overflow-hidden rounded-r-full bg-raised/70 sm:w-auto sm:flex-1">
-          <span className="block h-full rounded-r-full bg-sealed" style={{ width: `${shareB}%` }} />
-        </div>
-        <span className="order-first shrink-0 whitespace-nowrap sm:order-none">{cell(b, pb, missingB)}</span>
-      </div>
-    </div>
-  );
-}
-
-/** Montant signé coloré, pourcentage discret à côté (ou dessous avec `stack`) */
-function Gain({ v, p, stack = false }: { v: number | null; p?: number | null; stack?: boolean }) {
+/** Montant signé coloré, pourcentage discret à côté */
+function Gain({ v, p }: { v: number | null; p?: number | null }) {
   if (v == null) return <span className="text-muted">—</span>;
   return (
-    <span className={`num text-sm font-semibold ${stack ? "block text-right" : ""} ${v > 0 ? "text-gain" : v < 0 ? "text-loss" : ""}`}>
+    <span className={`num text-sm font-semibold ${v > 0 ? "text-gain" : v < 0 ? "text-loss" : ""}`}>
       {signed(v)}
-      {p != null && <span className={`text-xs font-normal text-muted ${stack ? "block" : "ml-1"}`}>{signedPct(p)}</span>}
+      {p != null && <span className="ml-1 text-xs font-normal text-muted">{signedPct(p)}</span>}
     </span>
   );
 }
@@ -529,11 +552,6 @@ function SealedRow({ r, right }: { r: SealedRank; right: React.ReactNode }) {
       </Link>
     </li>
   );
-}
-
-/** Les graphiques se dessinent à la largeur disponible (voir useContainerWidth) */
-function Scrollable({ children }: { children: React.ReactNode }) {
-  return <div className="min-w-0">{children}</div>;
 }
 
 function SetRow({ set }: { set: SetStat }) {

@@ -215,16 +215,18 @@ export async function loadCardStats(supabase: DB, ownerId: string): Promise<Stat
   const byCondition = countBy((r) => r.condition ?? "?");
   const byLanguage = countBy((r) => r.language ?? "?");
   const byRarity = countBy((r) => rarityLabel(r.rarity));
+  const rarityValue = new Map<string, number>();
+  for (const r of rows) if (r.current_price != null) rarityValue.set(rarityLabel(r.rarity), (rarityValue.get(rarityLabel(r.rarity)) ?? 0) + r.current_price * qty(r));
   const conditionSlices: Slice[] = CONDITIONS.map((c) => ({ code: c.code, label: `${c.code} · ${c.label}`, count: byCondition.get(c.code) ?? 0 }));
   const languageSlices: Slice[] = [...byLanguage.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([code, n]) => ({ code, label: (LANGUAGES as readonly string[]).includes(code) ? code : `Autre (${code})`, count: n }));
   // Rareté : les plus représentées d'abord, « Non renseignée » en dernier ; au-delà de 6, le reste est regroupé
   const rarityRows = [...byRarity.entries()].sort((a, b) => (a[0] === UNKNOWN_RARITY ? 1 : 0) - (b[0] === UNKNOWN_RARITY ? 1 : 0) || b[1] - a[1]);
-  const raritySlices: Slice[] = rarityRows.slice(0, RARITIES_SHOWN).map(([code, n]) => ({ code, label: code, count: n }));
+  const raritySlices: Slice[] = rarityRows.slice(0, RARITIES_SHOWN).map(([code, n]) => ({ code, label: code, count: n, value: hasValue ? rarityValue.get(code) ?? 0 : undefined }));
   if (rarityRows.length > RARITIES_SHOWN) {
     const rest = rarityRows.slice(RARITIES_SHOWN);
-    raritySlices.push({ code: "__rest__", label: `Autres (${rest.length})`, count: rest.reduce((a, [, n]) => a + n, 0) });
+    raritySlices.push({ code: "__rest__", label: `Autres (${rest.length})`, count: rest.reduce((a, [, n]) => a + n, 0), value: hasValue ? rest.reduce((a, [code]) => a + (rarityValue.get(code) ?? 0), 0) : undefined });
   }
 
   /* ——— Dépenses par source ——— */
@@ -346,6 +348,8 @@ export type SealedStats = {
   gainPct: number | null;
   kindSlices: Slice[];
   kindValues: { key: string; label: string; value: number; count: number }[];
+  /** valeur et nombre de produits par set, du plus cher au moins cher */
+  setValues: { key: string; label: string; value: number; count: number }[];
   series: ValuePoint[];
   /** premier relevé quotidien de cote, null tant qu'aucun */
   snapshotsSince: string | null;
@@ -413,7 +417,11 @@ export async function loadSealedStats(supabase: DB, ownerId: string, opts: { cot
   const ranks: SealedRank[] = [];
   const kindCount = new Map<string, number>();
   const kindValue = new Map<string, number>();
+  const setCount = new Map<string, number>();
+  const setValue = new Map<string, number>();
   for (const g of groups) {
+    const setKey = sealedSetName(g.product);
+    setCount.set(setKey, (setCount.get(setKey) ?? 0) + g.quantity);
     const unit = g.manual ?? cotes.get(g.product.id)?.value ?? null;
     const v = unit != null ? unit * g.quantity : null;
     count += g.quantity;
@@ -423,6 +431,7 @@ export async function loadSealedStats(supabase: DB, ownerId: string, opts: { cot
       value += v;
       valuedCount += g.quantity;
       kindValue.set(g.product.kind, (kindValue.get(g.product.kind) ?? 0) + v);
+      setValue.set(setKey, (setValue.get(setKey) ?? 0) + v);
     }
     kindCount.set(g.product.kind, (kindCount.get(g.product.kind) ?? 0) + g.quantity);
     // plus-value seulement sur la part dont on connaît le prix payé
@@ -448,7 +457,10 @@ export async function loadSealedStats(supabase: DB, ownerId: string, opts: { cot
   const kindOrder = (k: string) => (KIND_ORDER.indexOf(k) === -1 ? KIND_ORDER.length : KIND_ORDER.indexOf(k));
   const kindSlices: Slice[] = [...kindCount.entries()]
     .sort((a, b) => kindOrder(a[0]) - kindOrder(b[0]))
-    .map(([code, n]) => ({ code, label: kindLabel(code), count: n }));
+    .map(([code, n]) => ({ code, label: kindLabel(code), count: n, value: hasValue ? kindValue.get(code) ?? 0 : undefined }));
+  const setValues = [...setCount.entries()]
+    .map(([key, n]) => ({ key, label: key, value: setValue.get(key) ?? 0, count: n }))
+    .sort((a, b) => b.value - a.value || b.count - a.count);
   const kindValues = [...kindValue.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([key, v]) => ({ key, label: kindLabel(key), value: v, count: kindCount.get(key) ?? 0 }));
@@ -516,6 +528,7 @@ export async function loadSealedStats(supabase: DB, ownerId: string, opts: { cot
     gainPct,
     kindSlices,
     kindValues,
+    setValues,
     series,
     snapshotsSince,
     top: byValue.slice(0, 5),

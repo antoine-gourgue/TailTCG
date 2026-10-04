@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/v/", "/carte/", "/classeurs/", "/parametres"],
+      disallow: ["/vitrine/", "/carte/", "/classeurs/", "/parametres"],
     },
   };
 }

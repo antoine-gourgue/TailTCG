@@ -17,7 +17,7 @@ export function ShareButton({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} aria-label="Partager" className="btn btn-ghost max-sm:!px-3">
+      <button type="button" onClick={() => setOpen(true)} className="btn btn-ghost" title="Partager ma collection">
         <Share2 size={15} aria-hidden />
         <span className="hidden sm:inline">Partager</span>
       </button>

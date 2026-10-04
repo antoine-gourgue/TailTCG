@@ -22,5 +22,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  redirect("/login?error=lien-invalide");
+  redirect("/connexion?error=lien-invalide");
 }

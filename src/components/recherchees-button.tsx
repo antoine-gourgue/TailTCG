@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { Star } from "lucide-react";
-import { toggleWishlist, type WishlistState } from "@/app/wishlist/actions";
+import { toggleWishlist, type WishlistState } from "@/app/recherchees/actions";
 import type { CardMeta } from "@/components/item-form";
 
 // « Je la cherche » : ajoute/retire la carte des recherchées

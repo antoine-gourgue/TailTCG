@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/paginate";
 import { type Grade, type Tier } from "@/lib/game";
+import { PageHead } from "@/components/page-head";
 import { GameNav } from "@/components/game/game-nav";
 import { GradingLab } from "@/components/game/grading-lab";
 import { GradeStats } from "@/components/game/grade-stats";
@@ -55,7 +56,7 @@ export default async function GradationPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
 
   const all = await fetchAll<Row>((from, to) =>
     supabase
@@ -82,16 +83,9 @@ export default async function GradationPage() {
 
   return (
     <main className="page py-8">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="display mb-1 text-3xl font-bold tracking-tight">Gradation</h1>
-          <p className="text-sm text-muted">
-            Coche des cartes et lance la gradation : 4 sous-notes, une note globale, et la carte
-            passe sous boîtier.
-          </p>
-        </div>
+      <PageHead kicker="Boosters" title="Gradation" sub="Coche des cartes et lance la gradation : 4 sous-notes, une note globale, et la carte passe sous boîtier.">
         <GameNav current="gradation" />
-      </div>
+      </PageHead>
 
       <GradeStats overalls={overalls} />
 

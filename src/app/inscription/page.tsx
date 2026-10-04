@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { AuthScreen } from "@/app/login/auth-screen";
+import { AuthScreen } from "@/app/connexion/auth-screen";
 
 export const metadata = {
   title: "Inscription — TailTCG",

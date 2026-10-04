@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { requireAdmin } from "@/lib/admin";
 import { AppShell } from "@/components/app-shell";
+import { PageHead } from "@/components/page-head";
 import { AdminTabs } from "@/components/admin/admin-tabs";
 
 export const metadata = { title: "Back-office — TailTCG" };
@@ -18,10 +19,9 @@ export default async function AdminLayout({
   return (
     <AppShell>
       <main className="page py-8">
-        <div className="mb-5 flex items-center gap-2.5">
-          <ShieldCheck size={22} className="text-accent-strong" aria-hidden />
-          <h1 className="display text-3xl font-bold tracking-tight">Back-office</h1>
-        </div>
+        <PageHead kicker="Administration" title="Back-office" sub="Vue d'ensemble de tous les comptes et données." className="!mb-4">
+          <ShieldCheck size={20} className="text-accent-strong" aria-hidden />
+        </PageHead>
         <AdminTabs />
         {children}
       </main>

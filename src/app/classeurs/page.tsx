@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { binderColorHex } from "@/lib/binder-colors";
 import { signStorageImages, applyRectifiedImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
+import { PageHead } from "@/components/page-head";
 import { BindersGrid } from "@/components/binders-grid";
 import { binderDesign } from "@/lib/binder-design";
 import { coverRenderFor } from "@/lib/binder-cover-server";
@@ -22,7 +23,7 @@ export default async function ClasseursPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
 
   const [{ data: binders }, { data: links }, { data: items }] = await Promise.all([
     supabase
@@ -119,10 +120,9 @@ export default async function ClasseursPage() {
   return (
     <AppShell>
       <main className="page py-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="display text-3xl font-bold tracking-tight">Classeurs</h1>
+        <PageHead kicker="Ma collection" title="Classeurs" count={enriched.length || null}>
           <NewBinderButton sets={sets} generations={generations} />
-        </div>
+        </PageHead>
 
         {enriched.length === 0 ? (
           <div className="panel rise-in flex flex-col items-center gap-3 p-12 text-center">

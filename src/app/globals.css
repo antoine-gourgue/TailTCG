@@ -22,6 +22,16 @@
   --accent-soft: rgba(240, 72, 62, 0.13);
   --accent-ink: #ffffff;
 
+  /* Le Dock (sidebar et barre mobile) reste profond dans les deux thèmes */
+  --dock: #0d0c0f;
+  --dock-text: #ecebee;
+  --dock-muted: rgba(236, 235, 238, 0.55);
+  --dock-faint: rgba(236, 235, 238, 0.35);
+  --dock-raised: rgba(255, 255, 255, 0.06);
+  --dock-edge: rgba(255, 255, 255, 0.07);
+  /* Liseré fin des panneaux, à la place d'une bordure franche */
+  --ring: rgba(255, 255, 255, 0.07);
+
   --gain: #4ade80;
   --loss: #fb7185;
   --sealed: #7aa2f7;
@@ -49,6 +59,14 @@
   --accent-strong: #b42318;
   --accent-soft: rgba(217, 45, 32, 0.09);
   --accent-ink: #ffffff;
+
+  --dock: #fcfbfa;
+  --dock-text: #211f23;
+  --dock-muted: rgba(33, 31, 35, 0.62);
+  --dock-faint: rgba(33, 31, 35, 0.4);
+  --dock-raised: rgba(33, 31, 35, 0.055);
+  --dock-edge: rgba(33, 31, 35, 0.09);
+  --ring: rgba(40, 35, 45, 0.1);
 
   --gain: #15803d;
   --loss: #be123c;
@@ -79,6 +97,13 @@
   --color-gain: var(--gain);
   --color-loss: var(--loss);
   --color-sealed: var(--sealed);
+  --color-dock: var(--dock);
+  --color-dock-text: var(--dock-text);
+  --color-dock-muted: var(--dock-muted);
+  --color-dock-faint: var(--dock-faint);
+  --color-dock-raised: var(--dock-raised);
+  --color-dock-edge: var(--dock-edge);
+  --color-ring: var(--ring);
   --font-sans: var(--font-sans-var);
   --font-mono: var(--font-geist-mono);
 }
@@ -125,37 +150,45 @@ body {
 
 .app-main {
   min-height: 100vh;
-  /* Place pour le dock flottant mobile : 62px + sa marge (12px) + respiration,
-     pour que le dernier texte ne passe jamais dessous */
-  padding-bottom: calc(6.75rem + env(safe-area-inset-bottom));
+  /* Place pour le dock flottant mobile (68px + marge 12px + le Scanner qui
+     dépasse) : le dernier texte ne passe jamais dessous */
+  padding-bottom: calc(7.5rem + env(safe-area-inset-bottom));
 }
 
 @media (min-width: 768px) {
   .app-main {
-    /* Sidebar flottante : 0.75rem de marge + 16rem de large + respiration */
-    padding-left: 17.5rem;
+    /* Dock flottant : 0.75rem de marge + 17rem de large + respiration */
+    padding-left: 18.5rem;
     padding-bottom: 0;
     transition: padding-left 0.25s cubic-bezier(0.3, 0.7, 0.3, 1);
   }
 
   :root[data-sidebar="rail"] .app-main {
-    padding-left: 6rem;
+    padding-left: 7rem;
   }
 
   .app-sidebar {
-    width: 16rem;
+    width: 17rem;
     transition: width 0.25s cubic-bezier(0.3, 0.7, 0.3, 1);
   }
 
   :root[data-sidebar="rail"] .app-sidebar {
-    width: 4.5rem;
+    width: 5.5rem;
+    padding: 0.625rem;
   }
 
-  :root[data-sidebar="rail"] .nav-label {
-    opacity: 0;
-    width: 0;
-    margin: 0;
-    overflow: hidden;
+  /* Les deux états vivent dans le DOM, le CSS montre le bon : pas de flash */
+  .sb-open {
+    display: flex;
+  }
+  .sb-rail {
+    display: none;
+  }
+  :root[data-sidebar="rail"] .sb-open {
+    display: none;
+  }
+  :root[data-sidebar="rail"] .sb-rail {
+    display: flex;
   }
 
   .nav-label {
@@ -188,8 +221,8 @@ body {
 
 .panel {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 1.25rem;
+  border: 1px solid var(--ring);
+  border-radius: 1.5rem;
   box-shadow: var(--shadow-panel);
 }
 
@@ -327,6 +360,66 @@ select.field {
   background: color-mix(in srgb, var(--loss) 8%, transparent);
 }
 
+/* ————— Pilules : filtres (select natif habillé), recherche ————— */
+
+.pill-select {
+  appearance: none;
+  border-radius: 9999px;
+  border: 1px solid var(--ring);
+  background-color: var(--surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  padding: 0.4375rem 1.75rem 0.4375rem 0.875rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  max-width: 100%;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.pill-select:hover {
+  color: var(--foreground);
+  border-color: var(--border-strong);
+}
+
+.pill-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Filtre actif : accent doux */
+.pill-select[data-on="true"] {
+  background-color: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.pill-input {
+  width: 100%;
+  border-radius: 9999px;
+  border: 1px solid var(--ring);
+  background: var(--surface);
+  padding: 0.5rem 1rem 0.5rem 2.375rem;
+  font-size: 0.875rem;
+  color: var(--foreground);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 0.875rem center;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pill-input::placeholder {
+  color: var(--faint);
+}
+
+.pill-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 /* Boutons segmentés (état, onglets source) */
 .seg {
   border: 1px solid var(--border);
@@ -377,6 +470,7 @@ select.field {
   color: #f2f1f4;
   backdrop-filter: blur(4px);
 }
+
 
 /* Marqueur boutique (Leaflet) */
 .shop-pin {

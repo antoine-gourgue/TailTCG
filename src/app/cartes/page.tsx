@@ -1,14 +1,16 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { BellRing } from "lucide-react";
+import { BellRing, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { daysAgoISO } from "@/lib/domain";
 import { signStorageImages, applyRectifiedImages, repairCatalogImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
+import { PageHead } from "@/components/page-head";
+import { PhoneCaptureButton } from "@/components/capture/phone-capture-button";
 import { ShareButton } from "@/components/share-button";
 import { UndoDeleteToast } from "@/components/undo-delete-toast";
 import { AddedToast } from "@/components/added-toast";
+import { redirect } from "next/navigation";
 import {
   CollectionClient,
   type CollectionItem,
@@ -19,7 +21,6 @@ export const metadata = {
   title: "Cartes — TailTCG",
 };
 
-// Liste des cartes possédées : filtres, tri, sélection, réévaluation
 export default async function CartesPage({
   searchParams,
 }: {
@@ -45,7 +46,7 @@ export default async function CartesPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
 
   const [{ data: items }, { data: sources }, { data: binders }, { data: gradings }] =
     await Promise.all([
@@ -155,43 +156,36 @@ export default async function CartesPage({
     <>
       <AppShell>
       <main className="relative z-10 page py-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="display text-3xl font-bold tracking-tight">Cartes</h1>
-          <div className="flex gap-2">
-            <ShareButton
-              initialToken={settings?.share_token ?? null}
-              initialShowValues={settings?.share_show_values ?? false}
-            />
-            <Link href="/recherche" className="btn btn-primary">
-              + Ajouter une carte
-            </Link>
-          </div>
-        </div>
+        <PageHead kicker="Ma collection" title="Cartes" count={(items ?? []).filter((i) => i.sold_at == null).reduce((n, i) => n + (i.quantity ?? 1), 0)}>
+          <ShareButton initialToken={settings?.share_token ?? null} initialShowValues={settings?.share_show_values ?? false} />
+          <Link href="/catalogue" className="btn btn-ghost" title="Ajouter une carte depuis le catalogue">
+            <Plus size={15} aria-hidden />
+            <span className="hidden sm:inline">Ajouter</span>
+          </Link>
+          <PhoneCaptureButton kind="detect" label="Scanner" icon="scan" directHref="/scanner" className="btn btn-primary shadow-lg shadow-accent/30" />
+        </PageHead>
 
         {staleItems.length > 0 && (
-          <div className="panel mb-5 flex flex-wrap items-start gap-x-3 gap-y-2.5 border-accent/40 bg-accent-soft/60 px-5 py-3.5 text-sm sm:flex-nowrap sm:items-center">
-            <BellRing size={16} className="mt-0.5 shrink-0 text-accent-strong sm:mt-0" aria-hidden />
-            <p className="min-w-0 flex-1 leading-relaxed">
-              <span className="font-medium">
-                {staleItems.length} carte{staleItems.length > 1 ? "s" : ""} à
-                réévaluer :
-              </span>{" "}
-              {staleItems.slice(0, 5).map((i, idx) => (
-                <span key={i.id}>
-                  <Link
-                    href={`/carte/${i.id}?edit`}
-                    className="text-accent-strong underline-offset-2 hover:underline"
-                  >
-                    {i.card_name}
-                  </Link>
-                  {idx < Math.min(staleItems.length, 5) - 1 ? ", " : ""}
-                </span>
-              ))}
-              {staleItems.length > 5 && (
-                <span className="text-muted"> et {staleItems.length - 5} autres…</span>
-              )}
-            </p>
-            <Link href="/cartes/reevaluer" className="btn btn-primary ml-7 shrink-0 !py-2 text-[13px] sm:ml-0">
+          <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-accent-soft/60 px-5 py-3.5 text-sm ring-1 ring-accent/30">
+            <BellRing size={16} className="shrink-0 text-accent-strong" aria-hidden />
+            <span className="font-medium">
+              {staleItems.length} carte{staleItems.length > 1 ? "s" : ""} à
+              réévaluer :
+            </span>
+            {staleItems.slice(0, 5).map((i, idx) => (
+              <Link
+                key={i.id}
+                href={`/carte/${i.id}?edit`}
+                className="text-accent-strong underline-offset-2 hover:underline"
+              >
+                {i.card_name}
+                {idx < Math.min(staleItems.length, 5) - 1 ? "," : ""}
+              </Link>
+            ))}
+            {staleItems.length > 5 && (
+              <span className="text-muted">et {staleItems.length - 5} autres…</span>
+            )}
+            <Link href="/cartes/reevaluer" className="btn btn-primary ml-auto shrink-0 !py-1.5 text-[13px]">
               Tout réévaluer
             </Link>
           </div>
@@ -200,10 +194,7 @@ export default async function CartesPage({
           items={(
             await applyRectifiedImages(
               gradings,
-              await signStorageImages(
-                await repairCatalogImages(supabase, (items ?? []) as CollectionItem[]),
-                user.id
-              ),
+              await signStorageImages(await repairCatalogImages(supabase, (items ?? []) as CollectionItem[]), user.id),
               user.id
             )
           ).map((i) => ({

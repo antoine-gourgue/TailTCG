@@ -7,7 +7,7 @@ import { CardImage } from "@/components/card-image";
 import { CardScanner, type ConfirmResult, type ScanReview } from "@/components/scan/card-scanner";
 import { formatEur } from "@/lib/domain";
 import { bulkAddToCollection } from "@/app/items/actions";
-import { ownedCopies, undoScannedAdd } from "@/app/scan/actions";
+import { ownedCopies, undoScannedAdd } from "@/app/scanner/actions";
 import type { ScanCandidate } from "@/lib/scan/index";
 import { addCardUrl, ITEM_LANGUAGE } from "@/lib/scan/url";
 

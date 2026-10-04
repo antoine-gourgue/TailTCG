@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Smartphone, Check, Loader2 } from "lucide-react";
+import { Smartphone, Check, Loader2, ScanLine } from "lucide-react";
 import { createCaptureSession } from "@/app/capture/actions";
 import { Sheet } from "@/components/sheet";
 
@@ -19,6 +19,8 @@ export function PhoneCaptureButton({
   label,
   className = "btn btn-ghost",
   directHref,
+  icon = "phone",
+  title,
 }: {
   kind: "detect" | "photos";
   itemId?: string;
@@ -26,6 +28,9 @@ export function PhoneCaptureButton({
   className?: string;
   /** Sur écran tactile (téléphone), on scanne directement à cette adresse plutôt que via le QR */
   directHref?: string;
+  /** Icône du bouton : téléphone (relais QR) ou viseur de scan */
+  icon?: "phone" | "scan";
+  title?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -94,7 +99,7 @@ export function PhoneCaptureButton({
           setOpen(true);
           return;
         }
-        router.push(`/scan/${session.id}`);
+        router.push(`/scanner/${session.id}`);
       });
       return;
     }
@@ -106,8 +111,14 @@ export function PhoneCaptureButton({
 
   return (
     <>
-      <button type="button" onClick={start} disabled={starting} className={className}>
-        {starting ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <Smartphone size={15} aria-hidden />}
+      <button type="button" onClick={start} disabled={starting} className={className} title={title} aria-label={label || title}>
+        {starting ? (
+          <Loader2 size={15} className="animate-spin" aria-hidden />
+        ) : icon === "scan" ? (
+          <ScanLine size={16} aria-hidden />
+        ) : (
+          <Smartphone size={15} aria-hidden />
+        )}
         {label}
       </button>
 

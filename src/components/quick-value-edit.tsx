@@ -11,9 +11,11 @@ import { Sheet } from "@/components/sheet";
 export function ValueUpdateButton({
   itemId,
   current,
+  className = "btn btn-ghost",
 }: {
   itemId: string;
   current: number | null;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export function ValueUpdateButton({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="btn btn-ghost">
+      <button type="button" onClick={() => setOpen(true)} className={className}>
         <RefreshCw size={15} aria-hidden />
         Actualiser la valeur
       </button>

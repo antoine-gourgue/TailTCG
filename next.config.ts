@@ -1,6 +1,19 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Anciennes adresses (QR codes, vitrines partagées, favoris) : redirigées pour de bon
+  async redirects() {
+    return [
+      { source: "/login", destination: "/connexion", permanent: true },
+      { source: "/wishlist", destination: "/recherchees", permanent: true },
+      { source: "/recherche", destination: "/catalogue", permanent: true },
+      { source: "/scan", destination: "/scanner", permanent: true },
+      { source: "/scan/:id", destination: "/scanner/:id", permanent: true },
+      { source: "/v/:token", destination: "/vitrine/:token", permanent: true },
+      { source: "/v/:token/c/:id", destination: "/vitrine/:token/carte/:id", permanent: true },
+      { source: "/stats", destination: "/collection", permanent: true },
+    ];
+  },
   experimental: {
     serverActions: {
       // Upload des photos compressées (limite Vercel : 4,5 Mo par requête)

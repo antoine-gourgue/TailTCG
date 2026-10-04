@@ -1,11 +1,10 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { CatalogLang } from "@/lib/tcgdex";
 import { catalogSet } from "@/lib/catalog";
 import { MERGED_CHILDREN, MERGED_INTO } from "@/lib/set-merge";
 import { AppShell } from "@/components/app-shell";
-import { SetCardsGrid } from "@/components/set-cards-grid";
+import { SetView } from "@/components/set-view";
 import { fetchGuidePrices } from "@/lib/cardmarket";
 import { overrideCardmarketId } from "@/lib/cardmarket-overrides";
 import { BinderFromSetButton } from "@/components/binder-from-set-button";
@@ -30,111 +29,55 @@ export default async function ExtensionPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
 
   const set = await catalogSet(id, lang);
   if (!set) notFound();
 
-  // Cartes déjà dans les recherchées (pour l'étoile de la modale)
-  const { data: wishes } = await supabase.from("wishlist").select("tcgdex_id");
-  const wishedIds = (wishes ?? []).map((w) => w.tcgdex_id);
+  const [{ data: wishes }, { data: owned }, guidePrices] = await Promise.all([
+    // Cartes déjà dans les recherchées (pour l'étoile de la fiche express)
+    supabase.from("wishlist").select("tcgdex_id"),
+    // Exemplaires possédés de ce set et des sets fusionnés dedans (actifs, non vendus)
+    supabase
+      .from("collection_value")
+      .select("tcgdex_id, quantity, sold_at, current_price, purchase_price")
+      .in("set_id", [id, ...(MERGED_CHILDREN[id] ?? [])]),
+    // Prix Cardmarket : guide local d'abord (par idProduct), repli TCGdex
+    fetchGuidePrices(set.cards.map((c) => overrideCardmarketId(c.id, c.cmId))),
+  ]);
 
-  // Exemplaires possédés de ce set et des sets fusionnés dedans (actifs, non vendus) → complétion + repères,
-  // et leur valeur estimée (prix saisis à la main) à côté de la cote Cardmarket
-  const { data: owned } = await supabase
-    .from("collection_value")
-    .select("tcgdex_id, quantity, sold_at, current_price")
-    .in("set_id", [id, ...(MERGED_CHILDREN[id] ?? [])]);
   const ownedQty: Record<string, number> = {};
-  let estimated = 0;
-  let estimatedCopies = 0;
+  let myValue = 0;
+  let myPaid = 0;
+  let myCount = 0;
   for (const o of owned ?? []) {
-    if (o.sold_at == null && o.tcgdex_id) {
-      const q = o.quantity ?? 1;
-      ownedQty[o.tcgdex_id] = (ownedQty[o.tcgdex_id] ?? 0) + q;
-      if (o.current_price != null) {
-        estimated += o.current_price * q;
-        estimatedCopies += q;
-      }
-    }
+    if (o.sold_at != null || !o.tcgdex_id) continue;
+    const q = o.quantity ?? 1;
+    ownedQty[o.tcgdex_id] = (ownedQty[o.tcgdex_id] ?? 0) + q;
+    myCount += q;
+    if (o.current_price != null) myValue += o.current_price * q;
+    if (o.purchase_price != null) myPaid += o.purchase_price * q;
   }
 
-  // Prix Cardmarket : guide local d'abord (par idProduct), repli TCGdex
-  const guidePrices = await fetchGuidePrices(
-    set.cards.map((c) => overrideCardmarketId(c.id, c.cmId))
-  );
-
   const releaseDate = set.releaseDate
-    ? new Date(set.releaseDate).toLocaleDateString("fr-FR", {
-        month: "long",
-        year: "numeric",
-      })
+    ? new Date(set.releaseDate).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })
     : null;
-
-  const langSuffix = lang === "ja" ? "&lang=ja" : "";
-  const pricesAvailable = set.cards.some(
-    (c) => (overrideCardmarketId(c.id, c.cmId) != null && guidePrices.has(overrideCardmarketId(c.id, c.cmId)!)) || c.price != null
-  );
 
   return (
     <AppShell>
       <main className="page py-8">
-        <Link
-          href={`/recherche${lang === "ja" ? "?lang=ja" : ""}`}
-          className="mb-6 inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground"
-        >
-          ← Extensions
-        </Link>
-
-        <div className="mb-8 flex flex-wrap items-center gap-6">
-          {set.logo && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={`${set.logo}.webp`}
-              alt=""
-              className="h-16 object-contain"
-            />
-          )}
-          <div>
-            <h1 className="display text-3xl font-bold tracking-tight">
-              {set.name}
-            </h1>
-            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-              <span className="num rounded bg-raised px-1.5 py-0.5 uppercase">
-                {set.id}
-              </span>
-              {set.serie?.name && <span>{set.serie.name}</span>}
-              {(() => {
-                // Toutes les cartes présentes (secrètes comprises), pas le
-                // seul total « officiel »
-                const n = set.cardCount?.total ?? set.cards.length;
-                return n > 0 ? <span className="num">{n} cartes</span> : null;
-              })()}
-              {releaseDate && <span>{releaseDate}</span>}
-              {!pricesAvailable && (
-                <span
-                  className="rounded-md border border-edge px-1.5 py-0.5 text-xs text-faint"
-                  title="Aucune cote Cardmarket connue pour les cartes de ce set"
-                >
-                  Cote Cardmarket indisponible
-                </span>
-              )}
-            </p>
-          </div>
-          {/* Passé sous le titre (mobile, tablette), il reste à gauche ; en bout de ligne au-delà */}
-          <div className="lg:ml-auto">
-            <BinderFromSetButton setId={set.id} lang={lang} />
-          </div>
-        </div>
-
-        {set.scansMissing && (
-          <p className="mb-6 rounded-xl border border-edge bg-surface px-4 py-3 text-sm text-muted">
-            TCGdex n&apos;a pas encore les scans de ce set — les cartes sont
-            listées par nom et numéro, et restent ajoutables normalement.
-          </p>
-        )}
-
-        <SetCardsGrid
+        <SetView
+          set={{
+            id: set.id,
+            name: set.name,
+            logo: set.logo ?? null,
+            symbol: set.symbol ?? null,
+            serie: set.serie?.name ?? null,
+            releaseDate,
+            official: set.cardCount?.official ?? null,
+            total: set.cardCount?.total ?? set.cards.length,
+            scansMissing: Boolean(set.scansMissing),
+          }}
           cards={set.cards.map((c) => {
             const cmId = overrideCardmarketId(c.id, c.cmId);
             return {
@@ -148,13 +91,11 @@ export default async function ExtensionPage({
               lang: c.lang,
             };
           })}
-          officialCount={set.cardCount?.official ?? null}
-          langSuffix={langSuffix}
-          setId={set.id}
-          setName={set.name}
-          wishedIds={wishedIds}
+          lang={lang}
+          wishedIds={(wishes ?? []).map((w) => w.tcgdex_id)}
           ownedQty={ownedQty}
-          ownedEstimate={estimatedCopies > 0 ? { value: estimated, copies: estimatedCopies } : null}
+          mine={{ value: myValue, paid: myPaid, count: myCount }}
+          binderButton={<BinderFromSetButton setId={set.id} lang={lang} />}
         />
       </main>
     </AppShell>

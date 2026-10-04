@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -18,7 +19,7 @@ export default async function PersoPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
 
   const { data: customs } = await supabase
     .from("custom_cards")
@@ -47,10 +48,11 @@ export default async function PersoPage() {
     <AppShell>
       <main className="page py-8">
         <Link
-          href="/recherche"
-          className="mb-6 inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground"
+          href="/catalogue"
+          className="mb-4 inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground"
         >
-          ← Extensions
+          <ChevronLeft size={16} aria-hidden />
+          Catalogue
         </Link>
 
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">

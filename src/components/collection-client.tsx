@@ -16,8 +16,8 @@ import {
   SlidersHorizontal,
   CheckCheck,
   FolderMinus,
-  RefreshCw,
   X,
+  RefreshCw,
 } from "lucide-react";
 import { formatEur } from "@/lib/domain";
 import {
@@ -33,6 +33,7 @@ import { Sheet } from "@/components/sheet";
 import { FloatingBar } from "@/components/floating-bar";
 import { Logo } from "@/components/logo";
 import { Toast } from "@/components/toast";
+import { StatCard, StatStrip } from "@/components/stat-card";
 
 export type CollectionItem = {
   id: string;
@@ -102,29 +103,6 @@ function GainText({ value }: { value: number | null }) {
   );
 }
 
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: React.ReactNode;
-  tone?: "up" | "down";
-}) {
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      <span className="label-xs">{label}</span>
-      <span
-        className={`display num text-xl font-bold leading-none ${
-          tone === "up" ? "text-gain" : tone === "down" ? "text-loss" : ""
-        }`}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
 /**
  * Sélecteur à choix multiple (cases à cocher) présenté comme les autres
  * filtres : un bouton « Tous les sets / N sets » qui ouvre un panneau avec une
@@ -177,14 +155,15 @@ function MultiSelect({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`${cls} flex items-center justify-between gap-2 text-left ${selected.size > 0 ? "!border-accent/50 !text-accent-strong" : ""}`}
+        className={`${cls} flex items-center justify-between gap-2 text-left`}
+        data-on={selected.size > 0 ? "true" : undefined}
         aria-expanded={open}
       >
         <span className="truncate">{label}</span>
         <ArrowDown size={13} className="shrink-0 opacity-60" aria-hidden />
       </button>
       {open && (
-        <div className="absolute z-30 mt-1 max-h-72 w-64 max-w-[80vw] overflow-hidden rounded-xl border border-edge bg-raised shadow-xl">
+        <div className="absolute z-30 mt-1 max-h-72 w-64 max-w-[80vw] overflow-hidden rounded-2xl bg-raised shadow-xl ring-1 ring-ring">
           <div className="flex items-center gap-2 border-b border-edge p-2">
             <input
               type="search"
@@ -564,14 +543,15 @@ export function CollectionClient({
           Cherche une carte par son nom, l&apos;image et le set se remplissent
           tout seuls — il ne reste qu&apos;à noter l&apos;état et le prix.
         </p>
-        <Link href="/recherche" className="btn btn-primary mt-2">
+        <Link href="/catalogue" className="btn btn-primary mt-2">
           Ajouter ma première carte
         </Link>
       </div>
     );
   }
 
-  const selectCls = "field !w-auto text-[13px]";
+  const selectCls = "pill-select";
+  const on = (v: boolean) => (v ? "true" : undefined);
 
   // Les mêmes sélecteurs servent en ligne (desktop) et dans la sheet (mobile)
   const filterSelects = (cls: string) => (
@@ -580,6 +560,7 @@ export function CollectionClient({
         value={fSold}
         onChange={(e) => setFSold(e.target.value as "active" | "sold" | "all")}
         className={cls}
+        data-on={on(fSold !== "active")}
         aria-label="Statut"
       >
         <option value="active">En collection</option>
@@ -591,6 +572,7 @@ export function CollectionClient({
         value={fCondition}
         onChange={(e) => setFCondition(e.target.value)}
         className={cls}
+        data-on={on(!!fCondition)}
         aria-label="État"
       >
         <option value="">Tous états</option>
@@ -608,6 +590,7 @@ export function CollectionClient({
           value={fLanguage}
           onChange={(e) => setFLanguage(e.target.value)}
           className={cls}
+          data-on={on(!!fLanguage)}
           aria-label="Langue"
         >
           <option value="">Toutes langues</option>
@@ -623,6 +606,7 @@ export function CollectionClient({
           value={fSource}
           onChange={(e) => setFSource(e.target.value)}
           className={cls}
+          data-on={on(!!fSource)}
           aria-label="Source"
         >
           <option value="">Toutes sources</option>
@@ -633,7 +617,7 @@ export function CollectionClient({
           ))}
         </select>
       )}
-      <select value={fGraded} onChange={(e) => setFGraded(e.target.value)} className={cls} aria-label="Gradation">
+      <select value={fGraded} onChange={(e) => setFGraded(e.target.value)} className={cls} data-on={on(!!fGraded)} aria-label="Gradation">
         <option value="">Gradée ou non</option>
         <option value="oui">Gradées</option>
         <option value="non">Non gradées</option>
@@ -664,7 +648,7 @@ export function CollectionClient({
       type="button"
       onClick={() => setSortAsc((v) => !v)}
       disabled={sortKey === "custom"}
-      className="btn btn-ghost shrink-0 !px-2.5 !py-1.5 disabled:opacity-40 max-sm:h-11 max-sm:w-11 max-sm:!p-0"
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface text-muted ring-1 ring-ring transition hover:text-foreground disabled:opacity-40"
       title={sortAsc ? "Croissant" : "Décroissant"}
       aria-label={sortAsc ? "Tri croissant" : "Tri décroissant"}
     >
@@ -690,151 +674,110 @@ export function CollectionClient({
   }
 
   return (
-    // En mode sélection, la barre flottante couvre le bas : place pour la dernière rangée
-    <div className={selecting ? "pb-10 md:pb-20" : undefined}>
-      {/* Résumé : la valeur du classeur, toujours visible */}
-      {/* Chiffres sur 2, 3 puis 6 colonnes — rangées pleines et colonnes alignées (en flex-wrap,
-          chaque rangée se calait différemment, ex. iPad) ; commandes de vue dessous */}
-      <div className="panel rise-in mb-5 flex flex-col gap-4 px-5 py-4 sm:px-6">
-        <div className="grid grid-cols-2 items-start gap-x-6 gap-y-4 sm:grid-cols-3 xl:grid-cols-6">
-          <Stat label="Cartes" value={summary.count} />
+    <div>
+      {/* Chiffres du classeur, toujours visibles */}
+      <div className="rise-in mb-5">
+        <StatStrip cols={hideValues ? 3 : 5}>
+          <StatCard label="Cartes" value={summary.count} sub={`${filtered.length} référence${filtered.length > 1 ? "s" : ""}`} />
           {!hideValues && (
             <>
-              {/* Sur mobile, deux par rangée : chaque valeur à côté de sa plus-value */}
-              <Stat label="Investi" value={formatEur(summary.invested)} />
-              <Stat label="Valeur estimée" value={formatEur(summary.value)} />
-              <Stat
+              <StatCard label="Investi" value={formatEur(summary.invested)} />
+              <StatCard label="Valeur estimée" value={formatEur(summary.value)} />
+              <StatCard
                 label="Plus-value estimée"
-                value={
-                  summary.gain == null
-                    ? "—"
-                    : `${summary.gain > 0 ? "+" : ""}${formatEur(summary.gain)}`
-                }
-                tone={
-                  summary.gain == null
-                    ? undefined
-                    : summary.gain >= 0
-                      ? "up"
-                      : "down"
-                }
+                value={summary.gain == null ? "—" : `${summary.gain > 0 ? "+" : ""}${formatEur(summary.gain)}`}
+                sub={summary.gain != null && summary.invested > 0 ? `${summary.gain > 0 ? "+" : ""}${Math.round((summary.gain / summary.invested) * 100)} %` : undefined}
+                tone={summary.gain == null ? undefined : summary.gain >= 0 ? "up" : "down"}
               />
               {summary.market != null && (
-                <Stat label="Valeur Cardmarket" value={formatEur(summary.market)} />
-              )}
-              {summary.marketGain != null && (
-                <Stat
-                  label="Plus-value Cardmarket"
-                  value={`${summary.marketGain > 0 ? "+" : ""}${formatEur(summary.marketGain)}`}
-                  tone={summary.marketGain >= 0 ? "up" : "down"}
+                <StatCard
+                  label="Valeur Cardmarket"
+                  value={formatEur(summary.market)}
+                  sub={summary.marketGain != null ? `${summary.marketGain > 0 ? "+" : ""}${formatEur(summary.marketGain)} de plus-value` : undefined}
                 />
               )}
             </>
           )}
-        </div>
-        <div className="flex shrink-0 items-center gap-2 sm:justify-end">
+        </StatStrip>
+      </div>
+
+      {/* Outils — desktop : recherche, filtres, tri, sélection et vue en pilules */}
+      <div className="mb-5 hidden flex-wrap items-center gap-2 sm:flex">
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nom, numéro, set…" className="pill-input !w-60 text-[13px]" />
+        {filterSelects(selectCls)}
+        <span className="ml-auto flex items-center gap-2">
+          {sortSelect(selectCls)}
+          {sortToggle}
           {canSelect && (
             <button
               type="button"
               onClick={toggleSelecting}
               aria-pressed={selecting}
-              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] transition ${
-                selecting
-                  ? "border-accent/50 bg-accent-soft font-medium text-accent-strong"
-                  : "border-edge text-muted hover:text-foreground"
+              className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] ring-1 transition ${
+                selecting ? "bg-accent-soft font-semibold text-accent-strong ring-accent/40" : "bg-surface text-muted ring-ring hover:text-foreground"
               }`}
             >
-              <ListChecks size={13} aria-hidden /> <span className="hidden sm:inline">Sélectionner</span>
+              <ListChecks size={13} aria-hidden /> Sélectionner
             </button>
           )}
-          <div className="flex overflow-hidden rounded-lg border border-edge">
-            <button
-              type="button"
-              onClick={() => setView("grid")}
-              aria-pressed={view === "grid"}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-[13px] transition ${
-                view === "grid"
-                  ? "bg-accent-soft font-medium text-accent-strong"
-                  : "text-muted hover:text-foreground"
-              }`}
-            >
-              <LayoutGrid size={13} aria-hidden /> <span className="hidden sm:inline">Grille</span>
+          <span className="flex rounded-full bg-surface p-0.5 ring-1 ring-ring">
+            <button type="button" onClick={() => setView("grid")} aria-pressed={view === "grid"} aria-label="Grille" className={`rounded-full p-1.5 transition ${view === "grid" ? "bg-raised text-foreground" : "text-faint hover:text-foreground"}`}>
+              <LayoutGrid size={14} aria-hidden />
             </button>
-            <button
-              type="button"
-              onClick={() => setView("table")}
-              aria-pressed={view === "table"}
-              className={`flex items-center gap-1.5 border-l border-edge px-3 py-1.5 text-[13px] transition ${
-                view === "table"
-                  ? "bg-accent-soft font-medium text-accent-strong"
-                  : "text-muted hover:text-foreground"
-              }`}
-            >
-              <List size={13} aria-hidden /> <span className="hidden sm:inline">Tableau</span>
+            <button type="button" onClick={() => setView("table")} aria-pressed={view === "table"} aria-label="Tableau" className={`rounded-full p-1.5 transition ${view === "table" ? "bg-raised text-foreground" : "text-faint hover:text-foreground"}`}>
+              <List size={14} aria-hidden />
             </button>
-          </div>
-        </div>
+          </span>
+        </span>
       </div>
 
-      {/* Filtres et tri — desktop : tout en ligne */}
-      <div className="mb-6 hidden flex-wrap items-center gap-2 sm:flex">
-        <input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Chercher dans ma collection…"
-          className="field !w-52 text-[13px]"
-        />
-        {filterSelects(selectCls)}
-        {/* Tri et sens restent ensemble quand la rangée passe à la ligne (tablette) */}
-        <div className="flex items-center gap-2">
-          <span className="mx-1 h-5 w-px bg-edge" />
-          {sortSelect(selectCls)}
-          {sortToggle}
-        </div>
-      </div>
-
-      {/* Mobile : recherche pleine largeur, filtres dans une sheet */}
+      {/* Mobile : recherche pleine largeur, filtres dans une sheet, tri et sélection en pilules */}
       <div className="mb-5 flex flex-col gap-2 sm:hidden">
-        <input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Chercher dans ma collection…"
-          className="field text-[15px]"
-        />
-        <div className="flex items-center gap-2">
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nom, numéro, set…" className="pill-input text-[15px]" />
+        <div className="scrollbar-none -mx-4 flex items-center gap-2 overflow-x-auto px-4">
           <button
             type="button"
             onClick={() => setFiltersOpen(true)}
-            className={`btn btn-ghost flex-1 !justify-center ${
-              activeFilters > 0 ? "!border-accent/50 !text-accent-strong" : ""
-            }`}
+            className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] ring-1 transition ${activeFilters > 0 ? "bg-accent-soft font-semibold text-accent-strong ring-accent/40" : "bg-surface text-muted ring-ring"}`}
           >
-            <SlidersHorizontal size={15} aria-hidden />
+            <SlidersHorizontal size={14} aria-hidden />
             Filtres
-            {activeFilters > 0 && (
-              <span className="num rounded-full bg-accent px-1.5 text-[11px] font-bold text-accent-ink">
-                {activeFilters}
-              </span>
-            )}
+            {activeFilters > 0 && <span className="num rounded-full bg-accent px-1.5 text-[11px] font-bold text-accent-ink">{activeFilters}</span>}
           </button>
-          {sortSelect("field min-w-0 flex-1 text-[13px]")}
+          {sortSelect("pill-select shrink-0 !py-2")}
           {sortToggle}
+          {canSelect && (
+            <button
+              type="button"
+              onClick={toggleSelecting}
+              aria-pressed={selecting}
+              aria-label="Sélectionner"
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-1 transition ${selecting ? "bg-accent-soft text-accent-strong ring-accent/40" : "bg-surface text-muted ring-ring"}`}
+            >
+              <ListChecks size={14} aria-hidden />
+            </button>
+          )}
+          <span className="flex shrink-0 rounded-full bg-surface p-0.5 ring-1 ring-ring">
+            <button type="button" onClick={() => setView("grid")} aria-pressed={view === "grid"} aria-label="Grille" className={`rounded-full p-2 ${view === "grid" ? "bg-raised text-foreground" : "text-faint"}`}>
+              <LayoutGrid size={14} aria-hidden />
+            </button>
+            <button type="button" onClick={() => setView("table")} aria-pressed={view === "table"} aria-label="Tableau" className={`rounded-full p-2 ${view === "table" ? "bg-raised text-foreground" : "text-faint"}`}>
+              <List size={14} aria-hidden />
+            </button>
+          </span>
         </div>
       </div>
 
       {filtered.length === 0 ? (
         <p className="text-sm text-muted">Aucune carte ne correspond aux filtres.</p>
       ) : view === "grid" ? (
-        <ul className="rise-in grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        <ul className="rise-in grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {filtered.map((item, idx) => {
             const sel = selecting && selected.has(item.id);
             const tileContent = (
               <>
                 <div
-                  className={`card-tile aspect-[63/88] ${
-                    sel ? "outline outline-2 outline-offset-2 outline-accent" : ""
-                  }`}
+                  className={`card-tile aspect-[63/88] ${sel ? "ring-2 ring-accent ring-offset-2 ring-offset-background" : ""}`}
                 >
                   <CardImage
                     base={item.image_url || null}
@@ -873,7 +816,7 @@ export function CollectionClient({
                   )}
                 </div>
                 <div className="mt-2.5 px-0.5">
-                  <p className="truncate text-sm font-medium leading-tight group-hover:text-accent-strong">
+                  <p className="truncate text-[13px] font-semibold leading-tight group-hover:text-accent-strong">
                     {item.card_name}
                   </p>
                   <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
@@ -895,16 +838,12 @@ export function CollectionClient({
                     )}
                   </p>
                   {!hideValues && (
-                    <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-[11px] sm:text-xs">
-                      {/* Sur mobile, valeur et plus-value seulement : avec le payé, la ligne débordait de la vignette */}
-                      <span className="num hidden text-faint sm:inline" title="Prix d'achat">
-                        payé {formatEur(item.purchase_price ?? 0)}
-                      </span>
-                      <span className="hidden text-faint sm:inline" aria-hidden>→</span>
-                      <span className="num font-medium" title={item.current_price != null ? "Valeur estimée" : "Cote Cardmarket (aucune valeur saisie)"}>
-                        {formatEur(estimatedOf(item))}
-                      </span>
-                      <span className="ml-auto whitespace-nowrap">
+                    <p
+                      className="mt-1 flex items-baseline justify-between gap-2 text-[11px]"
+                      title={`Payé ${formatEur(item.purchase_price ?? 0)} · ${item.current_price != null ? "valeur estimée" : "cote Cardmarket (aucune valeur saisie)"} ${formatEur(estimatedOf(item))}`}
+                    >
+                      <span className="num font-semibold">{formatEur(estimatedOf(item))}</span>
+                      <span className="whitespace-nowrap">
                         <GainText value={gainOf(item)} />
                       </span>
                     </p>
@@ -959,7 +898,7 @@ export function CollectionClient({
           })}
         </ul>
       ) : (
-        <div className="panel rise-in overflow-x-auto">
+        <div className="panel rise-in overflow-x-auto !rounded-2xl">
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b border-edge text-left">
@@ -1031,6 +970,18 @@ export function CollectionClient({
       {/* Barre d'action flottante du mode sélection */}
       {selecting && (
         <FloatingBar>
+          {!readOnly && (
+            <button
+              type="button"
+              disabled={selected.size === 0 || busy}
+              onClick={() => router.push(`/cartes/reevaluer?ids=${[...selected].join(",")}`)}
+              title="Réévaluer"
+              aria-label="Réévaluer"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-raised hover:text-foreground disabled:opacity-40"
+            >
+              <RefreshCw size={16} aria-hidden />
+            </button>
+          )}
           <button
             type="button"
             onClick={exitSelect}
@@ -1070,18 +1021,6 @@ export function CollectionClient({
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-loss transition hover:bg-loss/10 disabled:opacity-40"
             >
               <FolderMinus size={17} aria-hidden />
-            </button>
-          )}
-          {!readOnly && (
-            <button
-              type="button"
-              disabled={selected.size === 0 || busy}
-              onClick={() => router.push(`/cartes/reevaluer?ids=${[...selected].join(",")}`)}
-              title="Réévaluer"
-              aria-label="Réévaluer"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-raised hover:text-foreground disabled:opacity-40"
-            >
-              <RefreshCw size={16} aria-hidden />
             </button>
           )}
           {!readOnly && (

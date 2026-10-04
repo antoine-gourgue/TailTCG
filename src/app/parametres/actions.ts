@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 export async function signOutEverywhere() {
   const supabase = await createClient();
   await supabase.auth.signOut({ scope: "global" });
-  redirect("/login");
+  redirect("/connexion");
 }
 
 export type PasswordState = { ok: boolean; message: string } | null;

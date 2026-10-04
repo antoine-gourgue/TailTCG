@@ -16,6 +16,7 @@ import { isAdminEmail } from "@/lib/admin";
 import { ConfirmAction } from "@/components/confirm-action";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app-shell";
+import { PageHead } from "@/components/page-head";
 import { SetPasswordForm } from "@/components/set-password-form";
 import { DisplayNameForm } from "@/components/display-name-form";
 import { RevalueForm } from "@/components/revalue-form";
@@ -31,7 +32,7 @@ export default async function ParametresPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
 
   const [{ data: settings }, { data: trashed }] = await Promise.all([
     supabase
@@ -56,10 +57,8 @@ export default async function ParametresPage() {
 
   return (
     <AppShell>
-      <main className="mx-auto w-full max-w-3xl px-4 py-8">
-        <h1 className="display mb-6 text-3xl font-bold tracking-tight">
-          Paramètres
-        </h1>
+      <main className="page max-w-4xl py-8">
+        <PageHead kicker="Compte" title="Paramètres" sub={memberSince ? `Membre depuis le ${memberSince}` : undefined} />
 
         <div className="flex flex-col gap-4">
           {isAdminEmail(user.email) && (

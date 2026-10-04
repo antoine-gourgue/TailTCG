@@ -14,7 +14,7 @@ export default async function ReinitialiserPage({
   searchParams: Promise<{ token_hash?: string; type?: string }>;
 }) {
   const { token_hash, type } = await searchParams;
-  if (!token_hash || type !== "recovery") redirect("/login?error=lien-invalide");
+  if (!token_hash || type !== "recovery") redirect("/connexion?error=lien-invalide");
 
   return <ResetPasswordForm tokenHash={token_hash} />;
 }

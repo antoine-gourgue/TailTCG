@@ -21,7 +21,7 @@ export function BinderShareButton({
   const [copied, setCopied] = useState(false);
 
   const url = shareToken
-    ? `${typeof window !== "undefined" ? window.location.origin : ""}/v/${shareToken}/c/${binderId}`
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/vitrine/${shareToken}/c/${binderId}`
     : null;
 
   async function copy() {

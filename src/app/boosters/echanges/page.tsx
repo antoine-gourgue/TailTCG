@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAll } from "@/lib/paginate";
 import { type Tier } from "@/lib/game";
+import { PageHead } from "@/components/page-head";
 import { GameNav } from "@/components/game/game-nav";
 import { TradesClient, type TCard, type TradeView, type MarketCard } from "@/components/game/trades-client";
 
@@ -45,7 +46,7 @@ export default async function EchangesPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
   const uid = user.id;
   const admin = createAdminClient();
 
@@ -141,16 +142,9 @@ export default async function EchangesPage() {
 
   return (
     <main className="page py-8">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="display mb-1 text-3xl font-bold tracking-tight">Échanges</h1>
-          <p className="text-sm text-muted">
-            Une carte contre une carte de même rareté. Mets tes doubles à échanger et propose aux
-            autres dresseurs.
-          </p>
-        </div>
+      <PageHead kicker="Boosters" title="Échanges" sub="Une carte contre une carte de même rareté. Mets tes doubles à échanger et propose aux autres dresseurs.">
         <GameNav current="echanges" />
-      </div>
+      </PageHead>
       <TradesClient
         marketplace={marketplace}
         incoming={incoming}

@@ -77,7 +77,15 @@ export async function searchCatalog(db: Db, query: string): Promise<CatalogSearc
   const localId = numMatch ? numMatch[2] : null;
 
   let rows: Row[] = [];
-  if (name) {
+  // Code d'extension (« SV4a 200 », « sv03.5 6 », « SV4a ») : les cartes de ce set, filtrées par numéro
+  const codeSets = name && !/\s/.test(name) && /^[a-z0-9.\-]{2,10}$/i.test(name) ? await db.from("catalog_sets").select("id").ilike("id", like(name)).limit(6) : null;
+  const codeIds = [...new Set((codeSets?.data ?? []).map((s) => s.id))];
+  if (codeIds.length > 0) {
+    const { data } = await db.from("catalog_cards").select("*").in("set_id", codeIds).limit(localId ? 2000 : MAX);
+    const inSet = (data ?? []) as Row[];
+    rows = localId ? inSet.filter((r) => sameLocalId(r.local_id, localId)) : inSet;
+  }
+  if (rows.length === 0 && name) {
     const cap = localId ? 600 : MAX;
     const terms = [name, ...(await aliasesOf(name))];
     const found = await Promise.all(terms.map((t) => db.rpc("search_catalog", { q: like(t), max_rows: cap })));
@@ -100,7 +108,7 @@ export async function searchCatalog(db: Db, query: string): Promise<CatalogSearc
         rows = (whole ?? []) as Row[];
       }
     }
-  } else if (localId) {
+  } else if (rows.length === 0 && localId) {
     const n = String(Number.parseInt(localId, 10));
     const { data } = await db
       .from("catalog_cards")

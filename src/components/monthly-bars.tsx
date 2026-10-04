@@ -5,7 +5,6 @@ import { formatEur } from "@/lib/domain";
 import type { MonthPoint } from "@/components/stats-widgets";
 import { useContainerWidth } from "@/lib/use-container-width";
 
-const H = 160;
 const MIN_W = 300;
 const PAD = { top: 18, right: 8, bottom: 22, left: 8 };
 const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
@@ -23,7 +22,8 @@ function bar(x: number, y: number, w: number, h: number, r: number): string {
 }
 
 /** Barres mensuelles : dépense (ou cartes ajoutées si aucun prix) sur 12 mois ; part scellée empilée si présente */
-export function MonthlyBars({ months, metric }: { months: MonthPoint[]; metric: "spend" | "cards" }) {
+export function MonthlyBars({ months, metric, height = 160 }: { months: MonthPoint[]; metric: "spend" | "cards"; height?: number }) {
+  const H = height;
   const [hover, setHover] = useState<number | null>(null);
   // Dessiné à la largeur réelle : textes lisibles sur mobile sans défilement
   const [box, width] = useContainerWidth<HTMLDivElement>();

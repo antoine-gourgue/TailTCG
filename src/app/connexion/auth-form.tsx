@@ -54,7 +54,7 @@ export function AuthForm({ mode, notice }: { mode: "login" | "signup"; notice?: 
 
       {/* Connexion ↔ inscription */}
       <nav className="mt-7 flex gap-1 rounded-xl border border-edge bg-raised p-1" aria-label="Connexion ou inscription">
-        <Link href="/login" replace aria-current={signup ? undefined : "page"} className={tab(!signup)}>
+        <Link href="/connexion" replace aria-current={signup ? undefined : "page"} className={tab(!signup)}>
           Connexion
         </Link>
         <Link href="/inscription" replace aria-current={signup ? "page" : undefined} className={tab(signup)}>
@@ -166,7 +166,7 @@ export function AuthForm({ mode, notice }: { mode: "login" | "signup"; notice?: 
 
       <p className="mt-6 text-center text-sm text-muted">
         {signup ? "Déjà un compte ?" : "Pas encore de compte ?"}{" "}
-        <Link href={signup ? "/login" : "/inscription"} replace className="font-semibold text-accent-strong underline-offset-4 hover:underline">
+        <Link href={signup ? "/connexion" : "/inscription"} replace className="font-semibold text-accent-strong underline-offset-4 hover:underline">
           {signup ? "Se connecter" : "Créer ma collection"}
         </Link>
       </p>

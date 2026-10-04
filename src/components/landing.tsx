@@ -336,7 +336,7 @@ function ShareMock() {
         <span className="h-2 w-2 rounded-full bg-loss/60" aria-hidden />
         <span className="h-2 w-2 rounded-full bg-accent/60" aria-hidden />
         <span className="h-2 w-2 rounded-full bg-gain/60" aria-hidden />
-        <span className="mk-pop num ml-2 flex-1 truncate rounded-md bg-surface px-2 py-0.5 text-[10px] text-faint">tailtcg.vercel.app/v/sacha</span>
+        <span className="mk-pop num ml-2 flex-1 truncate rounded-md bg-surface px-2 py-0.5 text-[10px] text-faint">tailtcg.vercel.app/vitrine/sacha</span>
       </div>
       <div className="p-4">
         <div className="mk-pop flex items-center gap-2" style={{ animationDelay: "0.2s" }}>
@@ -397,12 +397,14 @@ export function Landing() {
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
           <Logo variant="lockup" size={30} />
           <div className="flex items-center gap-2">
-            <Link href="/login" className="btn btn-ghost">
-              Se connecter
-            </Link>
+            <span className="hidden sm:block">
+              <Link href="/connexion" className="btn btn-ghost">
+                Se connecter
+              </Link>
+            </span>
             <Link href="/inscription" className="btn btn-primary">
               <span className="hidden sm:inline">Créer ma collection</span>
-              <span className="sm:hidden">Commencer</span>
+              <span className="sm:hidden">Se connecter</span>
             </Link>
           </div>
         </div>

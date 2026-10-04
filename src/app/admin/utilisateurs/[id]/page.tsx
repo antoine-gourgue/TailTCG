@@ -148,7 +148,7 @@ export default async function AdminUserDetail({
             <p className="text-sm text-muted">{account.email}</p>
           </div>
           {settings?.share_token && (
-            <Link href={`/v/${settings.share_token}`} target="_blank" className="btn btn-ghost">
+            <Link href={`/vitrine/${settings.share_token}`} target="_blank" className="btn btn-ghost">
               Voir la vitrine
               <ExternalLink size={14} aria-hidden />
             </Link>

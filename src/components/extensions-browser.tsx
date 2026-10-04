@@ -4,10 +4,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Layers } from "lucide-react";
 import { guessAssetBase, type SerieWithSets, type CatalogLang } from "@/lib/tcgdex";
-import { artworkUrl } from "@/lib/pokedex";
-import { Logo } from "@/components/logo";
 
-function SetLogo({
+export function SetLogo({
   logo,
   symbol,
   cover,
@@ -59,20 +57,21 @@ function SetLogo({
 export function ExtensionsBrowser({
   series,
   lang,
-  customCount = 0,
-  pokedexCount = 0,
+  ownedCountBySet = {},
 }: {
   series: SerieWithSets[];
   lang: CatalogLang;
-  customCount?: number;
-  pokedexCount?: number;
+  /** Cartes distinctes possédées par set : avancement sur chaque tuile */
+  ownedCountBySet?: Record<string, number>;
 }) {
   const [q, setQ] = useState("");
+  const [serieId, setSerieId] = useState("all");
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    if (!needle) return series;
-    return series
+    const pool = serieId === "all" ? series : series.filter((s) => s.id === serieId);
+    if (!needle) return pool;
+    return pool
       .map((serie) => {
         const serieMatch =
           serie.name.toLowerCase().includes(needle) ||
@@ -87,50 +86,42 @@ export function ExtensionsBrowser({
         return { ...serie, sets };
       })
       .filter((serie) => serie.sets.length > 0);
-  }, [series, q]);
+  }, [series, q, serieId]);
 
   const totalSets = series.reduce((acc, s) => acc + s.sets.length, 0);
 
   return (
     <div>
       {/* Filtre + bascule de catalogue */}
-      <div className="mb-8 flex flex-wrap items-center gap-3">
+      <div className="mb-3 flex flex-wrap items-center gap-2.5">
         <input
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={`Nom ou code d'extension… (${totalSets} sets)`}
-          className="field max-w-sm"
+          aria-label="Chercher une extension"
+          className="pill-input basis-full sm:basis-auto sm:flex-1 sm:max-w-sm"
         />
-        <div className="flex overflow-hidden rounded-xl border border-edge">
-          <Link
-            href="/recherche"
-            className={`px-3.5 py-2 text-sm transition ${
-              lang === "fr"
-                ? "bg-accent-soft font-semibold text-accent-strong"
-                : "text-muted hover:text-foreground"
-            }`}
-          >
+        <div className="flex gap-1.5">
+          <Link href="/catalogue" data-on={lang === "fr"} className={`seg px-3.5 py-1.5 text-[13px] ${lang === "fr" ? "font-medium text-accent-strong" : "text-muted"}`}>
             Internationales
           </Link>
-          <Link
-            href="/recherche?lang=ja"
-            className={`border-l border-edge px-3.5 py-2 text-sm transition ${
-              lang === "ja"
-                ? "bg-accent-soft font-semibold text-accent-strong"
-                : "text-muted hover:text-foreground"
-            }`}
-          >
+          <Link href="/catalogue?lang=ja" data-on={lang === "ja"} className={`seg px-3.5 py-1.5 text-[13px] ${lang === "ja" ? "font-medium text-accent-strong" : "text-muted"}`}>
             Japonaises
           </Link>
         </div>
       </div>
-
-      {lang === "ja" && (
-        <p className="mb-6 text-xs text-faint">
-          TCGdex ne fournit pas de logo pour les sets japonais : chaque set est illustré par sa première carte
-          quand son scan existe.
-        </p>
+      {lang === "fr" && (
+      <div className="scrollbar-none -mx-4 mb-5 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+        <button type="button" data-on={serieId === "all"} onClick={() => setSerieId("all")} className={`seg shrink-0 px-3.5 py-1.5 text-[13px] ${serieId === "all" ? "font-medium text-accent-strong" : "text-muted"}`}>
+          Toutes <span className="num text-[11px] opacity-70">{totalSets}</span>
+        </button>
+        {series.map((s) => (
+          <button key={s.id} type="button" data-on={serieId === s.id} onClick={() => setSerieId(s.id)} className={`seg shrink-0 px-3.5 py-1.5 text-[13px] ${serieId === s.id ? "font-medium text-accent-strong" : "text-muted"}`}>
+            {s.name} <span className="num text-[11px] opacity-70">{s.sets.length}</span>
+          </button>
+        ))}
+      </div>
       )}
 
       {filtered.length === 0 ? (
@@ -138,65 +129,7 @@ export function ExtensionsBrowser({
           Aucune extension ne correspond à « {q.trim()} ».
         </p>
       ) : (
-        <div className="flex flex-col gap-10">
-          {!q.trim() && (
-            <section>
-              <div className="mb-4 flex items-baseline gap-3">
-                <h2 className="display text-xl font-semibold">Mon catalogue</h2>
-              </div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {/* Pokédex : des cartes à ranger dans les classeurs, hors collection */}
-                <Link
-                  href="/extensions/pokedex"
-                  className="panel group flex flex-col gap-3 p-4 transition hover:border-accent hover:shadow-lg"
-                >
-                  <div className="flex h-14 items-center justify-center">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={artworkUrl(25)}
-                      alt=""
-                      loading="lazy"
-                      className="h-14 w-14 object-contain drop-shadow-[0_6px_8px_rgba(0,0,0,.5)] transition group-hover:scale-110"
-                    />
-                  </div>
-                  <div className="mt-auto">
-                    <p className="truncate text-sm font-medium leading-tight group-hover:text-accent-strong">
-                      Pokédex
-                    </p>
-                    <p className="mt-1 flex items-center gap-2 text-xs text-muted">
-                      <span className="num rounded bg-raised px-1.5 py-0.5 uppercase">dex</span>
-                      <span className="num">
-                        {pokedexCount > 0 ? `${pokedexCount} Pokémon` : "Cartes pour classeurs"}
-                      </span>
-                    </p>
-                  </div>
-                </Link>
-                {customCount > 0 && (
-                  <Link
-                    href="/extensions/perso"
-                    className="panel group flex flex-col gap-3 p-4 transition hover:border-accent hover:shadow-lg"
-                  >
-                    <div className="flex h-14 items-center justify-center">
-                      <Logo variant="mark" size={44} interactive={false} />
-                    </div>
-                    <div className="mt-auto">
-                      <p className="truncate text-sm font-medium leading-tight group-hover:text-accent-strong">
-                        Cartes hors catalogue
-                      </p>
-                      <p className="mt-1 flex items-center gap-2 text-xs text-muted">
-                        <span className="num rounded bg-raised px-1.5 py-0.5 uppercase">
-                          perso
-                        </span>
-                        <span className="num">
-                          {customCount} carte{customCount > 1 ? "s" : ""}
-                        </span>
-                      </p>
-                    </div>
-                  </Link>
-                )}
-              </div>
-            </section>
-          )}
+        <div className="flex flex-col gap-8">
           {filtered.map((serie) => (
             <section key={serie.id}>
               <div className="mb-4 flex items-baseline gap-3">
@@ -234,6 +167,24 @@ export function ExtensionsBrowser({
                           </span>
                         ) : null}
                       </p>
+                      {(() => {
+                        const owned = ownedCountBySet[set.id] ?? 0;
+                        const total = set.cardCount?.total ?? set.cardCount?.official ?? 0;
+                        if (!owned) return null;
+                        const pct = total ? Math.round((owned / total) * 100) : null;
+                        return (
+                          <div className="mt-2">
+                            <div className="h-1 overflow-hidden rounded-full bg-raised" aria-hidden>
+                              <span className="block h-full rounded-full bg-accent" style={{ width: `${Math.max(2, pct ?? 0)}%` }} />
+                            </div>
+                            <p className="num mt-1 text-[11px] text-muted">
+                              {owned}
+                              {total ? `/${total}` : ""} possédée{owned > 1 ? "s" : ""}
+                              {pct != null ? ` · ${pct} %` : ""}
+                            </p>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </Link>
                 ))}

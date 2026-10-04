@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, Boxes, Search } from "lucide-react";
+import { ArrowLeft, Boxes } from "lucide-react";
 import { KIND_ORDER, kindLabel, type CatalogProduct, type CatalogSerie, type CatalogSet } from "@/lib/sealed";
 import { formatEur } from "@/lib/domain";
 
@@ -22,12 +22,14 @@ function ProductTile({ p }: { p: CatalogProduct }) {
       href={`/scelles/produit/${p.id}`}
       className="group flex h-full flex-col overflow-hidden rounded-2xl border border-edge bg-surface transition hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-lg"
     >
-      <div className="flex aspect-square items-center justify-center bg-white p-4">
+      <div className="relative aspect-[4/3] overflow-hidden bg-white">
         {p.image ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={p.image} alt="" className="max-h-full max-w-full object-contain transition group-hover:scale-[1.03]" loading="lazy" />
+          <img src={p.image} alt="" className="absolute inset-0 h-full w-full object-contain p-4 transition group-hover:scale-[1.03]" loading="lazy" />
         ) : (
-          <Boxes size={32} className="text-neutral-400" aria-hidden />
+          <span className="absolute inset-0 flex items-center justify-center">
+            <Boxes size={32} className="text-neutral-400" aria-hidden />
+          </span>
         )}
       </div>
       <div className="flex flex-1 flex-col gap-1 p-3">
@@ -109,14 +111,13 @@ export function CatalogClient({ series }: { series: CatalogSerie[] }) {
 
   return (
     <div className="space-y-6">
-      <label className="relative block">
-        <Search size={16} aria-hidden className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
+      <label className="block">
         <input
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Chercher un produit ou une extension… (ex. ETB Évolutions Prismatiques, display 151)"
-          className="field !px-4 !py-3 !pl-11 !text-base"
+          className="pill-input !py-3 !text-base"
         />
       </label>
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
+import { ArrowUpRight, type LucideIcon } from "lucide-react";
 import { formatEur } from "@/lib/domain";
 import { CardImage } from "@/components/card-image";
 
@@ -12,13 +12,18 @@ export function Panel({
   title,
   hint,
   action,
+  href,
+  hrefLabel,
   className = "",
   children,
 }: {
-  icon: LucideIcon;
+  icon?: LucideIcon;
   title: string;
   hint?: string;
   action?: React.ReactNode;
+  /** Lien discret en haut à droite (« Toutes », « Journal »…) */
+  href?: string;
+  hrefLabel?: string;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -26,13 +31,18 @@ export function Panel({
     <section className={`panel flex flex-col p-5 ${className}`}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="display flex items-center gap-2 text-base font-semibold">
-            <Icon size={16} className="shrink-0 text-muted" aria-hidden />
+          <h2 className="display flex items-center gap-2 text-[15px] font-semibold">
+            {Icon && <Icon size={15} className="shrink-0 text-muted" aria-hidden />}
             {title}
           </h2>
-          {hint && <p className="mt-0.5 text-xs text-faint">{hint}</p>}
+          {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
         </div>
         {action}
+        {href && (
+          <Link href={href} className="flex shrink-0 items-center gap-1 text-xs text-muted transition hover:text-foreground">
+            {hrefLabel ?? "Voir"} <ArrowUpRight size={12} aria-hidden />
+          </Link>
+        )}
       </div>
       {children}
     </section>
@@ -87,9 +97,9 @@ export function Bar({
 }) {
   const width = pct <= 0 ? 0 : Math.min(Math.max(pct, 1.5), 100);
   return (
-    <div className={`h-1.5 overflow-hidden rounded-full bg-foreground/[0.07] ${className}`}>
+    <div className={`h-2 overflow-hidden rounded-full bg-raised ${className}`}>
       <div
-        className={`h-full rounded-full ${tone === "gain" ? "bg-gain" : "bg-accent"}`}
+        className={`h-full rounded-full ${tone === "gain" ? "bg-gain" : "bg-gradient-to-r from-accent to-accent-strong"}`}
         style={{ width: `${width}%` }}
       />
     </div>
@@ -129,7 +139,7 @@ export function BarRow({
 }
 
 /** Intensités de l'accent, de la plus forte à la plus légère */
-export type Slice = { code: string; label: string; count: number };
+export type Slice = { code: string; label: string; count: number; /** valeur estimée de la tranche, si connue */ value?: number };
 
 /** Le Donut (interactif) vit dans donut.tsx ; `Slice` reste ici pour les données */
 
@@ -187,6 +197,32 @@ export function RankRow({ item }: { item: RankItem }) {
         </span>
       </Link>
     </li>
+  );
+}
+
+/** Vignette de classement : la carte, son nom, sa plus-value en € et en % */
+export function RankTile({ item }: { item: RankItem }) {
+  const up = item.gain >= 0;
+  const sign = item.gain > 0 ? "+" : "";
+  return (
+    <Link href={`/carte/${item.id}`} className="group block min-w-0">
+      <div className="card-tile aspect-[63/88]">
+        <CardImage base={item.image_url || null} alt={item.card_name} />
+      </div>
+      <p className="mt-2 truncate text-xs font-semibold group-hover:text-accent-strong">{item.card_name}</p>
+      <p className="num flex items-baseline justify-between gap-2 text-[11px]">
+        <span className={`font-semibold ${up ? "text-gain" : "text-loss"}`}>
+          {sign}
+          {formatEur(item.gain)}
+        </span>
+        {item.pct != null && (
+          <span className="text-faint">
+            {sign}
+            {Math.round(item.pct)}%
+          </span>
+        )}
+      </p>
+    </Link>
   );
 }
 

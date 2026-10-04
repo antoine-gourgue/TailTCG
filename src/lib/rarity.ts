@@ -78,7 +78,7 @@ const RARITY_SYMBOLS: Record<string, string> = {
   "Double rare": "★★",
   "Illustration rare": "✧",
   "Illustration spéciale rare": "✧✧",
-  "Hyper rare": "🟊",
+  "Hyper rare": "★★★",
   "Rare Secrète": "✪",
   Secrète: "✪",
   "RGB rare": "✪",

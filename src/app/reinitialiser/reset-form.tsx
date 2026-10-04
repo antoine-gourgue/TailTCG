@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { Logo } from "@/components/logo";
-import { resetPasswordWithToken, type LoginState } from "../login/actions";
+import { resetPasswordWithToken, type LoginState } from "../connexion/actions";
 
 export function ResetPasswordForm({ tokenHash }: { tokenHash: string }) {
   const [state, action, pending] = useActionState<LoginState, FormData>(

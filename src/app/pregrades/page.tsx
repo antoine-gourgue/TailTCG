@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageImages } from "@/lib/images";
 import { AppShell } from "@/components/app-shell";
+import { PageHead } from "@/components/page-head";
 import { GradedSlab } from "@/components/graded-slab";
 import { PregradeLauncher, type LauncherItem } from "@/components/pregrade-launcher";
 
@@ -17,7 +18,7 @@ export default async function PregradesPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
 
   const [{ data: gradings }, { data: items }] = await Promise.all([
     supabase
@@ -97,17 +98,9 @@ export default async function PregradesPage() {
   return (
     <AppShell>
       <main className="page py-8">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="display mb-1 text-3xl font-bold tracking-tight">
-              Pré-gradées
-            </h1>
-            <p className="text-sm text-muted">
-              Scanne une carte : recto, verso, analyse — et son boîtier apparaît ici avec l&apos;estimation chez chaque société.
-            </p>
-          </div>
+        <PageHead kicker="Explorer" title="Pré-gradées" count={slabs.length || null} sub="Scanne une carte : recto, verso, analyse — son boîtier apparaît ici avec l'estimation chez chaque société.">
           <PregradeLauncher items={signedItems} />
-        </div>
+        </PageHead>
 
         {slabs.length === 0 ? (
           <div className="panel rise-in flex flex-col items-center gap-3 p-12 text-center">

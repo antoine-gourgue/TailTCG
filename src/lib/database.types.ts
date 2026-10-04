@@ -1167,8 +1167,10 @@ export type Database = {
           image_url: string
           local_id: string
           owner_id: string
+          priority: string
           set_id: string
           set_name: string
+          target_price: number | null
           tcgdex_id: string
         }
         Insert: {
@@ -1178,8 +1180,10 @@ export type Database = {
           image_url?: string
           local_id: string
           owner_id?: string
+          priority?: string
           set_id: string
           set_name: string
+          target_price?: number | null
           tcgdex_id: string
         }
         Update: {
@@ -1189,8 +1193,10 @@ export type Database = {
           image_url?: string
           local_id?: string
           owner_id?: string
+          priority?: string
           set_id?: string
           set_name?: string
+          target_price?: number | null
           tcgdex_id?: string
         }
         Relationships: []

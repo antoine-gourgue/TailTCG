@@ -22,7 +22,7 @@ import {
   type ScanDetails,
   type ScanRow,
   type ScanSessionStatus,
-} from "@/app/scan/actions";
+} from "@/app/scanner/actions";
 
 const POLL_MS = 2000;
 const scanKey = (r: Pick<ScanRow, "lang" | "tcgdex_id">) => `${r.lang}/${r.tcgdex_id}`;
@@ -177,7 +177,7 @@ export function ScanSessionClient({
         setError(s.error);
         return;
       }
-      router.push(`/scan/${s.id}`);
+      router.push(`/scanner/${s.id}`);
     });
   }
 

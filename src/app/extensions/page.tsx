@@ -7,5 +7,5 @@ export default async function ExtensionsPage({
   searchParams: Promise<{ lang?: string }>;
 }) {
   const { lang } = await searchParams;
-  redirect(lang === "ja" ? "/recherche?lang=ja" : "/recherche");
+  redirect(lang === "ja" ? "/catalogue?lang=ja" : "/catalogue");
 }

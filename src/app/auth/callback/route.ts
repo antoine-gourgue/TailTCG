@@ -19,5 +19,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/login?error=lien-invalide`);
+  return NextResponse.redirect(`${origin}/connexion?error=lien-invalide`);
 }

@@ -1,12 +1,17 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useState, useSyncExternalStore, useTransition } from "react";
 import { Share2, Copy, Check, RefreshCw, EyeOff } from "lucide-react";
 import {
   updateShare,
   setShareShowValues,
   type ShareState,
 } from "@/app/parametres/actions";
+
+// Origine du site, connue côté client seulement : même rendu au serveur et à
+// l'hydratation (évite l'écart de texte), puis l'URL complète s'affiche
+const noopSubscribe = () => () => {};
+const useOrigin = () => useSyncExternalStore(noopSubscribe, () => window.location.origin, () => "");
 
 // Gestion du lien public de la collection (jeton secret révocable)
 export function SharePanel({
@@ -25,12 +30,8 @@ export function SharePanel({
   const [, startValues] = useTransition();
 
   const token = state !== null ? state.token : initialToken;
-  const url =
-    token && typeof window !== "undefined"
-      ? `${window.location.origin}/v/${token}`
-      : token
-        ? `/v/${token}`
-        : null;
+  const origin = useOrigin();
+  const url = token ? `${origin}/vitrine/${token}` : null;
 
   async function copy() {
     if (!url) return;

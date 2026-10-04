@@ -5,7 +5,7 @@ import { isScanLang } from "@/lib/scan/url";
 
 // Téléphone : dépose une carte reconnue. La session reste ouverte, on peut
 // en envoyer autant qu'on veut ; elles s'affichent en direct sur
-// l'ordinateur (/scan/<session>), qui les ajoute une à une ou d'un coup.
+// l'ordinateur (/scanner/<session>), qui les ajoute une à une ou d'un coup.
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ token: string }> }

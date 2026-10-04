@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, CheckCheck, ListChecks, NotebookTabs, Plus, Printer, Search, X } from "lucide-react";
+import { Check, CheckCheck, ListChecks, NotebookTabs, Plus, Printer, X } from "lucide-react";
 import { addPokemonToBinder, createBinderAndAdd, createBinderFromPokedex } from "@/app/classeurs/actions";
 import { PokemonCard } from "@/components/pokemon-card";
 import { Sheet } from "@/components/sheet";
@@ -155,15 +155,8 @@ export function PokedexGrid({
           })}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-0 flex-1 sm:max-w-xs">
-            <Search size={14} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
-            <input
-              type="text"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Nom ou numéro…"
-              className="field !pl-9 text-[13px]"
-            />
+          <div className="min-w-0 basis-full sm:basis-auto sm:flex-1 sm:max-w-xs">
+            <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nom ou numéro…" className="pill-input text-[13px]" />
           </div>
           <div className="ml-auto flex items-center gap-2">
             {gen > 0 && !needle && (

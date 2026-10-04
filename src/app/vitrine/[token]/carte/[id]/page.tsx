@@ -207,10 +207,10 @@ export default async function SharedBinderPage({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {signedItems.length > 0 && (
-            <ViewToggle base={`/v/${token}/c/${binder.id}`} current={mode} />
+            <ViewToggle base={`/vitrine/${token}/c/${binder.id}`} current={mode} />
           )}
           {signedItems.length > 0 && mode === "pages" && <CleanViewToggle />}
-          <Link href={`/v/${token}`} className="btn btn-ghost">
+          <Link href={`/vitrine/${token}`} className="btn btn-ghost">
             ← Toute la collection
           </Link>
         </div>

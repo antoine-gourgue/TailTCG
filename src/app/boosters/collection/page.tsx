@@ -7,6 +7,7 @@ import { getSet } from "@/lib/tcgdex";
 import { loadSetPool } from "@/lib/game-pool";
 import { PLAYABLE_BY_ID } from "@/lib/game-sets";
 import { TIER_LABEL, tierOf, type Grade, type Tier } from "@/lib/game";
+import { PageHead } from "@/components/page-head";
 import { GameNav } from "@/components/game/game-nav";
 import { CollectionSetGrid, type SetGridCard } from "@/components/game/collection-set-grid";
 import { GameCardsGrid, type OwnedCard } from "@/components/game/game-cards-grid";
@@ -55,7 +56,7 @@ export default async function GameCollectionPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
 
   const all = await fetchAll<Row>((from, to) =>
     supabase
@@ -181,19 +182,19 @@ export default async function GameCollectionPage({
     }));
     return (
       <main className="page py-8">
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="display mb-1 text-3xl font-bold tracking-tight">Collection virtuelle</h1>
-            <p className="text-sm text-muted">
-              {all.length} carte{all.length > 1 ? "s" : ""} ·{" "}
-              <span className="inline-flex items-center gap-1">
-                <BadgeCheck size={13} aria-hidden className="text-accent-strong" />
-                {gradedCount} gradée{gradedCount > 1 ? "s" : ""}
-              </span>
-            </p>
-          </div>
+        <PageHead
+          kicker="Boosters"
+          title="Collection virtuelle"
+          count={all.length}
+          sub={
+            <span className="inline-flex items-center gap-1">
+              <BadgeCheck size={13} aria-hidden className="text-accent-strong" />
+              {gradedCount} gradée{gradedCount > 1 ? "s" : ""}
+            </span>
+          }
+        >
           <GameNav current="collection" />
-        </div>
+        </PageHead>
         <div className="mb-5">{tabs}</div>
         {all.length === 0 ? (
           <Empty />
@@ -225,17 +226,14 @@ export default async function GameCollectionPage({
 
   return (
     <main className="page py-8">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="display mb-1 text-3xl font-bold tracking-tight">Collection virtuelle</h1>
-          <p className="text-sm text-muted">
-            {all.length === 0
-              ? "Les cartes de tes boosters, à part de ta vraie collection."
-              : `${all.length} carte${all.length > 1 ? "s" : ""} · ${uniqueTotal} différente${uniqueTotal > 1 ? "s" : ""} · ${rareOrBetter} rare${rareOrBetter > 1 ? "s" : ""} ou mieux`}
-          </p>
-        </div>
+      <PageHead
+        kicker="Boosters"
+        title="Collection virtuelle"
+        count={all.length || null}
+        sub={all.length === 0 ? "Les cartes de tes boosters, à part de ta vraie collection." : `${uniqueTotal} différente${uniqueTotal > 1 ? "s" : ""} · ${rareOrBetter} rare${rareOrBetter > 1 ? "s" : ""} ou mieux`}
+      >
         <GameNav current="collection" />
-      </div>
+      </PageHead>
 
       {sets.length === 0 ? (
         <Empty />

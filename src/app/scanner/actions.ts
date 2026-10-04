@@ -135,7 +135,7 @@ export async function addOneScan(scanId: string): Promise<{ error: string | null
   if (row.status !== "pending") return { error: null, scan: row };
   const error = await addScanRows([row]);
   const { data: after } = await supabase.from("capture_scans").select("*").eq("id", scanId).maybeSingle();
-  revalidatePath(`/scan/${row.session_id}`);
+  revalidatePath(`/scanner/${row.session_id}`);
   return { error, scan: after ?? row };
 }
 
@@ -157,7 +157,7 @@ export async function addAllScans(
   const pending = (await loadScans(sessionId)).filter((s) => s.status === "pending");
   if (pending.length === 0) return { error: null, scans: await loadScans(sessionId) };
   const error = await addScanRows(pending);
-  revalidatePath(`/scan/${sessionId}`);
+  revalidatePath(`/scanner/${sessionId}`);
   return { error, scans: await loadScans(sessionId) };
 }
 
@@ -181,7 +181,7 @@ export async function skipScanAndNext(scanId: string): Promise<void> {
     .eq("id", scanId)
     .select("session_id")
     .maybeSingle();
-  if (!scan) redirect("/recherche");
+  if (!scan) redirect("/catalogue");
   const { data: next } = await supabase
     .from("capture_scans")
     .select("id, tcgdex_id, lang")
@@ -190,8 +190,8 @@ export async function skipScanAndNext(scanId: string): Promise<void> {
     .order("created_at")
     .limit(1)
     .maybeSingle();
-  revalidatePath(`/scan/${scan.session_id}`);
-  redirect(next ? addCardUrl({ id: next.tcgdex_id, lang: next.lang, scan: next.id }) : `/scan/${scan.session_id}`);
+  revalidatePath(`/scanner/${scan.session_id}`);
+  redirect(next ? addCardUrl({ id: next.tcgdex_id, lang: next.lang, scan: next.id }) : `/scanner/${scan.session_id}`);
 }
 
 /** Retire une carte scannée de la liste */

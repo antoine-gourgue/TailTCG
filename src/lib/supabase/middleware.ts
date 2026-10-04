@@ -5,13 +5,13 @@ import { getJwks } from "@/lib/supabase/jwks";
 // /api/cron est protégé par CRON_SECRET dans la route ; /v est la vitrine
 // publique (jeton secret vérifié dans la page)
 const PUBLIC_PATHS = [
-  "/login",
+  "/connexion",
   "/inscription",
   "/auth",
   // Réinitialisation par lien admin : accessible sans session
   "/reinitialiser",
   "/api/cron",
-  "/v/",
+  "/vitrine/",
   // Capture depuis le téléphone : accès par jeton, sans connexion
   "/capture/",
   "/api/capture/",
@@ -78,7 +78,7 @@ export async function updateSession(request: NextRequest) {
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/connexion";
     return NextResponse.redirect(url);
   }
 

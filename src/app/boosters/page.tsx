@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchPlayableSets } from "@/lib/game-sets";
 import { MAX_STOCK, nowMs, UNLIMITED_BOOSTERS, type Profile } from "@/lib/game";
 import { GameNav } from "@/components/game/game-nav";
+import { PageHead } from "@/components/page-head";
 import { BoosterOpener } from "@/components/game/booster-opener";
 
 export const metadata = {
@@ -20,7 +21,7 @@ export default async function BoostersPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
 
   const admin = createAdminClient();
   const [{ data: prof }, sets] = await Promise.all([
@@ -42,19 +43,13 @@ export default async function BoostersPage() {
 
   return (
     <main className="relative z-10 page py-8">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="display mb-1 text-3xl font-bold tracking-tight">Boosters</h1>
-          <p className="text-sm text-muted">
-            {UNLIMITED_BOOSTERS
-              ? "Ouvre autant de boosters que tu veux. "
-              : "Un booster toutes les 12 heures. "}
-            5 cartes du set de ton choix, un jeu à part : rien n&apos;entre dans ta vraie
-            collection.
-          </p>
-        </div>
+      <PageHead
+        kicker="Explorer"
+        title="Boosters"
+        sub={`${UNLIMITED_BOOSTERS ? "Ouvre autant de boosters que tu veux. " : "Un booster toutes les 12 heures. "}5 cartes du set de ton choix, un jeu à part : rien n'entre dans ta vraie collection.`}
+      >
         <GameNav current="boosters" />
-      </div>
+      </PageHead>
       <BoosterOpener
         profile={profile}
         featured={sets.slice(0, FEATURED)}

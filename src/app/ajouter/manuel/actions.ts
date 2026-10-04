@@ -153,7 +153,7 @@ export async function createCustomCards(
   }
 
   revalidatePath("/cartes");
-  revalidatePath("/recherche");
+  revalidatePath("/catalogue");
   redirect(`/cartes?added=${rows.length}`);
 }
 
@@ -198,6 +198,6 @@ export async function deleteCustomCard(formData: FormData): Promise<void> {
   await admin.storage.from("card-photos").remove([card.image_path]);
   await supabase.from("custom_cards").delete().eq("id", card.id);
 
-  revalidatePath("/recherche");
+  revalidatePath("/catalogue");
   revalidatePath("/cartes");
 }

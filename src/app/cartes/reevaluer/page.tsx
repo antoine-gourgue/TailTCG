@@ -23,7 +23,7 @@ export default async function RevaluePage({ searchParams }: { searchParams: Prom
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/connexion");
 
   const [{ data: items }, { data: settings }, { data: hist }] = await Promise.all([
     supabase
