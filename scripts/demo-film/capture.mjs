@@ -1,6 +1,6 @@
-// Vidéo de présentation (README) : `node scripts/demo-film/capture.mjs /tmp/tailtcg-demo` rend 750 images (25 s à 30 i/s),
+// Vidéo de présentation (README) : `DURATION=32 node scripts/demo-film/capture.mjs /tmp/tailtcg-demo` rend 960 images (32 s à 30 i/s),
 // puis ffmpeg -framerate 30 -i /tmp/tailtcg-demo/frames/f%04d.png -c:v libx264 -pix_fmt yuv420p -crf 20 docs/demo.mp4
-// et le GIF : ffmpeg -i docs/demo.mp4 -vf "fps=12,scale=800:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=160[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" docs/demo.gif
+// et le GIF : ffmpeg -i docs/demo.mp4 -vf "fps=10,scale=800:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=5" docs/demo.gif
 // Rend le film image par image (temps déterministe via window.__seek) avec Chrome headless + CDP
 import { writeFileSync, mkdirSync } from "node:fs";
 import { spawn } from "node:child_process";

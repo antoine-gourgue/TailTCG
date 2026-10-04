@@ -1,21 +1,28 @@
 <!doctype html><html lang="fr"><head><meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="icons.js"></script>
 <style>
+/* ——— Film de présentation (README), 1280×720, temps piloté par window.__seek(t) ———
+   Langage « Dock » de l'app : fond profond, panneaux à liseré, dock noir, accent corail, or du logo. */
 *{box-sizing:border-box}
-html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#131215;color:#ecebee;font-family:"Instrument Sans",system-ui,sans-serif}
+html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#131216;color:#f1f0f3;font-family:"Instrument Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 .num{font-family:"Geist Mono",monospace;font-variant-numeric:tabular-nums}
 .display{letter-spacing:-.025em;font-weight:700}
 .scene{position:absolute;inset:0;opacity:0}
-.glow{position:absolute;left:50%;top:50%;width:900px;height:900px;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(240,72,62,.28),transparent 62%);filter:blur(40px);opacity:0}
-.caption{position:absolute;left:96px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;width:490px}
-.kicker{font-size:13px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#ff6b5e}
-.h{font-size:64px;line-height:1.02;margin:14px 0 0}
-.h .a{color:#ff6b5e}
-.sub{font-size:21px;line-height:1.45;color:#9d9aa5;margin-top:22px;max-width:450px}
 .el{opacity:0}
-.panel{background:#1b1a1e;border:1px solid #2e2d33;border-radius:22px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
-/* téléphone */
+.ic{display:inline-flex;width:1em;height:1em;flex:none;vertical-align:-.15em}.ic svg{width:100%;height:100%}
+.glow{position:absolute;left:50%;top:50%;width:900px;height:900px;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(240,72,62,.26),transparent 62%);filter:blur(40px);opacity:0}
+.caption{position:absolute;left:96px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;width:440px}
+.kicker{font-size:13px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#ff6b5e}
+.h{font-size:60px;line-height:1.02;margin:14px 0 0}
+.h .a{color:#ff6b5e}
+.sub{font-size:19px;line-height:1.45;color:#9d9aa5;margin-top:20px;max-width:420px}
+.panel{background:#1a191d;border-radius:24px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 30px 80px rgba(0,0,0,.5)}
+.k10{font-size:8px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:rgba(241,240,243,.45)}
+.lk{display:block}
+
+/* ——— Téléphone (scan) ——— */
 .phone{position:absolute;right:170px;top:90px;width:280px;height:590px;border-radius:44px;border:7px solid #26252a;background:#000;box-shadow:0 40px 90px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.08);overflow:hidden}
 .phone .table{position:absolute;inset:0;background:radial-gradient(120% 70% at 50% 35%,#5a4c40,#1a1715 72%)}
 .phone .card{position:absolute;left:50%;top:118px;width:172px;transform:translateX(-50%) rotate(-5deg)}
@@ -30,35 +37,91 @@ html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#131215;
 .frame.lock{color:#34d399;background:rgba(16,185,129,.16);box-shadow:inset 0 0 0 3px rgba(52,211,153,.5)}
 .flash{position:absolute;inset:0;background:#10b981;opacity:0}
 .topbar{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:center;padding:20px 16px 0;font-weight:600;font-size:14px;background:linear-gradient(#000a,transparent);height:90px}
-.topbar .x{width:30px;height:30px;border-radius:50%;background:#ffffff26}
+.topbar .x{width:30px;height:30px;border-radius:50%;background:#ffffff26;display:grid;place-items:center;font-size:14px}
 .topbar .n{background:#4ade80;color:#000;border-radius:99px;padding:2px 8px;font-size:10px;font-weight:700}
 .pill{position:absolute;left:0;right:0;margin:0 auto;width:max-content;bottom:22px;background:#0009;backdrop-filter:blur(6px);border-radius:99px;padding:7px 14px;font-size:11px;white-space:nowrap;display:flex;gap:8px;align-items:center}
 .pill b{width:8px;height:8px;border-radius:50%;display:inline-block}
 .banner{position:absolute;left:12px;right:12px;bottom:70px;display:flex;gap:10px;align-items:center;background:#000c;border:1px solid #ffffff26;border-radius:16px;padding:10px;backdrop-filter:blur(8px);opacity:0}
 .banner img{width:40px;border-radius:4px}
-.banner .t1{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#6ee7b7}
+.banner .t1{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#6ee7b7;display:flex;align-items:center;gap:4px}
 .banner .t2{font-size:13px;font-weight:700;margin-top:2px}
 .banner .t3{font-size:10px;color:#ffffffb3;margin-top:2px}
 .banner .t3 em{font-style:normal;color:#6ee7b7;font-weight:700;margin-left:6px}
-/* dashboard */
-.dash{position:absolute;right:80px;width:590px;top:150px;padding:24px}
-.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.tile{border:1px solid #2e2d33;background:#24232733;border-radius:14px;padding:12px 14px}
-.tile .l{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9d9aa5}
-.tile .v{font-size:22px;font-weight:700;margin-top:4px}
-.chart{margin-top:18px;display:block;overflow:visible}
-/* classeur */
-.binder{position:absolute;right:150px;top:110px;width:560px;height:500px;display:flex;border-radius:14px 26px 26px 14px;background:#1b1a1e;border:1px solid #2e2d33;box-shadow:0 40px 90px rgba(0,0,0,.6);overflow:hidden}
-.rings{width:58px;background:#f0483e;border-right:1px solid #2e2d33;display:flex;flex-direction:column;justify-content:space-evenly;align-items:center;padding:20px 0}
-.rings i{width:12px;height:12px;border-radius:50%;background:#1b1a1e;border:1px solid #0006}
-.page{flex:1;padding:18px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-content:start;background:#24232733}
+
+/* ——— Fenêtre de l'app : Dock + tableau de bord ——— */
+.app{position:absolute;left:560px;top:124px;width:680px;height:472px;border-radius:26px;overflow:hidden;background:#131216;box-shadow:0 0 0 1px rgba(255,255,255,.08),0 40px 90px rgba(0,0,0,.6);display:grid;grid-template-columns:172px 1fr}
+.dock{margin:10px;border-radius:20px;background:#0d0c0f;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);padding:12px 10px;display:flex;flex-direction:column;gap:6px;color:#ecebee;font-size:11px}
+.dock .dlogo{padding:2px 4px 4px}.dock .dlogo svg{height:18px;width:auto;display:block}
+.wallet{background:rgba(255,255,255,.06);border-radius:12px;padding:9px 10px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+.wallet .k{font-size:7.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:rgba(236,235,238,.4)}
+.wallet .v{font-size:17px;font-weight:700;margin-top:3px;line-height:1}.wallet .g{font-size:9px;color:#4ade80;margin-top:4px}
+.scanbtn{display:flex;justify-content:center;align-items:center;gap:5px;background:linear-gradient(90deg,#f0483e,#ff6b5e);border-radius:999px;padding:6px;font-weight:600;font-size:10px;box-shadow:0 8px 18px rgba(240,72,62,.3);color:#fff}
+.grp{margin:6px 8px 0;font-size:7.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:rgba(236,235,238,.35)}
+.nv{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:10px;color:rgba(236,235,238,.55);font-size:10.5px}
+.nv .ic{font-size:12px}.nv .n{margin-left:auto;font-size:9px;color:rgba(236,235,238,.35)}
+.nv.on{background:linear-gradient(90deg,#f0483e,#ff6b5e);color:#fff;font-weight:600;box-shadow:0 8px 18px rgba(240,72,62,.3)}.nv.on .n{color:#fff9}
+.mainc{padding:16px 16px 14px 8px;display:flex;flex-direction:column;gap:8px}
+.kick{font-size:8px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:rgba(241,240,243,.5)}
+.ttl{font-size:21px;line-height:1;margin-top:-4px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.stat{background:#1a191d;border-radius:12px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);padding:8px 10px;min-width:0}
+.stat .k{font-size:7.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:rgba(241,240,243,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat .v{font-size:15px;font-weight:700;margin-top:3px;white-space:nowrap}.stat .s{font-size:8.5px;color:rgba(241,240,243,.5);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vpanel{background:#1a191d;border-radius:14px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);padding:10px 12px}
+.vpanel .k{font-size:7.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:rgba(241,240,243,.45)}
+.vpanel .big{font-size:24px;font-weight:800;line-height:1.1;margin-top:2px}.vpanel .gl{font-size:10px;color:#4ade80;margin-top:1px}
+.chart{display:block;width:100%;height:92px;margin-top:4px;overflow:visible}
+.last .lh{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;font-weight:700;margin-bottom:5px}.last .lh span:last-child{font-weight:400;color:rgba(241,240,243,.5);font-size:10px}
+.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}.cards img{width:100%;border-radius:6px;display:block;box-shadow:0 6px 14px rgba(0,0,0,.5)}
+
+/* ——— Classeur ——— */
+.binder{position:absolute;left:570px;top:110px;width:560px;height:500px;display:flex;border-radius:14px 26px 26px 14px;background:#1a191d;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 40px 90px rgba(0,0,0,.6);overflow:hidden}
+.rings{width:58px;background:#f0483e;display:flex;flex-direction:column;justify-content:space-evenly;align-items:center;padding:20px 0}
+.rings i{width:12px;height:12px;border-radius:50%;background:#1a191d;border:1px solid #0006}
+.page{flex:1;padding:18px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-content:start;background:#23222633}
 .page img{width:100%;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.5);display:block}
-.bname{position:absolute;right:150px;top:626px;width:560px;font-weight:700;font-size:20px}
+.bname{position:absolute;left:570px;top:626px;width:560px;font-weight:700;font-size:20px}
 .bname span{display:block;font-size:14px;font-weight:400;color:#9d9aa5;margin-top:2px}
-/* slab + vitrine */
-.slab{position:absolute;left:626px;top:120px;width:272px;border-radius:20px;background:linear-gradient(#ffffff14,#ffffff08,#ffffff10);border:1px solid #45434b;padding:8px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+
+/* ——— Scellés ——— */
+.sp{position:absolute;left:590px;top:176px;width:650px;padding:20px}
+.sp .hd{display:flex;justify-content:space-between;align-items:baseline}.sp .hd b{font-size:15px}.sp .hd span{font-size:11px;color:#9d9aa5}
+.sp .stats{grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.sp .stat{padding:9px 12px}.sp .stat .v{font-size:18px}.sp .stat .k{font-size:8px}
+.prods{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.prod{border-radius:16px;overflow:hidden;background:#1a191d;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.prod .im{position:relative;aspect-ratio:4/3;background:#fff}.prod .im img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:12px}
+.prod .badge{position:absolute;left:8px;top:8px;background:#16a34a;color:#fff;border-radius:7px;padding:3px 7px;font-size:11px;font-weight:700;opacity:0}
+.prod .tx{padding:10px 11px 11px}.prod .n1{font-size:12px;font-weight:600;line-height:1.25;height:30px;overflow:hidden}.prod .n2{font-size:10px;color:#9d9aa5;margin-top:2px}.prod .n3{font-size:13px;font-weight:700;margin-top:5px}
+
+/* ——— Boosters ——— */
+.bst{position:absolute;left:600px;top:0;width:640px;height:720px}
+.halo{position:absolute;left:50%;top:46%;width:560px;height:560px;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(244,195,97,.5),rgba(240,72,62,.2) 45%,transparent 68%);filter:blur(30px);opacity:0}
+.pack{position:absolute;left:50%;top:160px;width:232px;aspect-ratio:236/380;margin-left:-116px;border-radius:16px;overflow:hidden;--h:268;background:linear-gradient(160deg,hsl(var(--h) 70% 52%),hsl(var(--h) 60% 22%) 70%);box-shadow:0 30px 60px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,255,255,.18)}
+.pack:before{content:"";position:absolute;inset:0;background:repeating-conic-gradient(from 0deg at 50% 52%,rgba(255,255,255,.14) 0 3deg,transparent 3deg 9deg);mix-blend-mode:screen;opacity:.5}
+.pack:after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.28) 45%,transparent 60%);mix-blend-mode:overlay}
+.pack .crimp{position:absolute;left:0;right:0;height:6%;background:repeating-linear-gradient(90deg,rgba(0,0,0,.35) 0 3px,rgba(255,255,255,.25) 3px 5px)}
+.pack .crimp.t{top:0}.pack .crimp.b{bottom:0}
+.pack .brand{position:absolute;top:11%;left:0;right:0;text-align:center;font-family:"Geist Mono",monospace;font-size:10px;letter-spacing:.42em;color:rgba(255,255,255,.78);font-weight:700}
+.pack .logo{position:absolute;top:28%;left:12%;right:12%;height:34%;display:grid;place-items:center}
+.pack .logo img{max-width:100%;max-height:100%;filter:drop-shadow(0 6px 10px rgba(0,0,0,.6))}
+.pack .set{position:absolute;bottom:14%;left:0;right:0;text-align:center;color:#fff;font-weight:700;font-size:12px;letter-spacing:.14em;text-transform:uppercase;text-shadow:0 2px 6px rgba(0,0,0,.6)}
+.pack .n{position:absolute;bottom:8%;left:50%;transform:translateX(-50%);border:1px solid rgba(255,255,255,.6);border-radius:999px;padding:2px 10px;font-size:9px;letter-spacing:.2em;color:#fff;font-family:"Geist Mono",monospace;white-space:nowrap}
+.strip{position:absolute;left:50%;top:160px;width:232px;height:38px;margin-left:-116px;border-radius:16px 16px 0 0;--h:268;background:linear-gradient(180deg,hsl(var(--h) 75% 58%),hsl(var(--h) 65% 36%));box-shadow:inset 0 0 0 1px rgba(255,255,255,.28);border-bottom:2px dashed rgba(255,255,255,.65);transform-origin:10% 100%}
+.strip:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(0,0,0,.3) 0 3px,rgba(255,255,255,.22) 3px 5px);opacity:.9;border-radius:inherit}
+.rc{position:absolute;left:50%;top:118px;width:252px;margin-left:-126px;opacity:0}
+.rc img{width:100%;display:block;border-radius:12px;box-shadow:0 0 70px rgba(244,195,97,.55),0 30px 60px rgba(0,0,0,.7)}
+.ban{position:absolute;left:50%;top:86px;transform:translateX(-50%) rotate(-3deg);background:linear-gradient(90deg,#f0483e,#f4c361);color:#111;font-weight:800;font-size:20px;padding:7px 20px;border-radius:12px;letter-spacing:-.01em;box-shadow:0 10px 30px rgba(240,72,62,.5);white-space:nowrap;opacity:0}
+.rrow{position:absolute;left:0;right:0;bottom:62px;display:flex;justify-content:center;gap:10px}
+.rrow .rk{position:relative;width:76px;opacity:0}
+.rrow .rk img{width:100%;display:block;border-radius:6px;box-shadow:0 10px 24px rgba(0,0,0,.6)}
+.rrow .rk.hi img{box-shadow:0 0 0 2px #f4c361,0 10px 24px rgba(0,0,0,.6)}
+.rrow .tag{position:absolute;left:-6px;top:-8px;background:#f4c361;color:#111;border-radius:7px;padding:2px 6px;font-size:9px;font-weight:800;opacity:0;white-space:nowrap}
+
+/* ——— Pré-gradation + vitrine ——— */
+.slab{position:absolute;left:600px;top:120px;width:262px;border-radius:20px;background:linear-gradient(#ffffff14,#ffffff08,#ffffff10);box-shadow:inset 0 0 0 1px #45434b,0 30px 80px rgba(0,0,0,.6);padding:8px}
 .slab .hd{display:flex;align-items:center;gap:8px;background:#f5f1e6;color:#1a1a1a;border-radius:10px;padding:8px 10px}
-.slab .hd svg{width:26px;height:26px}
+.slab .hd svg{width:26px;height:26px;flex:none}
 .slab .hd .n1{font-size:13px;font-weight:700;line-height:1.1}
 .slab .hd .n2{font-size:8.5px;color:#0008;white-space:nowrap}
 .slab .grade{margin-left:auto;border-left:1px solid #0002;padding-left:8px;text-align:center;opacity:0}
@@ -66,20 +129,20 @@ html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#131215;
 .slab .grade s{display:block;text-decoration:none;font-size:7px;letter-spacing:.1em;text-transform:uppercase;color:#0009;font-weight:600}
 .slab .cd{margin-top:8px;background:#0003;border-radius:12px;padding:8px}
 .slab .cd img{width:100%;display:block;border-radius:8px}
-.win{position:absolute;left:920px;top:150px;width:300px;border-radius:18px;overflow:hidden;background:#1b1a1e;border:1px solid #2e2d33;box-shadow:0 30px 80px rgba(0,0,0,.6)}
-.win .bar{display:flex;align-items:center;gap:6px;padding:9px 12px;background:#24232799;border-bottom:1px solid #2e2d33}
+.win{position:absolute;left:900px;top:150px;width:340px;border-radius:20px;overflow:hidden;background:#1a191d;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 30px 80px rgba(0,0,0,.6)}
+.win .bar{display:flex;align-items:center;gap:6px;padding:9px 12px;background:#23222699;border-bottom:1px solid #2e2d33}
 .win .bar i{width:8px;height:8px;border-radius:50%}
-.win .url{margin-left:8px;flex:1;font-size:10px;color:#86828e;background:#1b1a1e;border-radius:6px;padding:2px 8px}
+.win .url{margin-left:8px;flex:1;font-size:10px;color:#86828e;background:#131216;border-radius:6px;padding:2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .win .body{padding:14px}
 .win .who{display:flex;align-items:center;gap:8px}
-.win .who svg{width:24px;height:24px}
+.win .who svg{width:24px;height:24px;flex:none}
 .win .who .n1{font-size:14px;font-weight:700;line-height:1.1}
 .win .who .n2{font-size:10px;color:#9d9aa5}
 .win .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
 .win .grid img{width:100%;border-radius:6px;display:block}
 .copied{margin-top:12px;display:inline-flex;align-items:center;gap:6px;background:#4ade8026;color:#4ade80;border-radius:99px;padding:5px 10px;font-size:11px;font-weight:600;opacity:0}
-.cap2{position:absolute;left:96px;top:0;bottom:0;width:480px;display:flex;flex-direction:column;justify-content:center}
-/* outro */
+
+/* ——— Outro ——— */
 .outro{display:flex;flex-direction:column;align-items:center;justify-content:center}
 .outro .url{font-size:30px;font-weight:700;margin-top:26px}
 .outro .line{font-size:18px;color:#9d9aa5;margin-top:12px}
@@ -89,26 +152,15 @@ html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#131215;
 <linearGradient id="face" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#20242F"/><stop offset="100%" stop-color="#151821"/></linearGradient>
 <linearGradient id="sweep" x1="0" y1="1" x2="1" y2="0"><stop offset="32%" stop-color="#fff" stop-opacity="0"/><stop offset="50%" stop-color="#fff" stop-opacity=".5"/><stop offset="68%" stop-color="#fff" stop-opacity="0"/></linearGradient>
 <clipPath id="clip"><rect x="17.5" y="11" width="29" height="41" rx="3.2"/></clipPath>
-<linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f0483e" stop-opacity=".35"/><stop offset="100%" stop-color="#f0483e" stop-opacity="0"/></linearGradient>
+<linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f0483e" stop-opacity=".38"/><stop offset="100%" stop-color="#f0483e" stop-opacity="0"/></linearGradient>
 </defs></svg>
 <div class="glow" id="glow"></div>
 
 <!-- 1. Intro -->
 <section class="scene" id="s1">
   <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
-    <div id="logo1" style="width:520px;opacity:0"><svg class="lk" viewBox="0 0 215 64" xmlns="http://www.w3.org/2000/svg"><rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(-13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/>
-<rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/>
-<path d="M55 2 C 44 20, 27 37, 1 53 C 27 42, 48 26, 58 8 Z" fill="url(#holo)" opacity=".85"/>
-<rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="url(#face)"/>
-<g clip-path="url(#clip)">
-  <rect x="21.5" y="15.5" width="21" height="16" rx="1.6" fill="url(#holo)"/>
-  <rect x="21.5" y="35" width="21" height="2.2" rx="1.1" fill="#3A4152"/>
-  <rect x="21.5" y="39.6" width="14.5" height="2.2" rx="1.1" fill="#333949"/>
-  <rect x="21.5" y="44.2" width="17.5" height="2.2" rx="1.1" fill="#2C3140"/>
-  <rect class="sweep" x="6" y="-8" width="14" height="80" fill="url(#sweep)" transform="rotate(24 32 32) translate(-40 0)"/>
-</g>
-<rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="none" stroke="#E8B44A" stroke-width="1.3"/><path class="wordA" d="M88.84 42.0V24.6H82.72V21.0H98.92V24.6H92.8V42.0ZM101.78000000000002 42.0 107.30000000000001 21.0H114.2L119.72000000000001 42.0H115.64000000000001L114.50000000000001 37.38H107.00000000000001L105.86000000000001 42.0ZM107.93 33.72H113.57000000000001L111.02000000000001 23.490000000000002H110.48ZM123.84000000000002 42.0V21.0H127.80000000000001V42.0ZM133.36 42.0V21.0H137.32000000000002V38.4H146.92000000000002V42.0Z" fill="#F2F3F5"/><path class="wordB" d="M156.08 42.0V24.6H149.96V21.0H166.16V24.6H160.04000000000002V42.0ZM178.44000000000003 42.42Q174.54000000000002 42.42 172.26000000000002 40.245000000000005Q169.98000000000002 38.07 169.98000000000002 34.02V28.98Q169.98000000000002 24.93 172.26000000000002 22.755000000000003Q174.54000000000002 20.580000000000002 178.44000000000003 20.580000000000002Q182.31000000000003 20.580000000000002 184.425 22.695Q186.54000000000002 24.810000000000002 186.54000000000002 28.5V28.68H182.64000000000001V28.380000000000003Q182.64000000000001 26.520000000000003 181.60500000000002 25.32Q180.57000000000002 24.12 178.44000000000003 24.12Q176.34000000000003 24.12 175.14000000000004 25.410000000000004Q173.94000000000003 26.700000000000003 173.94000000000003 28.92V34.08Q173.94000000000003 36.27 175.14000000000004 37.575Q176.34000000000003 38.88 178.44000000000003 38.88Q180.57000000000002 38.88 181.60500000000002 37.665000000000006Q182.64000000000001 36.45 182.64000000000001 34.62V34.08H186.54000000000002V34.5Q186.54000000000002 38.19 184.425 40.305Q182.31000000000003 42.42 178.44000000000003 42.42ZM198.64000000000004 42.42Q196.48000000000005 42.42 194.72500000000002 41.445Q192.97000000000003 40.47 191.93500000000003 38.595Q190.90000000000003 36.72 190.90000000000003 34.02V28.98Q190.90000000000003 24.93 193.18000000000004 22.755000000000003Q195.46000000000004 20.580000000000002 199.36000000000004 20.580000000000002Q203.23000000000005 20.580000000000002 205.34500000000003 22.635Q207.46000000000004 24.69 207.46000000000004 28.200000000000003V28.32H203.56000000000003V28.08Q203.56000000000003 26.4 202.52500000000003 25.259999999999998Q201.49000000000004 24.12 199.36000000000004 24.12Q197.26000000000005 24.12 196.06000000000006 25.410000000000004Q194.86000000000004 26.700000000000003 194.86000000000004 28.92V34.08Q194.86000000000004 36.27 196.06000000000006 37.605000000000004Q197.26000000000005 38.94 199.42000000000004 38.94Q201.58000000000004 38.94 202.57000000000005 37.8Q203.56000000000003 36.66 203.56000000000003 34.92V34.62H198.58000000000004V31.259999999999998H207.46000000000004V42.0H203.80000000000004V39.99H203.26000000000005Q203.05000000000004 40.5 202.58500000000004 41.07Q202.12000000000003 41.64 201.19000000000005 42.03Q200.26000000000005 42.42 198.64000000000004 42.42Z" fill="#E8B44A"/></svg></div>
-    <p id="tag1" class="display el" style="font-size:38px;margin:34px 0 0;text-align:center">Ta collection Pokémon,<br><span class="a" style="color:#ff6b5e">enfin à sa hauteur.</span></p>
+    <div id="logo1" style="width:520px;opacity:0" data-logo="lockup"></div>
+    <p id="tag1" class="display el" style="font-size:38px;margin:34px 0 0;text-align:center">Ta collection Pokémon,<br><span style="color:#ff6b5e">enfin à sa hauteur.</span></p>
   </div>
 </section>
 
@@ -126,32 +178,65 @@ html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#131215;
       <div class="frame lock" id="flock"><i></i><i></i><i></i><i></i></div>
     </div>
     <div class="flash" id="flash"></div>
-    <div class="topbar"><span class="x"></span><span>Scanner</span><span class="n num" id="cnt">2 ajoutées</span></div>
-    <div class="banner" id="banner"><img src="https://assets.tcgdex.net/fr/sv/sv03.5/006/low.webp" alt=""><div><div class="t1">✓ Ajoutée</div><div class="t2">Dracaufeu ex</div><div class="t3">151 · n° 006 <em class="num">42,00 €</em></div></div></div>
+    <div class="topbar"><span class="x"><i class="ic" data-i="x"></i></span><span>Scanner</span><span class="n num" id="cnt">2 ajoutées</span></div>
+    <div class="banner" id="banner"><img src="https://assets.tcgdex.net/fr/sv/sv03.5/006/low.webp" alt=""><div><div class="t1"><i class="ic" data-i="check"></i> Ajoutée</div><div class="t2">Dracaufeu ex</div><div class="t3">151 · n° 006 <em class="num">42,00 €</em></div></div></div>
     <div class="pill el" id="pill"><b id="dot" style="background:#fb923c"></b><span id="pilltxt">Carte repérée, ne bouge plus</span></div>
   </div>
 </section>
 
-<!-- 3. Cote -->
+<!-- 3. Tableau de bord (Dock) -->
 <section class="scene" id="s3">
   <div class="caption">
-    <p class="kicker el" id="k3">Cote Cardmarket</p>
+    <p class="kicker el" id="k3">Tableau de bord</p>
     <p class="h display el" id="h3">La valeur,<br><span class="a">chaque nuit.</span></p>
-    <p class="sub el" id="sub3">Valeur estimée, valeur Cardmarket, plus-value depuis le prix payé : pour chaque carte, chaque scellé, et toute la collection sur une courbe.</p>
+    <p class="sub el" id="sub3">Valeur estimée, cote Cardmarket, plus-value depuis le prix payé. Chaque carte, chaque scellé, et toute la collection sur une courbe.</p>
   </div>
-  <div class="dash panel el" id="dash">
-    <div class="tiles">
-      <div class="tile el" id="t1"><div class="l">Valeur estimée</div><div class="v num" id="v1">0,00 €</div></div>
-      <div class="tile el" id="t2"><div class="l">Cardmarket</div><div class="v num" id="v2">0,00 €</div></div>
-      <div class="tile el" id="t3"><div class="l">Plus-value</div><div class="v num" id="v3" style="color:#4ade80">+0,00 €</div></div>
+  <div class="app el" id="app">
+    <div class="dock">
+      <div class="dlogo" data-logo="lockup"></div>
+      <div class="wallet el dk"><div class="k">Ma collection</div><div class="v num" id="wv">0 €</div><div class="g num" id="wg">+0 € · +0 %</div></div>
+      <div class="scanbtn el dk"><i class="ic" data-i="scan-line"></i> Scanner</div>
+      <div class="grp el dk">Ma collection</div>
+      <div class="nv on el dk"><i class="ic" data-i="layout-dashboard"></i>Collection</div>
+      <div class="nv el dk"><i class="ic" data-i="layout-grid"></i>Cartes<span class="n num">67</span></div>
+      <div class="nv el dk"><i class="ic" data-i="boxes"></i>Scellés<span class="n num">13</span></div>
+      <div class="nv el dk"><i class="ic" data-i="notebook-tabs"></i>Classeurs<span class="n num">3</span></div>
+      <div class="nv el dk"><i class="ic" data-i="star"></i>Recherchées<span class="n num">6</span></div>
+      <div class="grp el dk">Explorer</div>
+      <div class="nv el dk"><i class="ic" data-i="search"></i>Catalogue</div>
+      <div class="nv el dk"><i class="ic" data-i="package"></i>Boosters</div>
     </div>
-    <svg class="chart" viewBox="0 0 560 170" width="540" height="164">
-      <path id="areaP" d="M0.0,158.0 L19.3,157.8 L38.6,146.7 L57.9,149.3 L77.2,139.7 L96.6,136.2 L115.9,135.5 L135.2,124.0 L154.5,118.6 L173.8,118.4 L193.1,107.3 L212.4,117.0 L231.7,107.3 L251.0,103.8 L270.3,103.1 L289.7,91.6 L309.0,79.2 L328.3,79.0 L347.6,67.9 L366.9,70.5 L386.2,60.9 L405.5,57.4 L424.8,56.7 L444.1,45.2 L463.4,39.8 L482.8,39.6 L502.1,28.6 L521.4,31.1 L540.7,21.5 L560.0,18.0 L560,170 L0,170 Z" fill="url(#area)" opacity="0"/>
-      <path id="lineP" d="M0.0,158.0 L19.3,157.8 L38.6,146.7 L57.9,149.3 L77.2,139.7 L96.6,136.2 L115.9,135.5 L135.2,124.0 L154.5,118.6 L173.8,118.4 L193.1,107.3 L212.4,117.0 L231.7,107.3 L251.0,103.8 L270.3,103.1 L289.7,91.6 L309.0,79.2 L328.3,79.0 L347.6,67.9 L366.9,70.5 L386.2,60.9 L405.5,57.4 L424.8,56.7 L444.1,45.2 L463.4,39.8 L482.8,39.6 L502.1,28.6 L521.4,31.1 L540.7,21.5 L560.0,18.0" fill="none" stroke="#f0483e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>
-      <circle id="dotP" cx="560.0" cy="18.0" r="5" fill="#f0483e" opacity="0"/>
-      <circle id="dotR" cx="560.0" cy="18.0" r="5" fill="none" stroke="#f0483e" stroke-width="2" opacity="0"/>
-    </svg>
-    <div class="num el" id="dates" style="display:flex;justify-content:space-between;color:#86828e;font-size:11px;margin-top:6px"><span>28/08</span><span>06/09</span><span>16/09</span><span>26/09</span></div>
+    <div class="mainc">
+      <div><div class="kick">Tableau de bord</div><div class="ttl display">Collection</div></div>
+      <div class="stats">
+        <div class="stat el st"><div class="k">Cartes</div><div class="v num" id="sv1">0</div><div class="s">13 références</div></div>
+        <div class="stat el st"><div class="k">Investi</div><div class="v num" id="sv2">0 €</div><div class="s">13 payées</div></div>
+        <div class="stat el st"><div class="k">Valeur estimée</div><div class="v num" id="sv3">0 €</div><div class="s num" style="color:#4ade80">+140 %</div></div>
+        <div class="stat el st"><div class="k">Cardmarket</div><div class="v num" id="sv4">0 €</div><div class="s">relevée cette nuit</div></div>
+      </div>
+      <div class="vpanel el" id="vpanel">
+        <div class="k">Valeur estimée</div>
+        <div class="big num" id="bigv">0,00 €</div>
+        <div class="gl num" id="gl">+0,00 € · +0 % depuis l'achat</div>
+        <svg class="chart" viewBox="0 0 560 92" preserveAspectRatio="none">
+          <path id="areaP" d="" fill="url(#area)" opacity="0"/>
+          <path id="lineP" d="" fill="none" stroke="#ff6b5e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" vector-effect="non-scaling-stroke"/>
+          <circle id="dotP" cx="560" cy="6" r="4" fill="#ff6b5e" opacity="0"/>
+          <circle id="dotR" cx="560" cy="6" r="4" fill="none" stroke="#ff6b5e" stroke-width="2" opacity="0"/>
+        </svg>
+      </div>
+      <div class="last">
+        <div class="lh el" id="lh"><span>Derniers ajouts</span><span>Tout voir</span></div>
+        <div class="cards">
+          <img class="el lc" src="https://assets.tcgdex.net/fr/sv/sv03.5/006/low.webp" alt="">
+          <img class="el lc" src="https://assets.tcgdex.net/fr/sv/sv03.5/199/low.webp" alt="">
+          <img class="el lc" src="https://assets.tcgdex.net/fr/sv/sv08/057/low.webp" alt="">
+          <img class="el lc" src="https://assets.tcgdex.net/fr/sv/sv03.5/025/low.webp" alt="">
+          <img class="el lc" src="https://assets.tcgdex.net/fr/sv/sv03.5/002/low.webp" alt="">
+          <img class="el lc" src="https://assets.tcgdex.net/fr/sv/sv03.5/196/low.webp" alt="">
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -160,7 +245,7 @@ html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#131215;
   <div class="caption">
     <p class="kicker el" id="k4">Classeurs</p>
     <p class="h display el" id="h4">Range-les<br><span class="a">à ton image.</span></p>
-    <p class="sub el" id="sub4">Pages à anneaux, couverture sur mesure, glisser-déposer. Une carte peut vivre dans plusieurs classeurs.</p>
+    <p class="sub el" id="sub4">Pages à anneaux, couverture sur mesure, glisser-déposer. Une carte peut vivre dans plusieurs classeurs, et le Pokédex se range aussi.</p>
   </div>
   <div class="binder el" id="binder">
     <div class="rings"><i></i><i></i><i></i><i></i><i></i><i></i></div>
@@ -169,163 +254,226 @@ html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#131215;
       <img class="el bc" src="https://assets.tcgdex.net/fr/sv/sv04.5/054/high.png" alt="">
       <img class="el bc" src="https://assets.tcgdex.net/fr/sv/sv03.5/006/high.png" alt="">
       <img class="el bc" src="https://assets.tcgdex.net/fr/base/base1/4/high.png" alt="">
-      <img class="el bc" src="https://assets.tcgdex.net/fr/sv/sv03.5/183/high.png" alt="">
       <img class="el bc" src="https://assets.tcgdex.net/fr/sv/sv03/125/high.png" alt="">
+      <img class="el bc" src="https://assets.tcgdex.net/fr/sv/sv03/223/high.png" alt="">
     </div>
   </div>
-  <div class="bname el" id="bname">Mes Dracaufeu<span>12 cartes · <b class="num" style="font-weight:600;color:#ecebee">1 240,00 €</b></span></div>
+  <div class="bname el" id="bname">Mes Dracaufeu<span>12 cartes · <b class="num" style="font-weight:600;color:#f1f0f3">1 240,00 €</b></span></div>
 </section>
 
-<!-- 5. Pré-gradation + vitrine -->
+<!-- 5. Scellés -->
 <section class="scene" id="s5">
-  <div class="cap2">
-    <p class="kicker el" id="k5">Et le reste</p>
-    <p class="h display el" id="h5">Pré-grade.<br><span class="a">Partage.</span></p>
-    <p class="sub el" id="sub5">Centrage mesuré, estimation chez PSA, PCA, CCC, CGC et BGS. Et une vitrine que tes amis parcourent d'un lien.</p>
+  <div class="caption">
+    <p class="kicker el" id="k5">Scellés</p>
+    <p class="h display el" id="h5">Coffrets, displays,<br><span class="a">tins.</span></p>
+    <p class="sub el" id="sub5">Chaque produit scellé a sa cote et son historique, comme une carte. Tu sais ce que vaut ta réserve, et ce qu'elle a pris.</p>
+  </div>
+  <div class="sp panel el" id="sp">
+    <div class="hd"><b>Ma réserve</b><span class="num">13 produits · 4 sets</span></div>
+    <div class="stats">
+      <div class="stat el sst"><div class="k">Payé</div><div class="v num" id="p1">0,00 €</div></div>
+      <div class="stat el sst"><div class="k">Cote</div><div class="v num" id="p2">0,00 €</div></div>
+      <div class="stat el sst"><div class="k">Plus-value</div><div class="v num" id="p3" style="color:#4ade80">+0 %</div></div>
+    </div>
+    <div class="prods">
+      <div class="prod el pr"><div class="im"><img src="https://tcgplayer-cdn.tcgplayer.com/product/503313_400w.jpg" alt=""><span class="badge num bd">+87 %</span></div><div class="tx"><div class="n1">Coffret Dresseur d'Élite 151</div><div class="n2">Coffret Dresseur d'Élite</div><div class="n3 num">112,00 €</div></div></div>
+      <div class="prod el pr"><div class="im"><img src="https://tcgplayer-cdn.tcgplayer.com/product/593355_400w.jpg" alt=""><span class="badge num bd">+83 %</span></div><div class="tx"><div class="n1">Coffret Dresseur d'Élite Évolutions Prismatiques</div><div class="n2">Coffret Dresseur d'Élite</div><div class="n3 num">119,00 €</div></div></div>
+      <div class="prod el pr"><div class="im"><img src="https://tcgplayer-cdn.tcgplayer.com/product/565602_400w.jpg" alt=""><span class="badge num bd">+76 %</span></div><div class="tx"><div class="n1">Booster sous blister Étincelles Déferlantes</div><div class="n2">Booster</div><div class="n3 num">11,48 €</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Boosters -->
+<section class="scene" id="s6">
+  <div class="caption">
+    <p class="kicker el" id="k6">Et pour souffler</p>
+    <p class="h display el" id="h6">Ouvre<br><span class="a">des boosters.</span></p>
+    <p class="sub el" id="sub6">108 sets jouables, cinq cartes par paquet, la cinquième toujours rare ou mieux. Collectionne, fais grader tes tirages, échange tes doubles.</p>
+  </div>
+  <div class="bst">
+    <div class="halo" id="halo"></div>
+    <div class="pack el" id="pack"><div class="crimp t"></div><div class="brand">TAILTCG</div><div class="logo"><img src="https://assets.tcgdex.net/fr/sv/sv03.5/logo.png" alt=""></div><div class="set">Écarlate et Violet</div><div class="n">5 CARTES</div><div class="crimp b"></div></div>
+    <div class="strip el" id="strip"></div>
+    <div class="rc" id="rc"><img src="https://assets.tcgdex.net/fr/sv/sv03.5/199/high.png" alt=""></div>
+    <div class="ban" id="ban">Illustration spéciale rare</div>
+    <div class="rrow">
+      <div class="rk"><img src="https://assets.tcgdex.net/fr/sv/sv03.5/002/low.webp" alt=""></div>
+      <div class="rk"><img src="https://assets.tcgdex.net/fr/sv/sv03.5/025/low.webp" alt=""><span class="tag">nouvelle !</span></div>
+      <div class="rk"><img src="https://assets.tcgdex.net/fr/sv/sv03.5/133/low.webp" alt=""></div>
+      <div class="rk"><img src="https://assets.tcgdex.net/fr/sv/sv03.5/006/low.webp" alt=""><span class="tag">nouvelle !</span></div>
+      <div class="rk hi"><img src="https://assets.tcgdex.net/fr/sv/sv03.5/199/low.webp" alt=""><span class="tag">nouvelle !</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 7. Pré-gradation + vitrine -->
+<section class="scene" id="s7">
+  <div class="caption">
+    <p class="kicker el" id="k7">Et le reste</p>
+    <p class="h display el" id="h7">Pré-grade.<br><span class="a">Partage.</span></p>
+    <p class="sub el" id="sub7">Centrage mesuré, estimation chez PSA, PCA, CCC, CGC et BGS. Et une vitrine que tes amis parcourent d'un lien.</p>
   </div>
   <div class="slab el" id="slab">
-    <div class="hd"><svg class="" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(-13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/>
-<rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/>
-<path d="M55 2 C 44 20, 27 37, 1 53 C 27 42, 48 26, 58 8 Z" fill="url(#holo)" opacity=".85"/>
-<rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="url(#face)"/>
-<g clip-path="url(#clip)">
-  <rect x="21.5" y="15.5" width="21" height="16" rx="1.6" fill="url(#holo)"/>
-  <rect x="21.5" y="35" width="21" height="2.2" rx="1.1" fill="#3A4152"/>
-  <rect x="21.5" y="39.6" width="14.5" height="2.2" rx="1.1" fill="#333949"/>
-  <rect x="21.5" y="44.2" width="17.5" height="2.2" rx="1.1" fill="#2C3140"/>
-  <rect class="sweep" x="6" y="-8" width="14" height="80" fill="url(#sweep)" transform="rotate(24 32 32) translate(-40 0)"/>
-</g>
-<rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="none" stroke="#E8B44A" stroke-width="1.3"/></svg><div><div class="n1">Dracaufeu</div><div class="n2">Set de base · 4/102</div><div class="n2 num">CEN 9 · COI 10 · BOR 9,5 · SUR 9</div></div><div class="grade num" id="grade"><b>9</b><s>Mint</s></div></div>
+    <div class="hd"><span data-logo="mark"></span><div><div class="n1">Dracaufeu</div><div class="n2">Set de base · 4/102</div><div class="n2 num">CEN 9 · COI 10 · BOR 9,5 · SUR 9</div></div><div class="grade num" id="grade"><b>9</b><s>Mint</s></div></div>
     <div class="cd"><img src="https://assets.tcgdex.net/fr/base/base1/4/high.png" alt=""></div>
   </div>
   <div class="win el" id="win">
-    <div class="bar"><i style="background:#fb718599"></i><i style="background:#f0483e99"></i><i style="background:#4ade8099"></i><span class="url num">tailtcg.vercel.app/v/sacha</span></div>
+    <div class="bar"><i style="background:#fb718599"></i><i style="background:#f0483e99"></i><i style="background:#4ade8099"></i><span class="url num">tailtcg.vercel.app/vitrine/sacha</span></div>
     <div class="body">
-      <div class="who"><svg class="" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(-13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/>
-<rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/>
-<path d="M55 2 C 44 20, 27 37, 1 53 C 27 42, 48 26, 58 8 Z" fill="url(#holo)" opacity=".85"/>
-<rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="url(#face)"/>
-<g clip-path="url(#clip)">
-  <rect x="21.5" y="15.5" width="21" height="16" rx="1.6" fill="url(#holo)"/>
-  <rect x="21.5" y="35" width="21" height="2.2" rx="1.1" fill="#3A4152"/>
-  <rect x="21.5" y="39.6" width="14.5" height="2.2" rx="1.1" fill="#333949"/>
-  <rect x="21.5" y="44.2" width="17.5" height="2.2" rx="1.1" fill="#2C3140"/>
-  <rect class="sweep" x="6" y="-8" width="14" height="80" fill="url(#sweep)" transform="rotate(24 32 32) translate(-40 0)"/>
-</g>
-<rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="none" stroke="#E8B44A" stroke-width="1.3"/></svg><div><div class="n1">La collection de Sacha</div><div class="n2">Vitrine en lecture seule · 132 cartes · 22 scellés</div></div></div>
+      <div class="who"><span data-logo="mark"></span><div><div class="n1">La collection de Sacha</div><div class="n2">Vitrine en lecture seule · 132 cartes · 22 scellés</div></div></div>
       <div class="grid">
         <img class="el wc" src="https://assets.tcgdex.net/fr/sv/sv03.5/006/low.webp" alt="">
         <img class="el wc" src="https://assets.tcgdex.net/fr/sv/sv03.5/025/low.webp" alt="">
         <img class="el wc" src="https://assets.tcgdex.net/fr/sv/sv03.5/133/low.webp" alt="">
         <img class="el wc" src="https://assets.tcgdex.net/fr/sv/sv08/057/low.webp" alt="">
       </div>
-      <div class="copied" id="copied">✓ Lien copié</div>
+      <div class="copied" id="copied"><i class="ic" data-i="check"></i> Lien copié</div>
     </div>
   </div>
 </section>
 
-<!-- 6. Outro -->
-<section class="scene outro" id="s6">
-  <div id="logo6" style="width:420px;opacity:0"><svg class="lk" viewBox="0 0 215 64" xmlns="http://www.w3.org/2000/svg"><rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(-13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/>
-<rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/>
-<path d="M55 2 C 44 20, 27 37, 1 53 C 27 42, 48 26, 58 8 Z" fill="url(#holo)" opacity=".85"/>
-<rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="url(#face)"/>
-<g clip-path="url(#clip)">
-  <rect x="21.5" y="15.5" width="21" height="16" rx="1.6" fill="url(#holo)"/>
-  <rect x="21.5" y="35" width="21" height="2.2" rx="1.1" fill="#3A4152"/>
-  <rect x="21.5" y="39.6" width="14.5" height="2.2" rx="1.1" fill="#333949"/>
-  <rect x="21.5" y="44.2" width="17.5" height="2.2" rx="1.1" fill="#2C3140"/>
-  <rect class="sweep" x="6" y="-8" width="14" height="80" fill="url(#sweep)" transform="rotate(24 32 32) translate(-40 0)"/>
-</g>
-<rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="none" stroke="#E8B44A" stroke-width="1.3"/><path class="wordA" d="M88.84 42.0V24.6H82.72V21.0H98.92V24.6H92.8V42.0ZM101.78000000000002 42.0 107.30000000000001 21.0H114.2L119.72000000000001 42.0H115.64000000000001L114.50000000000001 37.38H107.00000000000001L105.86000000000001 42.0ZM107.93 33.72H113.57000000000001L111.02000000000001 23.490000000000002H110.48ZM123.84000000000002 42.0V21.0H127.80000000000001V42.0ZM133.36 42.0V21.0H137.32000000000002V38.4H146.92000000000002V42.0Z" fill="#F2F3F5"/><path class="wordB" d="M156.08 42.0V24.6H149.96V21.0H166.16V24.6H160.04000000000002V42.0ZM178.44000000000003 42.42Q174.54000000000002 42.42 172.26000000000002 40.245000000000005Q169.98000000000002 38.07 169.98000000000002 34.02V28.98Q169.98000000000002 24.93 172.26000000000002 22.755000000000003Q174.54000000000002 20.580000000000002 178.44000000000003 20.580000000000002Q182.31000000000003 20.580000000000002 184.425 22.695Q186.54000000000002 24.810000000000002 186.54000000000002 28.5V28.68H182.64000000000001V28.380000000000003Q182.64000000000001 26.520000000000003 181.60500000000002 25.32Q180.57000000000002 24.12 178.44000000000003 24.12Q176.34000000000003 24.12 175.14000000000004 25.410000000000004Q173.94000000000003 26.700000000000003 173.94000000000003 28.92V34.08Q173.94000000000003 36.27 175.14000000000004 37.575Q176.34000000000003 38.88 178.44000000000003 38.88Q180.57000000000002 38.88 181.60500000000002 37.665000000000006Q182.64000000000001 36.45 182.64000000000001 34.62V34.08H186.54000000000002V34.5Q186.54000000000002 38.19 184.425 40.305Q182.31000000000003 42.42 178.44000000000003 42.42ZM198.64000000000004 42.42Q196.48000000000005 42.42 194.72500000000002 41.445Q192.97000000000003 40.47 191.93500000000003 38.595Q190.90000000000003 36.72 190.90000000000003 34.02V28.98Q190.90000000000003 24.93 193.18000000000004 22.755000000000003Q195.46000000000004 20.580000000000002 199.36000000000004 20.580000000000002Q203.23000000000005 20.580000000000002 205.34500000000003 22.635Q207.46000000000004 24.69 207.46000000000004 28.200000000000003V28.32H203.56000000000003V28.08Q203.56000000000003 26.4 202.52500000000003 25.259999999999998Q201.49000000000004 24.12 199.36000000000004 24.12Q197.26000000000005 24.12 196.06000000000006 25.410000000000004Q194.86000000000004 26.700000000000003 194.86000000000004 28.92V34.08Q194.86000000000004 36.27 196.06000000000006 37.605000000000004Q197.26000000000005 38.94 199.42000000000004 38.94Q201.58000000000004 38.94 202.57000000000005 37.8Q203.56000000000003 36.66 203.56000000000003 34.92V34.62H198.58000000000004V31.259999999999998H207.46000000000004V42.0H203.80000000000004V39.99H203.26000000000005Q203.05000000000004 40.5 202.58500000000004 41.07Q202.12000000000003 41.64 201.19000000000005 42.03Q200.26000000000005 42.42 198.64000000000004 42.42Z" fill="#E8B44A"/></svg></div>
-  <p class="url el" id="url6">tailtcg.vercel.app</p>
-  <p class="line el" id="line6">Gratuit · Sans pub · Fait par un collectionneur</p>
+<!-- 8. Outro -->
+<section class="scene outro" id="s8">
+  <div id="logo8" style="width:420px;opacity:0" data-logo="lockup"></div>
+  <p class="url el" id="url8">tailtcg.vercel.app</p>
+  <p class="line el" id="line8">Gratuit · Sans pub · Fait par un collectionneur</p>
 </section>
 
 <script>
+/* ——— Logo (vectorisé comme dans l'app) ——— */
+const TAIL = "M88.84 42.0V24.6H82.72V21.0H98.92V24.6H92.8V42.0ZM101.78000000000002 42.0 107.30000000000001 21.0H114.2L119.72000000000001 42.0H115.64000000000001L114.50000000000001 37.38H107.00000000000001L105.86000000000001 42.0ZM107.93 33.72H113.57000000000001L111.02000000000001 23.490000000000002H110.48ZM123.84000000000002 42.0V21.0H127.80000000000001V42.0ZM133.36 42.0V21.0H137.32000000000002V38.4H146.92000000000002V42.0Z";
+const TCG = "M156.08 42.0V24.6H149.96V21.0H166.16V24.6H160.04000000000002V42.0ZM178.44000000000003 42.42Q174.54000000000002 42.42 172.26000000000002 40.245000000000005Q169.98000000000002 38.07 169.98000000000002 34.02V28.98Q169.98000000000002 24.93 172.26000000000002 22.755000000000003Q174.54000000000002 20.580000000000002 178.44000000000003 20.580000000000002Q182.31000000000003 20.580000000000002 184.425 22.695Q186.54000000000002 24.810000000000002 186.54000000000002 28.5V28.68H182.64000000000001V28.380000000000003Q182.64000000000001 26.520000000000003 181.60500000000002 25.32Q180.57000000000002 24.12 178.44000000000003 24.12Q176.34000000000003 24.12 175.14000000000004 25.410000000000004Q173.94000000000003 26.700000000000003 173.94000000000003 28.92V34.08Q173.94000000000003 36.27 175.14000000000004 37.575Q176.34000000000003 38.88 178.44000000000003 38.88Q180.57000000000002 38.88 181.60500000000002 37.665000000000006Q182.64000000000001 36.45 182.64000000000001 34.62V34.08H186.54000000000002V34.5Q186.54000000000002 38.19 184.425 40.305Q182.31000000000003 42.42 178.44000000000003 42.42ZM198.64000000000004 42.42Q196.48000000000005 42.42 194.72500000000002 41.445Q192.97000000000003 40.47 191.93500000000003 38.595Q190.90000000000003 36.72 190.90000000000003 34.02V28.98Q190.90000000000003 24.93 193.18000000000004 22.755000000000003Q195.46000000000004 20.580000000000002 199.36000000000004 20.580000000000002Q203.23000000000005 20.580000000000002 205.34500000000003 22.635Q207.46000000000004 24.69 207.46000000000004 28.200000000000003V28.32H203.56000000000003V28.08Q203.56000000000003 26.4 202.52500000000003 25.259999999999998Q201.49000000000004 24.12 199.36000000000004 24.12Q197.26000000000005 24.12 196.06000000000006 25.410000000000004Q194.86000000000004 26.700000000000003 194.86000000000004 28.92V34.08Q194.86000000000004 36.27 196.06000000000006 37.605000000000004Q197.26000000000005 38.94 199.42000000000004 38.94Q201.58000000000004 38.94 202.57000000000005 37.8Q203.56000000000003 36.66 203.56000000000003 34.92V34.62H198.58000000000004V31.259999999999998H207.46000000000004V42.0H203.80000000000004V39.99H203.26000000000005Q203.05000000000004 40.5 202.58500000000004 41.07Q202.12000000000003 41.64 201.19000000000005 42.03Q200.26000000000005 42.42 198.64000000000004 42.42Z";
+const MARK = `<rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(-13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/><rect x="17.5" y="11" width="29" height="41" rx="3.2" transform="rotate(13 32 50)" fill="#1B1F29" stroke="#2E3444" stroke-width="1.1"/><path d="M55 2 C 44 20, 27 37, 1 53 C 27 42, 48 26, 58 8 Z" fill="url(#holo)" opacity=".85"/><rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="url(#face)"/><g clip-path="url(#clip)"><rect x="21.5" y="15.5" width="21" height="16" rx="1.6" fill="url(#holo)"/><rect x="21.5" y="35" width="21" height="2.2" rx="1.1" fill="#3A4152"/><rect x="21.5" y="39.6" width="14.5" height="2.2" rx="1.1" fill="#333949"/><rect x="21.5" y="44.2" width="17.5" height="2.2" rx="1.1" fill="#2C3140"/><rect class="sweep" x="6" y="-8" width="14" height="80" fill="url(#sweep)" transform="rotate(24 32 32) translate(-40 0)"/></g><rect x="17.5" y="11" width="29" height="41" rx="3.2" fill="none" stroke="#E8B44A" stroke-width="1.3"/>`;
+const logoSvg = (kind) => kind === "mark"
+  ? `<svg class="lk" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">${MARK}</svg>`
+  : `<svg class="lk" viewBox="0 0 215 64" xmlns="http://www.w3.org/2000/svg">${MARK}<path d="${TAIL}" fill="#F2F3F5"/><path d="${TCG}" fill="#E8B44A"/></svg>`;
+document.querySelectorAll("[data-logo]").forEach((el) => { el.innerHTML = logoSvg(el.dataset.logo); });
+/* icônes lucide */
+document.querySelectorAll(".ic[data-i]").forEach((el) => { el.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${window.ICONS[el.dataset.i] ?? ""}</svg>`; });
+
+/* ——— Courbe de valeur (un mois, en hausse douce) ——— */
+const VALUES = Array.from({ length: 30 }, (_, i) => { const noise = [0.6, -0.4, 0.9, -0.7, 0.3, 0, -0.9, 0.5][i % 8]; const dip = i >= 11 && i <= 15 ? -6 : 0; return 812 + i * 4.2 + dip + noise * 4; });
+(function buildChart() {
+  const w = 560, h = 92, pad = 6, min = Math.min(...VALUES), max = Math.max(...VALUES), span = max - min;
+  const pts = VALUES.map((v, i) => [(i / (VALUES.length - 1)) * w, pad + (1 - (v - min) / span) * (h - pad * 2)]);
+  const line = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  document.getElementById("lineP").setAttribute("d", line);
+  document.getElementById("areaP").setAttribute("d", `${line} L${w} ${h} L0 ${h} Z`);
+  const [lx, ly] = pts[pts.length - 1];
+  for (const id of ["dotP", "dotR"]) { const c = document.getElementById(id); c.setAttribute("cx", lx); c.setAttribute("cy", ly); }
+})();
+
+/* ——— Outils de timeline ——— */
 const $ = (id) => document.getElementById(id);
 const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
 const seg = (t, a, b) => clamp((t - a) / (b - a));
 const eo = (p) => 1 - Math.pow(1 - p, 3);
 const eio = (p) => (p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
 const back = (p) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2); };
-const fmt = (v) => v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
-/* apparition : fondu + translation */
+const fmt2 = (v) => v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+const fmt0 = (v) => Math.round(v).toLocaleString("fr-FR") + " €";
 function rise(el, t, a, b, dy = 24, ease = eo) { const p = ease(seg(t, a, b)); el.style.opacity = p; el.style.transform = `translateY(${(1 - p) * dy}px)`; }
 function pop(el, t, a, b, from = .86) { const p = seg(t, a, b); el.style.opacity = clamp(p * 1.6); el.style.transform = `scale(${from + (1 - from) * back(p)})`; }
+function stamp(el, t, a, b) { const p = eo(seg(t, a, b)); el.style.opacity = clamp(p * 2); el.style.transform = `scale(${2.1 - 1.1 * p}) rotate(${(1 - p) * -10}deg)`; }
 function fadeScene(el, t, inA, inB, outA, outB) { el.style.opacity = seg(t, inA, inB) * (1 - seg(t, outA, outB)); }
+function stagger(list, t, a, step, dur, fn) { list.forEach((el, i) => fn(el, seg(t, a + i * step, a + i * step + dur))); }
 
-const S = { s1: $("s1"), s2: $("s2"), s3: $("s3"), s4: $("s4"), s5: $("s5"), s6: $("s6") };
-const bc = [...document.querySelectorAll(".bc")];
-const wc = [...document.querySelectorAll(".wc")];
-const sweeps = [...document.querySelectorAll("#logo1 .sweep, #logo6 .sweep")];
+const S = Object.fromEntries(["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"].map((id) => [id, $(id)]));
+const q = (sel) => [...document.querySelectorAll(sel)];
+const dk = q(".dk"), st = q(".st"), lc = q(".lc"), bc = q(".bc"), sst = q(".sst"), pr = q(".pr"), bd = q(".bd"), rk = q(".rk"), tags = q(".rrow .tag"), wc = q(".wc");
+const sweeps = [q("#logo1 .sweep")[0], q("#logo8 .sweep")[0]];
 
 window.__seek = function (t) {
   /* halo */
-  const g = $("glow");
-  const gp = eo(seg(t, 0, 1.6));
-  g.style.opacity = (0.55 * gp) * (t < 21 ? 1 : 1) ;
-  g.style.transform = `translate(-50%,-50%) scale(${0.7 + 0.5 * gp})`;
+  const g = $("glow"); const gp = eo(seg(t, 0, 1.6));
+  g.style.opacity = 0.55 * gp; g.style.transform = `translate(-50%,-50%) scale(${0.7 + 0.5 * gp})`;
 
-  /* 1. Intro 0 → 3.4 */
-  fadeScene(S.s1, t, 0, 0.01, 3.0, 3.4);
+  /* 1. Intro 0 → 3.2 */
+  fadeScene(S.s1, t, 0, 0.01, 2.9, 3.2);
   pop($("logo1"), t, 0.15, 0.95, 0.7);
-  const sw = seg(t, 0.9, 1.9);
-  sweeps[0].setAttribute("transform", `rotate(24 32 32) translate(${-40 + 90 * sw} 0)`);
+  sweeps[0].setAttribute("transform", `rotate(24 32 32) translate(${-40 + 90 * seg(t, 0.9, 1.9)} 0)`);
   rise($("tag1"), t, 1.3, 2.0, 18);
 
-  /* 2. Scan 3.1 → 8.8 */
-  fadeScene(S.s2, t, 3.1, 3.5, 8.4, 8.8);
-  rise($("k2"), t, 3.4, 3.9, 14); rise($("h2"), t, 3.5, 4.1, 26); rise($("h2b"), t, 6.1, 6.6, 18); rise($("sub2"), t, 3.8, 4.4, 20);
-  rise($("phone"), t, 3.2, 4.0, 90, eio);
-  const fs = seg(t, 4.3, 4.7);
-  const lk = seg(t, 5.7, 6.0);
+  /* 2. Scan 3.0 → 8.4 */
+  fadeScene(S.s2, t, 3.0, 3.4, 8.0, 8.4);
+  rise($("k2"), t, 3.3, 3.8, 14); rise($("h2"), t, 3.4, 4.0, 26); rise($("h2b"), t, 5.9, 6.4, 18); rise($("sub2"), t, 3.7, 4.3, 20);
+  rise($("phone"), t, 3.1, 3.9, 90, eio);
+  const fs = seg(t, 4.2, 4.6), lk = seg(t, 5.5, 5.8);
   $("fseek").style.opacity = fs * (1 - lk); $("fseek").style.transform = `scale(${1.12 - 0.12 * eo(fs)})`;
   $("flock").style.opacity = lk;
-  const fl = seg(t, 5.7, 5.85) * (1 - seg(t, 5.85, 6.4));
-  $("flash").style.opacity = 0.5 * fl;
-  rise($("banner"), t, 5.85, 6.35, 16);
-  rise($("pill"), t, 4.5, 4.9, 8);
-  const locked = t >= 5.8;
+  $("flash").style.opacity = 0.5 * seg(t, 5.5, 5.65) * (1 - seg(t, 5.65, 6.2));
+  rise($("banner"), t, 5.65, 6.15, 16);
+  rise($("pill"), t, 4.4, 4.8, 8);
+  const locked = t >= 5.6;
   $("dot").style.background = locked ? "#34d399" : "#fb923c";
-  $("pilltxt").textContent = locked ? "Ajoutée · carte suivante" : "Carte repérée";
+  $("pilltxt").textContent = locked ? "Ajoutée · carte suivante" : "Carte repérée, ne bouge plus";
   $("cnt").textContent = locked ? "3 ajoutées" : "2 ajoutées";
-  $("cnt").style.transform = `scale(${1 + 0.25 * Math.sin(Math.PI * seg(t, 5.8, 6.2))})`;
+  $("cnt").style.transform = `scale(${1 + 0.25 * Math.sin(Math.PI * seg(t, 5.6, 6.0))})`;
 
-  /* 3. Cote 8.6 → 13.8 */
-  fadeScene(S.s3, t, 8.6, 9.0, 13.4, 13.8);
-  rise($("k3"), t, 8.9, 9.4, 14); rise($("h3"), t, 9.0, 9.6, 26); rise($("sub3"), t, 9.3, 9.9, 20);
-  rise($("dash"), t, 8.8, 9.5, 60, eio);
-  pop($("t1"), t, 9.4, 9.9); pop($("t2"), t, 9.55, 10.05); pop($("t3"), t, 9.7, 10.2);
-  const cu = eo(seg(t, 9.7, 11.2));
-  $("v1").textContent = fmt(934.6 * cu); $("v2").textContent = fmt(901.2 * cu); $("v3").textContent = "+" + fmt(267.42 * cu);
-  $("lineP").style.strokeDashoffset = 1 - eio(seg(t, 10.0, 12.0));
-  $("areaP").style.opacity = seg(t, 11.3, 12.2);
-  $("dotP").style.opacity = seg(t, 12.0, 12.3);
-  const rp = (t - 12.1) % 1.4 / 1.4; $("dotR").style.opacity = t > 12.1 ? (1 - rp) * 0.8 : 0; $("dotR").setAttribute("r", 5 + 14 * (t > 12.1 ? rp : 0));
-  $("dates").style.opacity = seg(t, 10.0, 10.5);
+  /* 3. Tableau de bord 8.2 → 13.8 */
+  fadeScene(S.s3, t, 8.2, 8.6, 13.4, 13.8);
+  rise($("k3"), t, 8.5, 9.0, 14); rise($("h3"), t, 8.6, 9.2, 26); rise($("sub3"), t, 8.9, 9.5, 20);
+  rise($("app"), t, 8.4, 9.1, 70, eio);
+  stagger(dk, t, 8.8, 0.07, 0.35, (el, p) => { el.style.opacity = p; el.style.transform = `translateX(${(1 - eo(p)) * -14}px)`; });
+  stagger(st, t, 9.3, 0.12, 0.45, (el, p) => { el.style.opacity = clamp(p * 1.6); el.style.transform = `scale(${0.86 + 0.14 * back(p)})`; });
+  rise($("vpanel"), t, 9.7, 10.3, 22);
+  const cu = eo(seg(t, 9.6, 11.3));
+  $("sv1").textContent = Math.round(67 * cu); $("sv2").textContent = fmt0(715 * cu); $("sv3").textContent = fmt0(1713 * cu); $("sv4").textContent = fmt0(1323 * cu);
+  $("wv").textContent = fmt0(1713 * cu); $("wg").textContent = `+${fmt0(997 * cu)} · +${Math.round(140 * cu)} %`;
+  $("bigv").textContent = fmt2(1713.01 * cu); $("gl").textContent = `+${fmt2(997.85 * cu)} · +${Math.round(140 * cu)} % depuis l'achat`;
+  $("lineP").style.strokeDashoffset = 1 - eio(seg(t, 10.1, 11.9));
+  $("areaP").style.opacity = seg(t, 11.2, 12.0);
+  $("dotP").style.opacity = seg(t, 11.9, 12.2);
+  const rp = ((t - 12.0) % 1.4) / 1.4; $("dotR").style.opacity = t > 12.0 ? (1 - rp) * 0.8 : 0; $("dotR").setAttribute("r", 4 + 12 * (t > 12.0 ? rp : 0));
+  rise($("lh"), t, 11.4, 11.8, 8);
+  stagger(lc, t, 11.6, 0.1, 0.4, (el, p) => { el.style.opacity = clamp(p * 1.5); el.style.transform = `scale(${0.8 + 0.2 * back(p)}) rotate(${(1 - p) * -4}deg)`; });
 
-  /* 4. Classeurs 13.6 → 17.8 */
-  fadeScene(S.s4, t, 13.6, 14.0, 17.4, 17.8);
+  /* 4. Classeurs 13.6 → 17.6 */
+  fadeScene(S.s4, t, 13.6, 14.0, 17.2, 17.6);
   rise($("k4"), t, 13.9, 14.4, 14); rise($("h4"), t, 14.0, 14.6, 26); rise($("sub4"), t, 14.3, 14.9, 20);
   const bp = eio(seg(t, 13.8, 14.6)); $("binder").style.opacity = bp; $("binder").style.transform = `translateX(${(1 - bp) * 120}px)`;
-  bc.forEach((im, i) => { const p = seg(t, 14.5 + i * 0.2, 14.95 + i * 0.2); im.style.opacity = clamp(p * 1.5); im.style.transform = `scale(${0.8 + 0.2 * back(p)}) rotate(${(1 - p) * -4}deg)`; });
-  rise($("bname"), t, 16.0, 16.5, 10);
+  stagger(bc, t, 14.5, 0.18, 0.45, (el, p) => { el.style.opacity = clamp(p * 1.5); el.style.transform = `scale(${0.8 + 0.2 * back(p)}) rotate(${(1 - p) * -4}deg)`; });
+  rise($("bname"), t, 15.9, 16.4, 10);
 
-  /* 5. Pré-grade + vitrine 17.6 → 21.4 */
-  fadeScene(S.s5, t, 17.6, 18.0, 21.0, 21.4);
-  rise($("k5"), t, 17.9, 18.4, 14); rise($("h5"), t, 18.0, 18.6, 26); rise($("sub5"), t, 18.3, 18.9, 20);
-  rise($("slab"), t, 17.8, 18.5, 60, eio);
-  const gs = seg(t, 18.9, 19.3); $("grade").style.opacity = gs; $("grade").style.transform = `scale(${2.2 - 1.2 * eo(gs)}) rotate(${(1 - eo(gs)) * -12}deg)`;
-  rise($("win"), t, 18.4, 19.1, 60, eio);
-  wc.forEach((im, i) => { const p = seg(t, 19.0 + i * 0.12, 19.4 + i * 0.12); im.style.opacity = p; im.style.transform = `scale(${0.85 + 0.15 * back(p)})`; });
-  pop($("copied"), t, 19.9, 20.3, 0.7);
+  /* 5. Scellés 17.4 → 21.4 */
+  fadeScene(S.s5, t, 17.4, 17.8, 21.0, 21.4);
+  rise($("k5"), t, 17.7, 18.2, 14); rise($("h5"), t, 17.8, 18.4, 26); rise($("sub5"), t, 18.1, 18.7, 20);
+  rise($("sp"), t, 17.6, 18.3, 70, eio);
+  stagger(sst, t, 18.2, 0.12, 0.4, (el, p) => { el.style.opacity = clamp(p * 1.6); el.style.transform = `scale(${0.86 + 0.14 * back(p)})`; });
+  const sc = eo(seg(t, 18.5, 19.9));
+  $("p1").textContent = fmt2(286.19 * sc); $("p2").textContent = fmt2(433.4 * sc); $("p3").textContent = `+${Math.round(51 * sc)} %`;
+  stagger(pr, t, 18.6, 0.2, 0.5, (el, p) => { el.style.opacity = clamp(p * 1.5); el.style.transform = `translateY(${(1 - eo(p)) * 26}px)`; });
+  stagger(bd, t, 19.5, 0.18, 0.4, (el, p) => stamp(el, p, 0, 1));
 
-  /* 6. Outro 21.2 → 25 */
-  fadeScene(S.s6, t, 21.2, 21.7, 99, 100);
-  pop($("logo6"), t, 21.3, 22.0, 0.8);
-  const sw2 = seg(t, 22.0, 23.0); sweeps[1].setAttribute("transform", `rotate(24 32 32) translate(${-40 + 90 * sw2} 0)`);
-  rise($("url6"), t, 22.0, 22.5, 14); rise($("line6"), t, 22.3, 22.8, 12);
+  /* 6. Boosters 21.2 → 25.8 */
+  fadeScene(S.s6, t, 21.2, 21.6, 25.4, 25.8);
+  rise($("k6"), t, 21.5, 22.0, 14); rise($("h6"), t, 21.6, 22.2, 26); rise($("sub6"), t, 21.9, 22.5, 20);
+  const pk = eio(seg(t, 21.3, 22.1)), sink = eio(seg(t, 22.9, 23.6));
+  $("pack").style.opacity = pk * (1 - sink); $("pack").style.transform = `translateY(${(1 - pk) * 90 + sink * 80}px) scale(${1 - sink * 0.1})`;
+  const tear = eo(seg(t, 22.4, 22.9));
+  $("strip").style.opacity = pk * (1 - seg(t, 22.7, 22.95));
+  $("strip").style.transform = `translate(${-12 * tear}px, ${(1 - pk) * 90 - 70 * tear}px) rotate(${-14 * tear}deg)`;
+  const rv = eio(seg(t, 22.8, 23.6));
+  $("rc").style.opacity = clamp(rv * 2); $("rc").style.transform = `translateY(${(1 - rv) * 150}px) scale(${0.55 + 0.45 * rv})`;
+  $("halo").style.opacity = seg(t, 23.3, 23.9); $("halo").style.transform = `translate(-50%,-50%) scale(${0.7 + 0.3 * seg(t, 23.3, 24.2)})`;
+  const bs = eo(seg(t, 23.6, 24.0)); $("ban").style.opacity = clamp(bs * 2); $("ban").style.transform = `translateX(-50%) rotate(-3deg) scale(${2 - bs})`;
+  stagger(rk, t, 24.0, 0.1, 0.4, (el, p) => { el.style.opacity = clamp(p * 1.5); el.style.transform = `translateY(${(1 - eo(p)) * 24}px) scale(${0.8 + 0.2 * back(p)})`; });
+  stagger(tags, t, 24.6, 0.1, 0.35, (el, p) => stamp(el, p, 0, 1));
+
+  /* 7. Pré-grade + vitrine 25.6 → 29.2 */
+  fadeScene(S.s7, t, 25.6, 26.0, 28.8, 29.2);
+  rise($("k7"), t, 25.9, 26.4, 14); rise($("h7"), t, 26.0, 26.6, 26); rise($("sub7"), t, 26.3, 26.9, 20);
+  rise($("slab"), t, 25.8, 26.5, 60, eio);
+  stamp($("grade"), t, 26.9, 27.3);
+  rise($("win"), t, 26.4, 27.1, 60, eio);
+  stagger(wc, t, 27.0, 0.12, 0.4, (el, p) => { el.style.opacity = p; el.style.transform = `scale(${0.85 + 0.15 * back(p)})`; });
+  pop($("copied"), t, 27.8, 28.2, 0.7);
+
+  /* 8. Outro 29.0 → 32 */
+  fadeScene(S.s8, t, 29.0, 29.5, 99, 100);
+  pop($("logo8"), t, 29.1, 29.8, 0.8);
+  sweeps[1].setAttribute("transform", `rotate(24 32 32) translate(${-40 + 90 * seg(t, 29.8, 30.8)} 0)`);
+  rise($("url8"), t, 29.8, 30.3, 14); rise($("line8"), t, 30.1, 30.6, 12);
 };
 window.__seek(0);
 window.__readyP = Promise.all([document.fonts.ready, ...[...document.images].map((im) => im.decode().catch(() => null))]).then(() => (window.__ready = true));
