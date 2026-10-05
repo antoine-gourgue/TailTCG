@@ -4,22 +4,16 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { OWNED_TABLES, knownAccountIds } from "@/lib/admin-data";
 
 type Result<T = unknown> = ({ ok: true } & T) | { ok: false; message: string };
 
-// Tables portant un owner_id, purgées à la suppression d'un compte
-const OWNED_TABLES = [
-  "item_value_history",
-  "item_photos",
-  "item_gradings",
-  "binder_items",
-  "binders",
-  "wishlist",
-  "custom_cards",
-  "sources",
-  "items",
-  "user_settings",
-] as const;
+/** Origine de l'app (http en local, https derrière Vercel) pour appeler ses propres crons */
+async function selfOrigin(): Promise<string> {
+  const h = await headers();
+  const proto = h.get("x-forwarded-proto") ?? (h.get("host")?.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${h.get("host")}`;
+}
 
 /** Coupe le partage public d'un compte (révoque son jeton) */
 export async function adminDisableShare(userId: string): Promise<Result> {
@@ -78,6 +72,11 @@ export async function adminDeleteUser(userId: string): Promise<Result> {
     return { ok: false, message: "Impossible de supprimer ton propre compte ici." };
 
   const db = createAdminClient();
+  // Échanges du jeu : ils suivent en cascade des cartes, mais un échange peut viser une carte d'un autre compte
+  for (const col of ["from_owner", "to_owner"] as const) {
+    const { error } = await db.from("game_trades").delete().eq(col, userId);
+    if (error) return { ok: false, message: `game_trades: ${error.message}` };
+  }
   for (const table of OWNED_TABLES) {
     const { error } = await db.from(table).delete().eq("owner_id", userId);
     if (error) return { ok: false, message: `${table}: ${error.message}` };
@@ -255,30 +254,81 @@ export async function adminPurgeTrash(): Promise<Result<{ count: number }>> {
     .not("deleted_at", "is", null)
     .select("id");
   if (error) return { ok: false, message: error.message };
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   return { ok: true, count: data?.length ?? 0 };
 }
 
-/** Déclenche le cron des cotes manuellement */
-export async function adminRunCron(): Promise<Result<{ summary: string }>> {
-  if (!(await requireAdmin())) return { ok: false, message: "Non autorisé" };
-  if (!process.env.CRON_SECRET)
-    return { ok: false, message: "CRON_SECRET non configuré." };
-  const h = await headers();
-  const origin = `https://${h.get("host")}`;
+/** Appelle un cron de l'app avec son secret (jamais renvoyé au navigateur) */
+async function callCron(path: string): Promise<{ ok: true; json: Record<string, unknown> } | { ok: false; message: string }> {
+  if (!process.env.CRON_SECRET) return { ok: false, message: "CRON_SECRET non configuré." };
   try {
-    const res = await fetch(`${origin}/api/cron/prices`, {
+    const res = await fetch(`${await selfOrigin()}${path}`, {
       headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
       cache: "no-store",
     });
-    const json = await res.json().catch(() => ({}));
-    revalidatePath("/admin/systeme");
-    if (!res.ok) return { ok: false, message: json?.error ?? `HTTP ${res.status}` };
-    return {
-      ok: true,
-      summary: `${json.updated ?? 0} mises à jour, ${json.skipped ?? 0} ignorées`,
-    };
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    revalidatePath("/admin", "layout");
+    if (!res.ok) return { ok: false, message: String(json?.error ?? `HTTP ${res.status}`) };
+    return { ok: true, json };
   } catch (e) {
     return { ok: false, message: (e as Error).message };
   }
+}
+
+/** Déclenche le cron des cotes des cartes */
+export async function adminRunCron(): Promise<Result<{ summary: string }>> {
+  if (!(await requireAdmin())) return { ok: false, message: "Non autorisé" };
+  const r = await callCron("/api/cron/prices");
+  if (!r.ok) return r;
+  return { ok: true, summary: `${r.json.updated ?? 0} cotes relevées, ${r.json.skipped ?? 0} ignorées` };
+}
+
+/** Rafraîchit le miroir du guide Cardmarket */
+export async function adminRunGuide(): Promise<Result<{ summary: string }>> {
+  if (!(await requireAdmin())) return { ok: false, message: "Non autorisé" };
+  const r = await callCron("/api/cron/cardmarket-guide");
+  if (!r.ok) return r;
+  const status = r.json.status;
+  return { ok: true, summary: status === "not-modified" ? "Fichier inchangé depuis le dernier passage" : `${Number(r.json.rows ?? 0).toLocaleString("fr-FR")} produits rafraîchis` };
+}
+
+/** Supprime les sessions de capture téléphone expirées sans avoir abouti (leurs scans suivent en cascade) */
+export async function adminPurgeExpiredCaptures(): Promise<Result<{ count: number }>> {
+  if (!(await requireAdmin())) return { ok: false, message: "Non autorisé" };
+  const db = createAdminClient();
+  const { data, error } = await db
+    .from("capture_sessions")
+    .delete()
+    .neq("status", "done")
+    .lt("expires_at", new Date().toISOString())
+    .select("id");
+  if (error) return { ok: false, message: error.message };
+  revalidatePath("/admin", "layout");
+  return { ok: true, count: data?.length ?? 0 };
+}
+
+/**
+ * Efface les lignes dont le propriétaire n'existe plus. Garde-fous : la liste
+ * des comptes doit être non vide et contenir l'admin qui lance la purge.
+ */
+export async function adminPurgeOrphans(): Promise<Result<{ count: number }>> {
+  const me = await requireAdmin();
+  if (!me) return { ok: false, message: "Non autorisé" };
+  let ids: string[];
+  try {
+    ids = await knownAccountIds();
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+  if (!ids.includes(me.id)) return { ok: false, message: "Liste des comptes incohérente, purge annulée." };
+  const db = createAdminClient();
+  const list = `(${ids.join(",")})`;
+  let count = 0;
+  for (const t of OWNED_TABLES) {
+    const { data, error } = await db.from(t).delete().not("owner_id", "in", list).select("owner_id");
+    if (error) return { ok: false, message: `${t}: ${error.message}` };
+    count += data?.length ?? 0;
+  }
+  revalidatePath("/admin", "layout");
+  return { ok: true, count };
 }

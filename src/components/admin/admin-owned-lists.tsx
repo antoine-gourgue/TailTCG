@@ -20,8 +20,7 @@ export function AdminBindersList({
   const router = useRouter();
   const [toast, setToast] = useState<Toast>(null);
   return (
-    <div className="panel p-5">
-      <p className="label-xs mb-3">Classeurs ({binders.length})</p>
+    <div>
       {binders.length === 0 ? (
         <p className="text-sm text-muted">Aucun.</p>
       ) : (
@@ -29,7 +28,7 @@ export function AdminBindersList({
           {binders.map((b) => (
             <li
               key={b.id}
-              className="flex items-center gap-2 rounded-lg border border-edge px-3 py-2 text-sm"
+              className="flex items-center gap-2 rounded-xl bg-raised/50 px-3 py-2.5 text-sm ring-1 ring-ring"
             >
               <Link
                 href={`/admin/utilisateurs/${ownerId}/classeur/${b.id}`}
@@ -70,8 +69,7 @@ export function AdminSourcesList({
   const router = useRouter();
   const [toast, setToast] = useState<Toast>(null);
   return (
-    <div className="panel p-5">
-      <p className="label-xs mb-3">Sources ({sources.length})</p>
+    <div>
       {sources.length === 0 ? (
         <p className="text-sm text-muted">Aucune.</p>
       ) : (
@@ -79,7 +77,7 @@ export function AdminSourcesList({
           {sources.map((s) => (
             <li
               key={s.id}
-              className="flex items-center gap-2 rounded-lg border border-edge px-3 py-2 text-sm"
+              className="flex items-center gap-2 rounded-xl bg-raised/50 px-3 py-2.5 text-sm ring-1 ring-ring"
             >
               <Link
                 href={`/admin/utilisateurs/${ownerId}/boutique/${s.id}`}

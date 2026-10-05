@@ -36,8 +36,13 @@ const ALIASES: Record<string, string> = {
 export function rarityLabel(raw: string | null | undefined): string {
   const r = (raw ?? "").trim();
   if (!r) return UNKNOWN_RARITY;
-  const alias = ALIASES[r.toLowerCase()];
-  return alias ?? r;
+  return canonicalRarity(ALIASES[r.toLowerCase()] ?? r);
+}
+
+/** Variante de casse ramenée au libellé de référence (« Peu commune » → « Peu Commune ») */
+function canonicalRarity(label: string): string {
+  const low = label.toLowerCase();
+  return RARITY_ORDER.find((r) => r.toLowerCase() === low) ?? label;
 }
 
 /** Ordre d'affichage des raretés TCGdex (inconnues à la fin) */

@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: "/login", destination: "/connexion", permanent: true },
+      { source: "/admin/contenu", destination: "/admin/collections", permanent: true },
       { source: "/wishlist", destination: "/recherchees", permanent: true },
       { source: "/recherche", destination: "/catalogue", permanent: true },
       { source: "/scan", destination: "/scanner", permanent: true },

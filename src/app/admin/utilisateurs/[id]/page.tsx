@@ -1,220 +1,358 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  LayoutGrid,
-  Award,
-  NotebookTabs,
-  Star,
-  MapPin,
-  BadgeEuro,
-  Camera,
-  ExternalLink,
-} from "lucide-react";
+import { Award, Boxes, ChevronLeft, ExternalLink, KeyRound, LayoutGrid, MailCheck, MailWarning, MapPin, NotebookTabs, Package, Star, UserPlus } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAdmin } from "@/lib/admin";
+import { loadAdminData } from "@/lib/admin-data";
+import { combineStats, loadCardStats, loadSealedStats } from "@/lib/stats-data";
+import { sealedCotes } from "@/lib/sealed-prices";
+import { signStorageImages } from "@/lib/images";
+import { activityTone, fmtInt, relTime, shortDate } from "@/lib/admin-format";
+import { rarityLabel } from "@/lib/rarity";
 import { formatEur } from "@/lib/domain";
-import { UserAdminActions } from "@/components/admin/user-admin-actions";
-import { AdminCardsTable, type AdminItem } from "@/components/admin/admin-cards-table";
-import { AdminBindersList, AdminSourcesList } from "@/components/admin/admin-owned-lists";
+import { StatCard, StatStrip } from "@/components/stat-card";
+import { CardImage } from "@/components/card-image";
+import { ValueHistoryChart } from "@/components/value-history-chart";
 import { SlabReportTile } from "@/components/slab-report-tile";
 import type { GradingReportData } from "@/components/grading-report";
+import { AdminCardsTable, type AdminItem } from "@/components/admin/admin-cards-table";
+import { AdminBindersList, AdminSourcesList } from "@/components/admin/admin-owned-lists";
+import { Avatar, Badge, Dot, PanelHead } from "@/components/admin/admin-ui";
+import { EventFeed } from "@/components/admin/event-feed";
+import { DangerZone, ResetLinkButton } from "@/components/admin/user-actions";
+import { GridOrTable, UserTabs, type UserTab } from "@/components/admin/user-tabs";
 
-function fmt(d: string | null | undefined) {
-  return d ? new Date(d).toLocaleDateString("fr-FR") : "—";
-}
-
-function Stat({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof LayoutGrid;
-  label: string;
-  value: string | number;
-}) {
-  return (
-    <div className="panel flex flex-col gap-1 p-4">
-      <span className="label-xs flex items-center gap-2">
-        <Icon size={13} aria-hidden />
-        {label}
-      </span>
-      <span className="display num text-xl font-bold leading-none">{value}</span>
-    </div>
-  );
-}
-
-export default async function AdminUserDetail({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function AdminUserDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const me = await requireAdmin();
   const db = createAdminClient();
+  const d = await loadAdminData();
+  const a = d.accounts.find((x) => x.id === id);
+  if (!a) notFound();
 
-  const { data: userRes } = await db.auth.admin.getUserById(id);
-  const account = userRes?.user;
-  if (!account) notFound();
-
-  const [
-    { data: settings },
-    { data: items },
-    { data: gradings },
-    { data: binders },
-    { data: binderLinks },
-    { data: binderPlaceholders },
-    { data: sources },
-    { data: wishlist },
-    { data: photos },
-  ] = await Promise.all([
-    db.from("user_settings").select("*").eq("owner_id", id).maybeSingle(),
+  const [cardStats, sealedStats, { data: settings }, { data: items }, { data: gradings }, { data: binders }, { data: binderLinks }, { data: binderPlaceholders }, { data: sources }, { data: wishlist }] = await Promise.all([
+    loadCardStats(db, id),
+    (async () => {
+      const lots = d.sealed.filter((l) => l.owner_id === id);
+      const cotes = lots.length ? await sealedCotes(lots.map((l) => l.product), db) : new Map();
+      return loadSealedStats(db, id, { cotes });
+    })(),
+    db.from("user_settings").select("share_token").eq("owner_id", id).maybeSingle(),
     db.from("items").select("id, card_name, set_name, local_id, tcgdex_id, condition, card_type, language, quantity, purchase_price, manual_price, graded, grade, sold_at, sold_price, deleted_at, created_at, notes").eq("owner_id", id).order("created_at", { ascending: false }),
     db.from("item_gradings").select("item_id, grade, centering, corners, edges, surface, created_at, rectified_path, rectified_verso_path, ratios, details").eq("owner_id", id).order("created_at", { ascending: false }),
     db.from("binders").select("id, name").eq("owner_id", id).order("created_at"),
     db.from("binder_items").select("binder_id").eq("owner_id", id),
     db.from("binder_placeholders").select("binder_id").eq("owner_id", id),
     db.from("sources").select("id, name, kind, city").eq("owner_id", id).order("name"),
-    db.from("wishlist").select("id").eq("owner_id", id),
-    db.from("item_photos").select("id").eq("owner_id", id),
+    db.from("wishlist").select("id, card_name, set_name, image_url, priority, target_price").eq("owner_id", id).order("created_at", { ascending: false }),
   ]);
+  const stats = combineStats(cardStats, sealedStats);
 
+  // Pré-gradations : dernière par carte, visuels signés pour le rapport
   const allItems = (items ?? []) as AdminItem[];
-  const live = allItems.filter((i) => i.deleted_at == null);
-  const cards = live.reduce((n, i) => n + (i.quantity ?? 1), 0);
-  const value = live.reduce((n, i) => n + (i.sold_at == null && i.manual_price != null ? i.manual_price * (i.quantity ?? 1) : 0), 0);
-  const invested = live.reduce((n, i) => n + (i.purchase_price != null ? i.purchase_price * (i.quantity ?? 1) : 0), 0);
-  const trash = allItems.filter((i) => i.deleted_at != null).length;
-
-  // Pré-gradations (dernière par carte) + visuels signés pour le rapport
-  const latestGrading = new Map<string, NonNullable<typeof gradings>[number]>();
-  for (const g of gradings ?? []) if (!latestGrading.has(g.item_id)) latestGrading.set(g.item_id, g);
-  const gradingList = [...latestGrading.values()];
-  const gradePaths = gradingList.flatMap((g) =>
-    [g.rectified_path, g.rectified_verso_path].filter((p): p is string => p != null)
-  );
-  const gradeUrl = new Map<string, string | null>();
-  if (gradePaths.length > 0) {
-    const { data: signed } = await db.storage.from("card-photos").createSignedUrls(gradePaths, 3600);
-    gradePaths.forEach((p, i) => gradeUrl.set(p, signed?.[i]?.signedUrl ?? null));
+  const latest = new Map<string, NonNullable<typeof gradings>[number]>();
+  for (const g of gradings ?? []) if (!latest.has(g.item_id)) latest.set(g.item_id, g);
+  const paths = [...latest.values()].flatMap((g) => [g.rectified_path, g.rectified_verso_path].filter((p): p is string => p != null));
+  const signed = new Map<string, string | null>();
+  if (paths.length) {
+    const { data: urls } = await db.storage.from("card-photos").createSignedUrls(paths, 3600);
+    paths.forEach((p, i) => signed.set(p, urls?.[i]?.signedUrl ?? null));
   }
   const itemById = new Map(allItems.map((i) => [i.id, i]));
-  const slabs = gradingList
-    .map((g) => ({ g, item: itemById.get(g.item_id) }))
-    .filter((s): s is { g: (typeof s)["g"]; item: AdminItem } => s.item != null)
-    .map(({ g, item }) => ({
-      itemId: g.item_id,
-      imageUrl: g.rectified_path ? gradeUrl.get(g.rectified_path) ?? null : null,
-      report: {
-        grade: g.grade ?? 0,
-        centering: g.centering ?? 0,
-        corners: g.corners ?? 0,
-        edges: g.edges ?? 0,
-        surface: g.surface ?? 0,
-        createdAt: g.created_at,
-        ratios: (g.ratios as GradingReportData["ratios"]) ?? null,
-        annotations: ((g.details as { annotations?: GradingReportData["annotations"] })?.annotations) ?? [],
-        rectoUrl: g.rectified_path ? gradeUrl.get(g.rectified_path) ?? null : null,
-        versoUrl: g.rectified_verso_path ? gradeUrl.get(g.rectified_verso_path) ?? null : null,
-        cardName: item.card_name,
-        setName: item.set_name,
-        localId: item.local_id,
-      } satisfies GradingReportData,
-    }));
+  const slabs = [...latest.values()].flatMap((g) => {
+    const item = itemById.get(g.item_id);
+    if (!item) return [];
+    const recto = g.rectified_path ? (signed.get(g.rectified_path) ?? null) : null;
+    const report: GradingReportData = {
+      grade: g.grade ?? 0,
+      centering: g.centering ?? 0,
+      corners: g.corners ?? 0,
+      edges: g.edges ?? 0,
+      surface: g.surface ?? 0,
+      createdAt: g.created_at,
+      ratios: (g.ratios as GradingReportData["ratios"]) ?? null,
+      annotations: (g.details as { annotations?: GradingReportData["annotations"] })?.annotations ?? [],
+      rectoUrl: recto,
+      versoUrl: g.rectified_verso_path ? (signed.get(g.rectified_verso_path) ?? null) : null,
+      cardName: item.card_name,
+      setName: item.set_name,
+      localId: item.local_id,
+    };
+    return [{ itemId: g.item_id, imageUrl: recto, report }];
+  });
 
-  // Total = cartes possédées (binder_items) + hors collection (placeholders)
   const binderCount = new Map<string, number>();
-  for (const l of binderLinks ?? []) binderCount.set(l.binder_id, (binderCount.get(l.binder_id) ?? 0) + 1);
-  for (const p of binderPlaceholders ?? []) binderCount.set(p.binder_id, (binderCount.get(p.binder_id) ?? 0) + 1);
-  const bindersWithCount = (binders ?? []).map((b) => ({
-    id: b.id,
-    name: b.name,
-    count: binderCount.get(b.id) ?? 0,
-  }));
+  for (const l of [...(binderLinks ?? []), ...(binderPlaceholders ?? [])]) binderCount.set(l.binder_id, (binderCount.get(l.binder_id) ?? 0) + 1);
+  const bindersWithCount = (binders ?? []).map((b) => ({ id: b.id, name: b.name, count: binderCount.get(b.id) ?? 0 }));
 
-  return (
-    <div className="flex flex-col gap-8">
-      <div>
-        <Link href="/admin/utilisateurs" className="text-sm text-muted transition hover:text-foreground">
-          ← Tous les utilisateurs
-        </Link>
-        <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+  // Vignettes : cartes les plus chères (valeur saisie, sinon cote)
+  const mine = d.items.filter((i) => i.owner_id === id && i.sold_at == null);
+  const priced = (i: (typeof mine)[number]) => i.current_price ?? i.market_trend ?? 0;
+  // Visuels hors catalogue (`storage:`) : URL signées, bornées aux fichiers du compte
+  const topCards = await signStorageImages([...mine].sort((x, y) => priced(y) - priced(x)).slice(0, 12), id);
+  const lots = d.sealed.filter((l) => l.owner_id === id);
+  const products = new Map<number, { product: (typeof lots)[number]["product"]; qty: number }>();
+  for (const l of lots) {
+    const g = products.get(l.product.id) ?? { product: l.product, qty: 0 };
+    g.qty += l.quantity;
+    products.set(l.product.id, g);
+  }
+  const gameCards = d.game.filter((c) => c.owner_id === id);
+  const rares = gameCards.filter((c) => (c.tier === "ultra" || c.tier === "secret") && c.image_url).slice(0, 8);
+  const events = d.events.filter((e) => e.ownerId === id).slice(0, 6);
+  const shareToken = settings?.share_token ?? null;
+  const self = me?.id === id;
+  const accounts = new Map([[a.id, a]]);
+
+  const tabs: UserTab[] = [
+    {
+      key: "cartes",
+      label: "Cartes",
+      icon: <LayoutGrid size={14} aria-hidden />,
+      count: a.cards,
+      content:
+        topCards.length === 0 && allItems.length === 0 ? (
+          <Empty>Aucune carte.</Empty>
+        ) : (
+          <GridOrTable
+            refs={a.refs}
+            total={allItems.length}
+            grid={
+              <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+                {topCards.map((i) => (
+                  <li key={i.id} className="min-w-0">
+                    <Link href={`/admin/utilisateurs/${id}/carte/${i.id}`} className="block">
+                      <div className="card-tile aspect-[63/88]">
+                        <CardImage base={i.image_url} alt={i.card_name} placeholder="compact" />
+                      </div>
+                      <p className="mt-1.5 flex items-baseline justify-between gap-1.5 text-[11px]">
+                        <span className="truncate">{i.card_name}</span>
+                        <span className="num shrink-0 font-semibold">{priced(i) ? formatEur(priced(i)) : "—"}</span>
+                      </p>
+                      <p className="truncate text-[10px] text-faint">
+                        {i.condition} · {i.language}
+                        {i.current_price != null ? " · saisie" : i.market_trend != null ? " · cote" : ""}
+                      </p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            }
+            table={<AdminCardsTable items={allItems} ownerId={id} />}
+          />
+        ),
+    },
+    {
+      key: "scelles",
+      label: "Scellés",
+      icon: <Boxes size={14} aria-hidden />,
+      count: a.sealed,
+      content:
+        products.size === 0 ? (
+          <Empty>Aucun produit scellé.</Empty>
+        ) : (
+          <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+            {[...products.values()]
+              .sort((x, y) => y.qty - x.qty)
+              .map(({ product: p, qty }) => (
+                <li key={p.id} className="overflow-hidden rounded-2xl bg-surface ring-1 ring-ring">
+                  <div className="relative aspect-[4/3] bg-white">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.image} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-contain p-2.5" />
+                    <span className="num absolute right-1.5 top-1.5 rounded-md bg-black/75 px-1.5 py-px text-[10.5px] font-bold text-white">×{qty}</span>
+                  </div>
+                  <div className="p-2.5">
+                    <p className="line-clamp-2 text-xs font-semibold leading-tight">{p.name}</p>
+                    <p className="mt-0.5 truncate text-[10.5px] text-muted">{p.set_name_fr ?? p.set_name}</p>
+                    <p className="num mt-1 text-xs font-bold">{d.sealedCote.get(p.id) != null ? formatEur(d.sealedCote.get(p.id)!) : "—"}</p>
+                  </div>
+                </li>
+              ))}
+          </ul>
+        ),
+    },
+    {
+      key: "jeu",
+      label: "Jeu",
+      icon: <Package size={14} aria-hidden />,
+      count: a.game,
+      content:
+        gameCards.length === 0 ? (
+          <Empty>Aucun booster ouvert.</Empty>
+        ) : (
           <div>
-            <h2 className="display flex items-center gap-2 text-2xl font-bold tracking-tight">
-              {settings?.display_name ?? "— (pas de pseudo)"}
-              {account.banned_until && (
-                <span className="rounded-full bg-loss/15 px-2 py-0.5 text-xs font-semibold text-loss">
-                  Suspendu
-                </span>
-              )}
-            </h2>
-            <p className="text-sm text-muted">{account.email}</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                ["Boosters", fmtInt(a.openings)],
+                ["Cartes tirées", fmtInt(a.game)],
+                ["Gradées", fmtInt(a.gameGraded)],
+                ["À l'échange", fmtInt(gameCards.filter((c) => c.for_trade).length)],
+              ].map(([k, v]) => (
+                <div key={k} className="rounded-xl bg-raised px-3 py-2">
+                  <p className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-muted">{k}</p>
+                  <p className="num mt-0.5 font-bold">{v}</p>
+                </div>
+              ))}
+            </div>
+            {rares.length > 0 && (
+              <>
+                <p className="mb-2 mt-4 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">Derniers tirages rares</p>
+                <ul className="grid grid-cols-4 gap-2.5 sm:grid-cols-8">
+                  {rares.map((c, i) => (
+                    <li key={i} className="min-w-0">
+                      <div className="card-tile aspect-[63/88]">
+                        <CardImage base={c.image_url} alt={c.card_name} placeholder="compact" />
+                      </div>
+                      <p className="mt-1 truncate text-[10px] text-faint">{rarityLabel(c.rarity)}</p>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
-          {settings?.share_token && (
-            <Link href={`/vitrine/${settings.share_token}`} target="_blank" className="btn btn-ghost">
-              Voir la vitrine
-              <ExternalLink size={14} aria-hidden />
-            </Link>
-          )}
-        </div>
-        <dl className="mt-4 grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
-          <div><dt className="label-xs">Inscrit</dt><dd className="num">{fmt(account.created_at)}</dd></div>
-          <div><dt className="label-xs">Dernière connexion</dt><dd className="num">{fmt(account.last_sign_in_at)}</dd></div>
-          <div><dt className="label-xs">Email confirmé</dt><dd>{account.email_confirmed_at ? "Oui" : "Non"}</dd></div>
-          <div><dt className="label-xs">Partage</dt><dd>{settings?.share_token ? (settings.share_show_values ? "Actif (valeurs)" : "Actif") : "—"}</dd></div>
-        </dl>
-      </div>
-
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        <Stat icon={LayoutGrid} label="Cartes" value={cards} />
-        <Stat icon={BadgeEuro} label="Valeur" value={formatEur(value)} />
-        <Stat icon={BadgeEuro} label="Investi" value={formatEur(invested)} />
-        <Stat icon={Award} label="Cartes pré-gradées" value={latestGrading.size} />
-        <Stat icon={NotebookTabs} label="Classeurs" value={(binders ?? []).length} />
-        <Stat icon={Star} label="Recherchées" value={(wishlist ?? []).length} />
-        <Stat icon={MapPin} label="Sources" value={(sources ?? []).length} />
-        <Stat icon={Camera} label="Photos" value={(photos ?? []).length} />
-      </section>
-
-      <UserAdminActions
-        userId={id}
-        email={account.email ?? ""}
-        shared={settings?.share_token != null}
-        banned={account.banned_until != null}
-      />
-
-      {/* Cartes détaillées + actions */}
-      <section>
-        <h3 className="display mb-3 text-lg font-semibold">
-          Cartes{" "}
-          <span className="text-sm font-normal text-muted">
-            ({live.length} actives{trash ? ` · ${trash} en corbeille` : ""})
-          </span>
-        </h3>
-        <AdminCardsTable items={allItems} ownerId={id} />
-      </section>
-
-      {/* Pré-gradées */}
-      {slabs.length > 0 && (
-        <section>
-          <h3 className="display mb-3 text-lg font-semibold">
-            Pré-gradées{" "}
-            <span className="text-sm font-normal text-muted">
-              ({slabs.length}) — clique un boîtier pour le rapport
-            </span>
-          </h3>
-          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {slabs.map((s) => (
-              <li key={s.itemId}>
-                <SlabReportTile data={s.report} imageUrl={s.imageUrl} />
+        ),
+    },
+    ...(slabs.length
+      ? [
+          {
+            key: "pregrades",
+            label: "Pré-gradées",
+            icon: <Award size={14} aria-hidden />,
+            count: slabs.length,
+            content: (
+              <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                {slabs.map((s) => (
+                  <li key={s.itemId}>
+                    <SlabReportTile data={s.report} imageUrl={s.imageUrl} />
+                  </li>
+                ))}
+              </ul>
+            ),
+          },
+        ]
+      : []),
+    { key: "classeurs", label: "Classeurs", icon: <NotebookTabs size={14} aria-hidden />, count: bindersWithCount.length, content: <AdminBindersList ownerId={id} binders={bindersWithCount} /> },
+    {
+      key: "recherchees",
+      label: "Recherchées",
+      icon: <Star size={14} aria-hidden />,
+      count: (wishlist ?? []).length,
+      content:
+        (wishlist ?? []).length === 0 ? (
+          <Empty>Aucune carte recherchée.</Empty>
+        ) : (
+          <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+            {(wishlist ?? []).map((w) => (
+              <li key={w.id} className="min-w-0">
+                <div className="card-tile aspect-[63/88]">
+                  <CardImage base={w.image_url} alt={w.card_name} placeholder="compact" />
+                </div>
+                <p className="mt-1.5 truncate text-[11px]">{w.card_name}</p>
+                <p className="truncate text-[10px] text-faint">
+                  {w.priority === "high" ? "Priorité haute" : w.priority === "low" ? "Un jour" : w.set_name}
+                  {w.target_price != null ? ` · cible ${formatEur(w.target_price)}` : ""}
+                </p>
               </li>
             ))}
           </ul>
-        </section>
-      )}
+        ),
+    },
+    { key: "boutiques", label: "Boutiques", icon: <MapPin size={14} aria-hidden />, count: (sources ?? []).length, content: <AdminSourcesList ownerId={id} sources={sources ?? []} /> },
+  ];
 
-      {/* Classeurs & sources */}
-      <section className="grid gap-4 lg:grid-cols-2">
-        <AdminBindersList ownerId={id} binders={bindersWithCount} />
-        <AdminSourcesList ownerId={id} sources={sources ?? []} />
+  return (
+    <div className="flex flex-col gap-3.5">
+      <Link href="/admin/utilisateurs" className="flex w-max items-center gap-1 text-[13px] text-muted transition hover:text-foreground">
+        <ChevronLeft size={15} aria-hidden /> Utilisateurs
+      </Link>
+
+      {/* Identité */}
+      <section className="panel p-5 sm:p-6" style={{ background: `radial-gradient(70% 120% at 0% 0%, hsl(${a.hue} 70% 50% / .16), var(--surface) 60%)` }}>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="min-w-0 flex-1 basis-72">
+            <div className="flex items-center gap-3.5">
+              <Avatar name={a.name ?? a.email} hue={a.hue} size="lg" />
+              <div className="min-w-0">
+                <h2 className="display truncate text-2xl font-bold tracking-tight sm:text-[26px]">{a.name ?? "Sans pseudo"}</h2>
+                <p className="mt-0.5 truncate text-[13px] text-muted">{a.email}</p>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              {a.admin && <Badge tone="accent">Admin</Badge>}
+              {a.confirmed ? (
+                <Badge tone="ok">
+                  <MailCheck size={11} aria-hidden /> Email confirmé
+                </Badge>
+              ) : (
+                <Badge tone="warn">
+                  <MailWarning size={11} aria-hidden /> Email non confirmé
+                </Badge>
+              )}
+              {a.banned && <Badge tone="ko">Suspendu</Badge>}
+              <Badge tone={a.shared ? "ok" : "muted"}>{a.shared ? "Vitrine publique" : "Pas de vitrine"}</Badge>
+              <span className="num rounded-md bg-raised px-1.5 py-0.5 text-[11px] text-muted">{a.id.slice(0, 8)}</span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[12.5px] text-muted">
+              <span className="flex items-center gap-1.5">
+                <UserPlus size={13} aria-hidden /> Inscrit le <b className="text-foreground">{shortDate(a.createdAt, d.now)}</b>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <KeyRound size={13} aria-hidden /> Connexion le <b className="text-foreground">{shortDate(a.lastSignIn, d.now)}</b>
+              </span>
+              <span className="flex items-center gap-1.5 text-foreground">
+                <Dot tone={activityTone(a.lastActivity, d.now)} /> Actif {relTime(a.lastActivity, d.now)}
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <ResetLinkButton email={a.email} />
+            {shareToken ? (
+              <Link href={`/vitrine/${shareToken}`} target="_blank" className="btn btn-ghost">
+                <ExternalLink size={14} aria-hidden /> Voir sa vitrine
+              </Link>
+            ) : (
+              <span className="btn btn-ghost pointer-events-none opacity-40">
+                <ExternalLink size={14} aria-hidden /> Voir sa vitrine
+              </span>
+            )}
+          </div>
+        </div>
       </section>
+
+      <StatStrip cols={5}>
+        <StatCard label="Cartes" value={fmtInt(a.cards)} sub={`${fmtInt(a.refs)} références`} />
+        <StatCard label="Valeur" value={stats.value != null ? formatEur(stats.value) : "—"} sub={stats.market != null ? `cote ${formatEur(stats.market)}` : "rien de valorisé"} />
+        <StatCard label="Investi" value={formatEur(stats.invested)} sub="prix d'achat connus" />
+        <StatCard
+          label="Plus-value"
+          value={stats.gain != null ? `${stats.gain >= 0 ? "+" : ""}${formatEur(stats.gain)}` : "—"}
+          sub={stats.gainPct != null ? `${stats.gainPct >= 0 ? "+" : ""}${Math.round(stats.gainPct)} %` : "—"}
+          tone={stats.gain != null ? (stats.gain >= 0 ? "up" : "down") : undefined}
+        />
+        <StatCard label="Scellés" value={fmtInt(a.sealed)} sub={`${a.sealedProducts} produit${a.sealedProducts > 1 ? "s" : ""}`} />
+      </StatStrip>
+
+      <section className="grid grid-cols-1 gap-3.5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <section className="panel p-5">
+          <PanelHead title="Valeur de la collection" hint="La même courbe que sur son tableau de bord : cartes et scellés" />
+          {stats.valueSeries.length >= 2 ? (
+            <ValueHistoryChart points={stats.valueSeries} minSpanRatio={0.08} height={190} />
+          ) : (
+            <Empty>Pas encore assez de relevés pour une courbe.</Empty>
+          )}
+        </section>
+        <section className="panel p-5">
+          <PanelHead title="Activité" hint="Ses derniers gestes" />
+          <EventFeed events={events} accounts={accounts} now={d.now} />
+        </section>
+      </section>
+
+      <UserTabs tabs={tabs} />
+      <DangerZone userId={id} shared={shareToken != null} banned={a.banned} self={self} />
     </div>
   );
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return <p className="rounded-xl bg-raised/60 px-4 py-6 text-center text-sm text-muted">{children}</p>;
 }
