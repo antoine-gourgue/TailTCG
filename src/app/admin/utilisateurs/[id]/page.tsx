@@ -20,7 +20,9 @@ import { AdminBindersList, AdminSourcesList } from "@/components/admin/admin-own
 import { Avatar, Badge, Dot, PanelHead } from "@/components/admin/admin-ui";
 import { EventFeed } from "@/components/admin/event-feed";
 import { DangerZone, ResetLinkButton } from "@/components/admin/user-actions";
-import { GridOrTable, UserTabs, type UserTab } from "@/components/admin/user-tabs";
+import { UserTabs, type UserTab } from "@/components/admin/user-tabs";
+import { UserCardsBrowser, UserSealedBrowser, type AdminCardRow, type AdminSealedRow } from "@/components/admin/user-collection";
+import { kindLabel, sealedSetName } from "@/lib/sealed";
 
 export default async function AdminUserDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -38,7 +40,7 @@ export default async function AdminUserDetail({ params }: { params: Promise<{ id
       return loadSealedStats(db, id, { cotes });
     })(),
     db.from("user_settings").select("share_token").eq("owner_id", id).maybeSingle(),
-    db.from("items").select("id, card_name, set_name, local_id, tcgdex_id, condition, card_type, language, quantity, purchase_price, manual_price, graded, grade, sold_at, sold_price, deleted_at, created_at, notes").eq("owner_id", id).order("created_at", { ascending: false }),
+    db.from("items").select("id, card_name, set_name, local_id, tcgdex_id, image_url, condition, card_type, language, quantity, purchase_price, manual_price, graded, grade, sold_at, sold_price, deleted_at, created_at, notes").eq("owner_id", id).order("created_at", { ascending: false }),
     db.from("item_gradings").select("item_id, grade, centering, corners, edges, surface, created_at, rectified_path, rectified_verso_path, ratios, details").eq("owner_id", id).order("created_at", { ascending: false }),
     db.from("binders").select("id, name").eq("owner_id", id).order("created_at"),
     db.from("binder_items").select("binder_id").eq("owner_id", id),
@@ -85,18 +87,47 @@ export default async function AdminUserDetail({ params }: { params: Promise<{ id
   for (const l of [...(binderLinks ?? []), ...(binderPlaceholders ?? [])]) binderCount.set(l.binder_id, (binderCount.get(l.binder_id) ?? 0) + 1);
   const bindersWithCount = (binders ?? []).map((b) => ({ id: b.id, name: b.name, count: binderCount.get(b.id) ?? 0 }));
 
-  // Vignettes : cartes les plus chères (valeur saisie, sinon cote)
-  const mine = d.items.filter((i) => i.owner_id === id && i.sold_at == null);
-  const priced = (i: (typeof mine)[number]) => i.current_price ?? i.market_trend ?? 0;
-  // Visuels hors catalogue (`storage:`) : URL signées, bornées aux fichiers du compte
-  const topCards = await signStorageImages([...mine].sort((x, y) => priced(y) - priced(x)).slice(0, 12), id);
+  // Toutes les cartes (vendues et corbeille comprises) : visuels hors catalogue signés, cote du jour
+  const marketById = new Map(d.items.filter((i) => i.owner_id === id).map((i) => [i.id, i.market_trend]));
+  const signedItems = await signStorageImages((items ?? []).map((i) => ({ ...i, image_url: i.image_url as string | null })), id);
+  const cardRows: AdminCardRow[] = signedItems.map((i) => ({
+    id: i.id,
+    name: i.card_name,
+    set: i.set_name,
+    localId: i.local_id,
+    image: i.image_url || null,
+    condition: i.condition,
+    language: i.language ?? "FR",
+    qty: i.quantity ?? 1,
+    value: i.manual_price,
+    market: marketById.get(i.id) ?? null,
+    sold: i.sold_at != null,
+    trash: i.deleted_at != null,
+    graded: i.graded ?? false,
+    createdAt: i.created_at,
+  }));
+  // Tous les scellés, par produit
   const lots = d.sealed.filter((l) => l.owner_id === id);
-  const products = new Map<number, { product: (typeof lots)[number]["product"]; qty: number }>();
+  const products = new Map<number, AdminSealedRow & { valued: boolean; paidAny: boolean }>();
   for (const l of lots) {
-    const g = products.get(l.product.id) ?? { product: l.product, qty: 0 };
+    const p = l.product;
+    const g = products.get(p.id) ?? { id: p.id, name: p.name, kind: kindLabel(p.kind), set: sealedSetName(p), image: p.image, qty: 0, lots: 0, value: 0, paid: 0, manual: false, lastAt: null, valued: false, paidAny: false };
+    const unit = l.manual_price ?? d.sealedCote.get(p.id) ?? null;
     g.qty += l.quantity;
-    products.set(l.product.id, g);
+    g.lots += 1;
+    if (unit != null) {
+      g.value = (g.value ?? 0) + unit * l.quantity;
+      g.valued = true;
+    }
+    if (l.purchase_price != null) {
+      g.paid = (g.paid ?? 0) + l.purchase_price * l.quantity;
+      g.paidAny = true;
+    }
+    if (l.manual_price != null) g.manual = true;
+    if (l.created_at && (!g.lastAt || l.created_at > g.lastAt)) g.lastAt = l.created_at;
+    products.set(p.id, g);
   }
+  const sealedRows: AdminSealedRow[] = [...products.values()].map(({ valued, paidAny, ...r }) => ({ ...r, value: valued ? r.value : null, paid: paidAny ? r.paid : null }));
   const gameCards = d.game.filter((c) => c.owner_id === id);
   const rares = gameCards.filter((c) => (c.tier === "ultra" || c.tier === "secret") && c.image_url).slice(0, 8);
   const events = d.events.filter((e) => e.ownerId === id).slice(0, 6);
@@ -110,66 +141,14 @@ export default async function AdminUserDetail({ params }: { params: Promise<{ id
       label: "Cartes",
       icon: <LayoutGrid size={14} aria-hidden />,
       count: a.cards,
-      content:
-        topCards.length === 0 && allItems.length === 0 ? (
-          <Empty>Aucune carte.</Empty>
-        ) : (
-          <GridOrTable
-            refs={a.refs}
-            total={allItems.length}
-            grid={
-              <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-                {topCards.map((i) => (
-                  <li key={i.id} className="min-w-0">
-                    <Link href={`/admin/utilisateurs/${id}/carte/${i.id}`} className="block">
-                      <div className="card-tile aspect-[63/88]">
-                        <CardImage base={i.image_url} alt={i.card_name} placeholder="compact" />
-                      </div>
-                      <p className="mt-1.5 flex items-baseline justify-between gap-1.5 text-[11px]">
-                        <span className="truncate">{i.card_name}</span>
-                        <span className="num shrink-0 font-semibold">{priced(i) ? formatEur(priced(i)) : "—"}</span>
-                      </p>
-                      <p className="truncate text-[10px] text-faint">
-                        {i.condition} · {i.language}
-                        {i.current_price != null ? " · saisie" : i.market_trend != null ? " · cote" : ""}
-                      </p>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            }
-            table={<AdminCardsTable items={allItems} ownerId={id} />}
-          />
-        ),
+      content: cardRows.length === 0 ? <Empty>Aucune carte.</Empty> : <UserCardsBrowser ownerId={id} cards={cardRows} table={<AdminCardsTable items={allItems} ownerId={id} />} />,
     },
     {
       key: "scelles",
       label: "Scellés",
       icon: <Boxes size={14} aria-hidden />,
       count: a.sealed,
-      content:
-        products.size === 0 ? (
-          <Empty>Aucun produit scellé.</Empty>
-        ) : (
-          <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
-            {[...products.values()]
-              .sort((x, y) => y.qty - x.qty)
-              .map(({ product: p, qty }) => (
-                <li key={p.id} className="overflow-hidden rounded-2xl bg-surface ring-1 ring-ring">
-                  <div className="relative aspect-[4/3] bg-white">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.image} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-contain p-2.5" />
-                    <span className="num absolute right-1.5 top-1.5 rounded-md bg-black/75 px-1.5 py-px text-[10.5px] font-bold text-white">×{qty}</span>
-                  </div>
-                  <div className="p-2.5">
-                    <p className="line-clamp-2 text-xs font-semibold leading-tight">{p.name}</p>
-                    <p className="mt-0.5 truncate text-[10.5px] text-muted">{p.set_name_fr ?? p.set_name}</p>
-                    <p className="num mt-1 text-xs font-bold">{d.sealedCote.get(p.id) != null ? formatEur(d.sealedCote.get(p.id)!) : "—"}</p>
-                  </div>
-                </li>
-              ))}
-          </ul>
-        ),
+      content: <UserSealedBrowser ownerId={id} products={sealedRows} />,
     },
     {
       key: "jeu",

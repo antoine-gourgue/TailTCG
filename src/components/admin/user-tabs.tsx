@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { LayoutGrid, Rows3 } from "lucide-react";
 
 /** `icon` : élément déjà rendu (une fonction ne traverse pas la frontière serveur → client) */
 export type UserTab = { key: string; label: string; icon: ReactNode; count: number; content: ReactNode };
@@ -36,22 +35,5 @@ export function UserTabs({ tabs }: { tabs: UserTab[] }) {
         </div>
       ))}
     </section>
-  );
-}
-
-/** Cartes : vignettes des plus chères, ou le tableau complet (édition, corbeille) */
-export function GridOrTable({ grid, table, refs, total }: { grid: ReactNode; table: ReactNode; refs: number; total: number }) {
-  const [view, setView] = useState<"grid" | "table">("grid");
-  return (
-    <div>
-      {view === "grid" ? grid : table}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs text-faint">{view === "grid" ? `Les ${Math.min(12, refs)} plus chères sur ${refs.toLocaleString("fr-FR")} références · le tableau permet d'éditer chaque carte` : `${total.toLocaleString("fr-FR")} lignes, vendues et corbeille comprises`}</span>
-        <button type="button" onClick={() => setView(view === "grid" ? "table" : "grid")} className="btn btn-ghost !px-3 !py-1.5 text-xs">
-          {view === "grid" ? <Rows3 size={13} aria-hidden /> : <LayoutGrid size={13} aria-hidden />}
-          {view === "grid" ? "Voir en tableau" : "Voir en vignettes"}
-        </button>
-      </div>
-    </div>
   );
 }

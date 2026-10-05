@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { dayMonth } from "@/lib/admin-format";
@@ -201,6 +202,30 @@ export function HealthCard({ icon, tone, title, line, detail, dot }: { icon: Luc
         <p className="mt-0.5 text-[12.5px]">{line}</p>
         <p className="num mt-0.5 truncate text-[11px] text-faint">{detail}</p>
       </div>
+    </div>
+  );
+}
+
+/** Retour vers la fiche du propriétaire, avec son avatar */
+export function OwnerBack({ href, name, hue, label = "Retour au compte" }: { href: string; name: string; hue: number; label?: string }) {
+  return (
+    <Link href={href} className="flex w-max items-center gap-2 text-[13px] text-muted transition hover:text-foreground">
+      <span aria-hidden>←</span>
+      <Avatar name={name} hue={hue} size="sm" />
+      <span>
+        {label} <b className="font-semibold text-foreground">{name}</b>
+      </span>
+    </Link>
+  );
+}
+
+/** Chiffre clé d'un en-tête : libellé, valeur, sous-texte */
+export function HeroStat({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: "up" | "down" | "faint" }) {
+  return (
+    <div className="min-w-0 rounded-2xl bg-raised/60 px-3.5 py-3 ring-1 ring-ring">
+      <p className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">{label}</p>
+      <p className={`display num mt-1 truncate text-xl font-bold leading-tight ${tone === "up" ? "text-gain" : tone === "down" ? "text-loss" : tone === "faint" ? "text-faint" : ""}`}>{value}</p>
+      {sub && <p className="num mt-0.5 truncate text-[11px] text-muted">{sub}</p>}
     </div>
   );
 }

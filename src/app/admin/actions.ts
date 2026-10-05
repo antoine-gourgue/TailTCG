@@ -332,3 +332,32 @@ export async function adminPurgeOrphans(): Promise<Result<{ count: number }>> {
   revalidatePath("/admin", "layout");
   return { ok: true, count };
 }
+
+/** Modifie un lot scellé d'un compte (quantité, prix et date d'achat, valeur saisie) */
+export async function adminUpdateSealedLot(
+  lotId: string,
+  ownerId: string,
+  productId: number,
+  fields: { quantity: number; purchase_price: number | null; purchase_date: string | null; manual_price: number | null },
+): Promise<Result> {
+  if (!(await requireAdmin())) return { ok: false, message: "Non autorisé" };
+  if (!Number.isInteger(fields.quantity) || fields.quantity < 1) return { ok: false, message: "Quantité invalide" };
+  for (const v of [fields.purchase_price, fields.manual_price]) if (v != null && (!Number.isFinite(v) || v < 0)) return { ok: false, message: "Montant invalide" };
+  const db = createAdminClient();
+  const { error } = await db.from("sealed_items").update(fields).eq("id", lotId).eq("owner_id", ownerId);
+  if (error) return { ok: false, message: error.message };
+  revalidatePath(`/admin/utilisateurs/${ownerId}/scelle/${productId}`);
+  revalidatePath(`/admin/utilisateurs/${ownerId}`);
+  return { ok: true };
+}
+
+/** Supprime un lot scellé d'un compte */
+export async function adminDeleteSealedLot(lotId: string, ownerId: string, productId: number): Promise<Result> {
+  if (!(await requireAdmin())) return { ok: false, message: "Non autorisé" };
+  const db = createAdminClient();
+  const { error } = await db.from("sealed_items").delete().eq("id", lotId).eq("owner_id", ownerId);
+  if (error) return { ok: false, message: error.message };
+  revalidatePath(`/admin/utilisateurs/${ownerId}/scelle/${productId}`);
+  revalidatePath(`/admin/utilisateurs/${ownerId}`);
+  return { ok: true };
+}
