@@ -167,9 +167,21 @@ async function shoot(out, pages) {
   } finally { chrome.kill(); }
 }
 
+// Tables à owner_id : aucune n'a de clé étrangère vers auth.users, supprimer
+// l'utilisateur laisserait ses lignes orphelines. On les efface d'abord
+// (les tables filles — photos, gradations, historique, pages de classeur,
+// échanges du jeu — suivent en cascade de items / binders / game_cards).
+const OWNED = ["game_cards", "game_openings", "game_profiles", "capture_scans", "capture_sessions", "binder_items", "binders", "wishlist", "sealed_items", "custom_cards", "items", "sources", "user_settings"];
+async function purge(uid) {
+  for (const t of OWNED) {
+    const { error } = await admin.from(t).delete().eq("owner_id", uid);
+    if (error) console.log(`  ${t} : ${error.message}`);
+  }
+}
 async function destroy() {
   if (!existsSync(CRED)) { console.log("aucun compte"); return; }
   const cred = JSON.parse(readFileSync(CRED, "utf8"));
+  await purge(cred.uid);
   await admin.auth.admin.deleteUser(cred.uid);
   const { unlinkSync } = await import("node:fs");
   unlinkSync(CRED);
@@ -180,6 +192,22 @@ const [cmd, ...rest] = process.argv.slice(2);
 const ALL = [["collection", "/collection"], ["cartes", "/cartes"], ["scelles", "/scelles"], ["classeurs", "/classeurs"], ["recherchees", "/recherchees"], ["catalogue", `/catalogue${process.env.AUDIT_CATALOGUE_QS || ""}`], ["pregrades", "/pregrades"], ["boutiques", "/boutiques"], ["journal", "/journal"], ["parametres", "/parametres"], ["boosters", "/boosters"], ["scelles-ajouter", "/scelles/ajouter"], ["boosters-collection", `/boosters/collection${process.env.AUDIT_GAME_QS || ""}`], ["boosters-gradation", "/boosters/gradation"], ["boosters-echanges", "/boosters/echanges"], ["ajouter-manuel", "/ajouter/manuel"], ["pokedex", "/extensions/pokedex"], ["extension", `/extensions/${process.env.AUDIT_SET || "sv03.5"}`], ["ajouter-carte", `/ajouter?card=${process.env.AUDIT_CARD || "sv03.5-006"}`], ["reevaluer", "/cartes/reevaluer"], ["scanner", "/scanner"], ["connexion", "/connexion"], ["landing", "/"]];
 if (cmd === "seed") await seed();
 else if (cmd === "destroy") await destroy();
+else if (cmd === "orphans") {
+  // Lignes dont le propriétaire n'existe plus (anciens comptes d'audit supprimés sans purge)
+  const users = new Set();
+  for (let page = 1; ; page++) { const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 }); if (error) throw new Error(error.message); for (const u of data?.users ?? []) users.add(u.id); if (!data?.users?.length || data.users.length < 1000) break; }
+  // Garde-fou : sans liste de comptes, tout paraîtrait orphelin
+  if (!users.size) throw new Error("aucun compte listé, abandon");
+  console.log(`${users.size} compte(s) existant(s)`);
+  for (const t of OWNED) {
+    const { data } = await admin.from(t).select("owner_id").limit(5000);
+    const lost = [...new Set((data ?? []).map((r) => r.owner_id))].filter((id) => !users.has(id));
+    if (!lost.length) continue;
+    const n = (data ?? []).filter((r) => lost.includes(r.owner_id)).length;
+    if (rest[0] === "--delete") { for (const id of lost) await admin.from(t).delete().eq("owner_id", id); console.log(`${t} : ${n} ligne(s) orpheline(s) supprimée(s)`); }
+    else console.log(`${t} : ${n} ligne(s) orpheline(s) (${lost.length} compte(s))`);
+  }
+}
 else if (cmd === "shoot") {
   const out = rest[0];
   const names = rest.slice(1);
@@ -203,4 +231,4 @@ else if (cmd === "shoot") {
     }
   }
   await shoot(out, pages);
-} else console.log("usage: seed | shoot <out> [pages] | destroy");
+} else console.log("usage: seed | shoot <out> [pages] | destroy | orphans [--delete]");

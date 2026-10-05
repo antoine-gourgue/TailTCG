@@ -20,6 +20,7 @@ function RemoveLotButton({ id }: { id: string }) {
   );
 }
 import { AddForm } from "./add-form";
+import { ValueButton } from "./value-form";
 
 export type SealedProductRow = {
   id: number;
@@ -45,7 +46,7 @@ export type SealedLot = {
 
 const USD_TO_EUR = 0.92;
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
-const pct = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(1).replace(".", ",")} %`;
+const pct = (v: number) => `${v > 0 ? "+" : ""}${v.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
 const fmtDay = (d: string) => new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 const signed = (v: number) => `${v > 0 ? "+" : ""}${formatEur(v)}`;
 
@@ -86,7 +87,9 @@ export function ProductDetail({
     const unit = l.manual_price ?? cote?.value ?? null;
     return n + (unit != null ? unit * l.quantity : 0);
   }, 0);
-  const gain = owned > 0 && cote ? estimated - paid : null;
+  const gain = owned > 0 && (cote || lots.some((l) => l.manual_price != null)) ? estimated - paid : null;
+  // « Ma valeur » : prix unitaire saisi à la main sur mes lots (prime sur la cote)
+  const manual = lots.find((l) => l.manual_price != null)?.manual_price ?? null;
   const usdEur = product.price_usd != null && product.price_usd > 0 ? Math.round(product.price_usd * USD_TO_EUR * 100) / 100 : null;
   const varTone = (v: number | null) => (v == null ? "faint" : v > 0 ? "gain" : v < 0 ? "loss" : undefined);
 
@@ -128,52 +131,85 @@ export function ProductDetail({
             </p>
             <h1 className="display mt-1.5 text-2xl font-bold leading-tight tracking-tight sm:text-3xl lg:text-4xl">{product.name}</h1>
 
-            <div className="mt-6 grid grid-cols-3 gap-3 text-left lg:flex lg:flex-wrap lg:items-end lg:justify-start lg:gap-x-10 lg:gap-y-4">
-              <div>
-                <p className="label-xs text-muted">{cote?.source === "tcgplayer" ? "Estimation" : cote?.source === "cardmarket-low" ? "À partir de" : "Cote Cardmarket"}</p>
-                <p className={`display num mt-1.5 text-2xl font-bold leading-none sm:text-3xl lg:text-[40px] ${cote ? "" : "text-faint"}`}>{cote ? formatEur(cote.value) : "—"}</p>
-                <p className="num mt-2 text-[10px] text-muted sm:text-xs">
-                  {cote?.source === "tcgplayer" ? "marché US converti" : cote?.source === "cardmarket-low" ? "annonce la moins chère" : v7 != null ? `${pct(v7)} sur 7 j` : "relevée chaque nuit"}
-                </p>
-              </div>
-              {owned > 0 ? (
+            {/* Les trois chiffres du héros : lignes empilées sur mobile (les montants ne tiennent pas en colonnes), grille dès 640 px */}
+            {(() => {
+              type HeroStat = { key: string; label: string; tag?: string; value: string; tone?: "gain" | "loss" | "faint"; sub?: React.ReactNode; big?: boolean };
+              const toneCls = (t?: HeroStat["tone"]) => (t === "gain" ? "text-gain" : t === "loss" ? "text-loss" : t === "faint" ? "text-faint" : "");
+              const stats: HeroStat[] = [
+                {
+                  key: "cote",
+                  label: cote?.source === "tcgplayer" ? "Estimation" : cote?.source === "cardmarket-low" ? "À partir de" : "Cote Cardmarket",
+                  value: cote ? formatEur(cote.value) : "—",
+                  tone: cote ? undefined : "faint",
+                  big: true,
+                  sub: cote?.source === "tcgplayer" ? "marché US converti" : cote?.source === "cardmarket-low" ? "annonce la moins chère" : v7 != null ? `${pct(v7)} sur 7 j` : "relevée chaque nuit",
+                },
+              ];
+              if (owned > 0) {
+                stats.push(
+                  {
+                    key: "reserve",
+                    label: "Ma valeur",
+                    tag: manual != null ? "saisie" : undefined,
+                    value: formatEur(estimated),
+                    sub: `× ${owned}${manual != null ? ` à ${formatEur(manual)}` : ""} · payé ${formatEur(paid)}`,
+                  },
+                  {
+                    key: "gain",
+                    label: "Plus-value",
+                    value: totalGain == null ? "—" : signed(totalGain),
+                    tone: totalGain == null ? "faint" : totalGain > 0 ? "gain" : totalGain < 0 ? "loss" : undefined,
+                    sub: gainPct != null ? <span className={gainPct >= 0 ? "text-gain" : "text-loss"}>{pct(gainPct)}</span> : "prix d'achat inconnu",
+                  }
+                );
+              } else {
+                if (v30 != null) stats.push({ key: "v30", label: "30 jours", value: pct(v30), tone: varTone(v30) });
+                if (usdEur != null)
+                  stats.push({
+                    key: "usd",
+                    label: "Marché US",
+                    value: formatEur(usdEur),
+                    sub: `${product.price_usd!.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`,
+                  });
+              }
+              const Tag = ({ text }: { text: string }) => (
+                <span className="ml-1.5 rounded-full bg-accent-soft px-1.5 py-px text-[9px] font-semibold normal-case tracking-normal text-accent-strong">{text}</span>
+              );
+              return (
                 <>
-                  <div>
-                    <p className="label-xs text-muted">Ma réserve</p>
-                    <p className="display num mt-1.5 text-xl font-bold leading-none sm:text-2xl lg:text-3xl">{formatEur(estimated)}</p>
-                    <p className="num mt-2 text-[10px] text-muted sm:text-xs">
-                      × {owned} · payé {formatEur(paid)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="label-xs text-muted">Plus-value</p>
-                    <p className={`display num mt-1.5 text-xl font-bold leading-none sm:text-2xl lg:text-3xl ${totalGain == null ? "text-faint" : totalGain > 0 ? "text-gain" : totalGain < 0 ? "text-loss" : ""}`}>
-                      {totalGain == null ? "—" : signed(totalGain)}
-                    </p>
-                    <p className="num mt-2 text-[10px] text-muted sm:text-xs">{gainPct != null ? <span className={gainPct >= 0 ? "text-gain" : "text-loss"}>{pct(gainPct)}</span> : "prix d'achat inconnu"}</p>
+                  <dl className="mt-5 divide-y divide-edge text-left sm:hidden">
+                    {stats.map((st) => (
+                      <div key={st.key} className="flex items-center justify-between gap-4 py-2.5">
+                        <div className="min-w-0">
+                          <dt className="label-xs text-muted">
+                            {st.label}
+                            {st.tag && <Tag text={st.tag} />}
+                          </dt>
+                          {st.sub && <dd className="num mt-0.5 text-[11px] text-muted">{st.sub}</dd>}
+                        </div>
+                        <dd className={`display num shrink-0 font-bold leading-none ${st.big ? "text-2xl" : "text-xl"} ${toneCls(st.tone)}`}>{st.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <div className="mt-6 hidden grid-cols-3 gap-3 text-left sm:grid lg:flex lg:flex-wrap lg:items-end lg:justify-start lg:gap-x-10 lg:gap-y-4">
+                    {stats.map((st) => (
+                      <div key={st.key}>
+                        <p className="label-xs text-muted">
+                          {st.label}
+                          {st.tag && <Tag text={st.tag} />}
+                        </p>
+                        <p className={`display num mt-1.5 font-bold leading-none ${st.big ? "text-3xl lg:text-[40px]" : "text-2xl lg:text-3xl"} ${toneCls(st.tone)}`}>{st.value}</p>
+                        {st.sub && <p className="num mt-2 text-xs text-muted">{st.sub}</p>}
+                      </div>
+                    ))}
                   </div>
                 </>
-              ) : (
-                <>
-                  {v30 != null && (
-                    <div>
-                      <p className="label-xs text-muted">30 jours</p>
-                      <p className={`display num mt-1.5 text-xl font-bold leading-none sm:text-2xl lg:text-3xl ${varTone(v30) === "gain" ? "text-gain" : varTone(v30) === "loss" ? "text-loss" : ""}`}>{pct(v30)}</p>
-                    </div>
-                  )}
-                  {usdEur != null && (
-                    <div>
-                      <p className="label-xs text-muted">Marché US</p>
-                      <p className="display num mt-1.5 text-xl font-bold leading-none sm:text-2xl lg:text-3xl">{formatEur(usdEur)}</p>
-                      <p className="num mt-2 text-[10px] text-muted sm:text-xs">{product.price_usd!.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $</p>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+              );
+            })()}
 
             <div className="mt-6 flex flex-wrap items-center justify-center gap-2 lg:justify-start">
               <AddForm productId={product.id} compact />
+              {owned > 0 && <ValueButton productId={product.id} owned={owned} cote={cote?.value ?? null} manual={manual} />}
               {product.cardmarket_id != null && (
                 <a href={cardmarketUrl({ idProduct: product.cardmarket_id, name: product.name })} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
                   Cardmarket <ExternalLink size={13} aria-hidden />

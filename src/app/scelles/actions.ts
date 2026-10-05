@@ -37,3 +37,29 @@ export async function removeSealedItem(formData: FormData): Promise<void> {
   await supabase.from("sealed_items").delete().eq("id", id);
   revalidatePath("/scelles");
 }
+
+export type SealedValueState = { ok: true } | { ok: false; error: string } | null;
+
+/**
+ * « Ma valeur » : prix unitaire que je fixe moi-même pour mes exemplaires d'un
+ * produit, à la place de la cote (`manual_price` sur chacun de mes lots).
+ * Vide, ou `clear=1` : retour à la cote. La RLS limite la mise à jour à mes lots.
+ */
+export async function setSealedValue(_prev: SealedValueState, formData: FormData): Promise<SealedValueState> {
+  const product_id = Number(formData.get("product_id"));
+  const raw = String(formData.get("value") ?? "").replace(",", ".").trim();
+  const clear = formData.get("clear") === "1";
+  const value = clear || !raw ? null : Number(raw);
+
+  if (!Number.isInteger(product_id) || product_id <= 0) return { ok: false, error: "Produit invalide." };
+  if (value != null && (!Number.isFinite(value) || value < 0)) return { ok: false, error: "Valeur invalide." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("sealed_items").update({ manual_price: value }).eq("product_id", product_id);
+  if (error) return { ok: false, error: "Enregistrement impossible, réessaie." };
+
+  revalidatePath("/scelles");
+  revalidatePath(`/scelles/produit/${product_id}`);
+  revalidatePath("/collection");
+  return { ok: true };
+}
