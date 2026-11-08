@@ -4,9 +4,9 @@
   "name": "30ᵉ Anniversaire",
   "serie": "Méga-Évolution",
   "logo": null,
-  "total": 158,
+  "total": 161,
   "releaseDate": "2026-09-16",
-  "cover": "https://assets.tcgdex.net/fr/me/30th/114"
+  "cover": "https://assets.tcgdex.net/fr/me/30th/116"
  },
  {
   "id": "me05",
@@ -63,15 +63,6 @@
   "cover": "https://assets.tcgdex.net/fr/me/me01/136"
  },
  {
-  "id": "sv10.5w",
-  "name": "Flamme Blanche",
-  "serie": "Écarlate et Violet",
-  "logo": "https://assets.tcgdex.net/fr/sv/sv10.5w/logo",
-  "total": 173,
-  "releaseDate": "2025-07-17",
-  "cover": "https://assets.tcgdex.net/fr/sv/sv10.5w/125"
- },
- {
   "id": "sv10.5b",
   "name": "Foudre Noire",
   "serie": "Écarlate et Violet",
@@ -79,6 +70,15 @@
   "total": 172,
   "releaseDate": "2025-07-17",
   "cover": "https://assets.tcgdex.net/fr/sv/sv10.5b/124"
+ },
+ {
+  "id": "sv10.5w",
+  "name": "Flamme Blanche",
+  "serie": "Écarlate et Violet",
+  "logo": "https://assets.tcgdex.net/fr/sv/sv10.5w/logo",
+  "total": 173,
+  "releaseDate": "2025-07-17",
+  "cover": "https://assets.tcgdex.net/fr/sv/sv10.5w/125"
  },
  {
   "id": "sv10",
