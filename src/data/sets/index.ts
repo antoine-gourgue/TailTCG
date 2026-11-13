@@ -45,6 +45,7 @@ export const SET_POOLS: Record<string, () => Promise<{ default: unknown }>> = {
   "me03": () => import("./me03.json"),
   "me04": () => import("./me04.json"),
   "me05": () => import("./me05.json"),
+  "me06": () => import("./me06.json"),
   "neo1": () => import("./neo1.json"),
   "neo2": () => import("./neo2.json"),
   "neo3": () => import("./neo3.json"),

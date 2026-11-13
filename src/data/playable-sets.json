@@ -1,5 +1,14 @@
 [
  {
+  "id": "me06",
+  "name": "Règne Delta",
+  "serie": "Méga-Évolution",
+  "logo": null,
+  "total": 141,
+  "releaseDate": "2026-11-06",
+  "cover": "https://assets.tcgdex.net/fr/me/me06/102"
+ },
+ {
   "id": "30th",
   "name": "30ᵉ Anniversaire",
   "serie": "Méga-Évolution",
