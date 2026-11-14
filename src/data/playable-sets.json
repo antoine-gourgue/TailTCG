@@ -639,51 +639,6 @@
   "cover": "https://assets.tcgdex.net/fr/bw/bw6/93"
  },
  {
-  "id": "bw5",
-  "name": "Explorateurs Obscurs",
-  "serie": "Noir & Blanc",
-  "logo": "https://assets.tcgdex.net/fr/bw/bw5/logo",
-  "total": 111,
-  "releaseDate": "2012-05-09",
-  "cover": "https://assets.tcgdex.net/fr/bw/bw5/80"
- },
- {
-  "id": "bw4",
-  "name": "Destinées Futures",
-  "serie": "Noir & Blanc",
-  "logo": "https://assets.tcgdex.net/fr/bw/bw4/logo",
-  "total": 103,
-  "releaseDate": "2012-02-08",
-  "cover": "https://assets.tcgdex.net/fr/bw/bw4/75"
- },
- {
-  "id": "bw3",
-  "name": "Nobles Victoires",
-  "serie": "Noir & Blanc",
-  "logo": "https://assets.tcgdex.net/fr/bw/bw3/logo",
-  "total": 102,
-  "releaseDate": "2011-11-16",
-  "cover": "https://assets.tcgdex.net/fr/bw/bw3/74"
- },
- {
-  "id": "bw2",
-  "name": "Pouvoirs Émergents",
-  "serie": "Noir & Blanc",
-  "logo": "https://assets.tcgdex.net/fr/bw/bw2/logo",
-  "total": 98,
-  "releaseDate": "2011-08-31",
-  "cover": "https://assets.tcgdex.net/fr/bw/bw2/71"
- },
- {
-  "id": "bw1",
-  "name": "Noir & Blanc",
-  "serie": "Noir & Blanc",
-  "logo": "https://assets.tcgdex.net/fr/bw/bw1/logo",
-  "total": 115,
-  "releaseDate": "2011-04-25",
-  "cover": "https://assets.tcgdex.net/fr/bw/bw1/83"
- },
- {
   "id": "hgss4",
   "name": "Triomphant",
   "serie": "HeartGold SoulSilver",
